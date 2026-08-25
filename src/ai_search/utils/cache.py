@@ -1,6 +1,6 @@
 """缓存层 —— Redis 实现（懒连接单例）。
 
-供限流（滑动窗口）、短信验证码存储、会话等共用。
+供限流（滑动窗口）、会话等共用。
 结果缓存（同 query+params）后续按 enable_cache 开关接入。
 """
 
@@ -72,7 +72,7 @@ class RedisCache(Cache):
         return bool(await r.exists(key))
 
     async def incr(self, key: str, ttl: int = 60) -> int:
-        """自增并设过期（用于限流计数、短信频控）。"""
+        """自增并设过期（用于限流计数）。"""
         r = await self._client()
         async with r.pipeline(transaction=True) as pipe:
             pipe.incr(key)

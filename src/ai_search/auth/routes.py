@@ -1,11 +1,9 @@
 """鉴权路由 —— /auth/* 端点。
 
-四种登录：
+登录方式：
   - POST /auth/register        邮箱+密码注册（注册即送免费额度）
   - POST /auth/login           邮箱+密码登录 → access+refresh
   - POST /auth/refresh         refresh token 换新 access
-  - POST /auth/sms/send        发送短信验证码（60s 频控）
-  - POST /auth/login/sms       手机号+验证码登录（首次自动建号）
   - GET  /auth/oauth/github    跳转 GitHub 授权
   - GET  /auth/oauth/github/callback   GitHub 回调 → 建/绑 OAuthAccount → 签发 JWT
   - GET  /auth/oauth/wechat    微信扫码（stub，501）
@@ -29,7 +27,6 @@ from .dependencies import get_current_user
 from .jwt_handler import create_access_token, create_refresh_token, decode_token
 from .oauth import GitHubOAuth, WeChatOAuth
 from .password import hash_password, verify_password
-from .sms import send_code, verify_code
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -58,15 +55,6 @@ class RefreshRequest(BaseModel):
     refresh_token: str
 
 
-class SMSSendRequest(BaseModel):
-    phone: str = Field(..., pattern=r"^\d{11}$")
-
-
-class SMSLoginRequest(BaseModel):
-    phone: str = Field(..., pattern=r"^\d{11}$")
-    code: str = Field(..., pattern=r"^\d{6}$")
-
-
 class UserInfo(BaseModel):
     id: str
     email: str | None = None
@@ -89,7 +77,7 @@ async def _touch_login(db: AsyncSession, user: User) -> None:
     user.last_login_at = datetime.now(timezone.utc)
 
 
-# 短信验证码登录与 OAuth 登录都会自动建号并发放免费额度；
+# OAuth 登录会自动建号并发放免费额度；
 # 为避免循环导入（billing.service 依赖鉴权层），这里用惰性导入发放额度。
 async def _grant_free_credits(db: AsyncSession, user: User) -> None:
     from ..billing.service import grant_credits  # noqa: WPS433 (惰性导入防循环)
@@ -191,45 +179,6 @@ async def refresh(req: RefreshRequest, db: AsyncSession = Depends(get_db)) -> To
     user = await db.get(User, payload["sub"])
     if not user or user.status != UserStatus.ACTIVE.value:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "用户不存在或已停用")
-    return _issue_tokens(user)
-
-
-# ---------- 手机号+短信 ----------
-
-
-@router.post("/sms/send", status_code=status.HTTP_202_ACCEPTED)
-async def sms_send(req: SMSSendRequest) -> dict:
-    """发送短信验证码。60s 频控由 send_code 内部保证。"""
-    try:
-        await send_code(req.phone)
-    except ValueError as e:  # 频控
-        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, str(e)) from e
-    return {"msg": "验证码已发送", "ttl": 300}
-
-
-@router.post("/login/sms", response_model=TokenResponse)
-async def login_sms(req: SMSLoginRequest, db: AsyncSession = Depends(get_db)) -> TokenResponse:
-    """手机号+验证码登录。首次登录自动建号并赠送免费额度。"""
-    if not await verify_code(req.phone, req.code):
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "验证码错误或已失效")
-
-    user = (
-        await db.execute(select(User).where(User.phone == req.phone))
-    ).scalar_one_or_none()
-    if not user:
-        user = User(
-            phone=req.phone,
-            role=UserRole.USER.value,
-            status=UserStatus.ACTIVE.value,
-        )
-        db.add(user)
-        await db.flush()
-        await _grant_free_credits(db, user)
-    elif user.status != UserStatus.ACTIVE.value:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "账号已被停用")
-
-    await _touch_login(db, user)
-    await db.commit()
     return _issue_tokens(user)
 
 

@@ -45,13 +45,6 @@ class Settings(BaseSettings):
     credit_cost_basic: int = 1     # basic 搜索扣 1
     credit_cost_advanced: int = 2  # advanced 搜索扣 2
 
-    # --- 商业化后端：短信验证码（实名制登录）---
-    sms_provider: str = "aliyun"   # aliyun | tencent
-    sms_access_key: str = ""
-    sms_secret_key: str = ""
-    sms_sign_name: str = ""
-    sms_template_code: str = ""
-
     # --- 商业化后端：OAuth ---
     oauth_github_client_id: str = ""
     oauth_github_client_secret: str = ""

@@ -6,10 +6,8 @@
 路由：
 - GET /                          营销首页（site_router，公开）
 - GET /dashboard/auth?token=xxx    OAuth/JWT 登录后落地：把 token 换成 session cookie → 302 到 /dashboard
-- GET /dashboard/login             登录页（手机+短信、GitHub、邮箱密码）
+- GET /dashboard/login             登录页（邮箱密码、GitHub OAuth）
 - POST /dashboard/login            邮箱密码登录 → 设 cookie → 302 /dashboard
-- POST /dashboard/login/sms        手机+短信登录 → 设 cookie → 302 /dashboard
-- POST /dashboard/sms/send         发送短信验证码
 - GET /dashboard/logout            清 cookie → 302 /dashboard/login
 - GET /dashboard                   主面板（余额/用量/快速搜索）
 - GET /dashboard/api-keys          API Key 管理
@@ -34,9 +32,8 @@ from ..auth.session import (
     read_session_cookie,
     set_session_cookie,
 )
-from ..auth.sms import send_code, verify_code
 from ..config import get_settings
-from ..db.models import User, UserRole, UserStatus
+from ..db.models import User, UserStatus
 from ..db.session import get_db
 
 logger = logging.getLogger(__name__)
@@ -90,7 +87,7 @@ async def auth_landing(
 
 @router.get("/login")
 async def login_page(request: Request) -> object:
-    """登录页（手机+短信 / 邮箱密码 / GitHub OAuth）。"""
+    """登录页（邮箱密码 / GitHub OAuth）。"""
     settings = get_settings()
     return templates.TemplateResponse(
         request,
@@ -118,51 +115,6 @@ async def login_submit(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "邮箱或密码错误")
     if user.status != UserStatus.ACTIVE.value:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "账号已被停用")
-    resp = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
-    set_session_cookie(resp, str(user.id))
-    return resp
-
-
-@router.post("/sms/send")
-async def dashboard_sms_send(phone: str = Form(...)) -> dict:
-    """Dashboard 内发送短信验证码。"""
-    try:
-        await send_code(phone)
-    except ValueError as e:
-        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, str(e)) from e
-    return {"msg": "验证码已发送"}
-
-
-@router.post("/login/sms")
-async def login_sms(
-    phone: str = Form(...),
-    code: str = Form(...),
-    db: AsyncSession = Depends(get_db),
-) -> RedirectResponse:
-    """手机+短信登录 → 设 cookie → /dashboard。首次自动建号。"""
-    if not await verify_code(phone, code):
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "验证码错误或已失效")
-    user = (
-        await db.execute(select(User).where(User.phone == phone))
-    ).scalar_one_or_none()
-    if not user:
-        user = User(
-            phone=phone,
-            role=UserRole.USER.value,
-            status=UserStatus.ACTIVE.value,
-        )
-        db.add(user)
-        await db.flush()
-        # 首次建号发免费额度
-        from ..billing.service import grant_credits
-
-        await grant_credits(
-            db, user_id=user.id, amount=get_settings().free_tier_credits,
-            tx_type="grant", remark="内测免费额度",
-        )
-    elif user.status != UserStatus.ACTIVE.value:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "账号已被停用")
-    await db.commit()
     resp = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
     set_session_cookie(resp, str(user.id))
     return resp
