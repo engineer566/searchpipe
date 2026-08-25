@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..auth.core import AuthContext
 from ..config import get_settings
+from ..db.models import UserRole
 from .service import InsufficientCreditsError, deduct_credits, refund_credits
 
 
@@ -44,9 +45,21 @@ async def charge_credits(
     """扣费（纯 DB）。余额不足抛 InsufficientCreditsError。
 
     生成 req_ref 供失败退款对账（remark 一致）。
+
+    admin/owner 免扣费：直接返回 cost=0 的结果，不碰 DB、不写消费流水。
+    退款路径 refund_credits_for 已对 cost<=0 短路，故 admin 失败也不写退款流水。
     """
-    cost = credit_cost(search_depth)
     req_ref = f"search:{uuid.uuid4().hex[:12]}"
+    if UserRole.is_admin(ctx.user.role):
+        return ChargeResult(
+            cost=0,
+            balance_after=0,
+            req_ref=req_ref,
+            user_id=ctx.user_id,
+            api_key_id=ctx.api_key_id,
+        )
+
+    cost = credit_cost(search_depth)
     balance = await deduct_credits(db, ctx.user_id, cost, remark=req_ref)
     return ChargeResult(
         cost=cost,

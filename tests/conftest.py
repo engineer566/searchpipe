@@ -99,3 +99,30 @@ def auth_headers(test_user_creds) -> dict:
 def api_key_headers(test_user_creds) -> dict:
     """带 API Key 的请求头。"""
     return {"Authorization": f"Bearer {test_user_creds['api_key']}"}
+
+
+def pytest_collection_modifyitems(config, items):  # noqa: ARG001
+    """固定测试文件执行顺序：httpx.ASGITransport（pytest session loop）文件先跑，
+    TestClient（线程 portal loop）文件后跑。
+
+    原因：test_mcp_server.py 在 pytest session loop 上跑 httpx+fastmcp；
+    test_search.py / test_admin_unlimited.py 用同步 TestClient（anyio portal 独立线程 loop）。
+    两者共用 db/base.py 模块级 engine 单例与 Redis cache 单例——asyncpg / redis.asyncio
+    连接 protocol 绑定首次使用它的 loop。实测：session-loop 文件先跑、TestClient 文件
+    后跑全绿（MCP teardown dispose 还原，TestClient 夹具再 rebind 适配自己 portal loop）；
+    反序（TestClient 先、session-loop 后）会在 MCP setup 的 Redis close 阶段触发
+    "Future attached to a different loop"。此处强制 session-loop 优先，保证全量 `pytest` 稳定。
+    """
+    import os.path
+
+    def _file_key(it) -> str:
+        # 归一化为 tests/<name>.py 形式（与 order 表的键一致）
+        rel = os.path.relpath(str(it.module.__file__), os.getcwd())
+        return rel.replace(os.sep, "/")
+
+    order = {
+        "tests/test_mcp_server.py": 0,
+        "tests/test_search.py": 1,
+        "tests/test_admin_unlimited.py": 2,
+    }
+    items.sort(key=lambda it: order.get(_file_key(it), 99))
