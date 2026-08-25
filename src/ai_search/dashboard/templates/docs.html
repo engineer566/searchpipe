@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}开发文档 · SearchPipe{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>开发文档</h1>
+  <p>认证方式、端点参数、响应结构与集成示例。</p>
+</div>
+
+<div class="card">
+  <h2>认证</h2>
+  <p class="card-sub">所有 API 调用需要认证。程序调用使用 API Key（<a href="/dashboard/api-keys">创建</a>），支持两种传递方式：</p>
+  <div class="code-block" data-copy><pre><code>Authorization: Bearer sp-你的密钥
+# 或
+X-API-Key: sp-你的密钥</code></pre></div>
+</div>
+
+<div class="card">
+  <h2>POST /search</h2>
+  <p class="card-sub">一次调用完成检索聚合 → 正文抓取 → LLM 重排 →（可选）AI 摘要。</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>参数</th><th>类型</th><th>默认</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td><code>query</code> <span class="tag tag-err">必填</span></td><td class="muted">string</td><td class="muted">—</td><td>搜索问题或关键词</td></tr>
+        <tr><td><code>max_results</code></td><td class="muted">int</td><td class="muted">5</td><td>返回结果数（1–20）</td></tr>
+        <tr><td><code>include_answer</code></td><td class="muted">bool</td><td class="muted">false</td><td>是否生成带引用的 AI 摘要</td></tr>
+        <tr><td><code>include_raw_content</code></td><td class="muted">bool</td><td class="muted">false</td><td>是否返回抓取的完整正文</td></tr>
+        <tr><td><code>search_depth</code></td><td class="muted">string</td><td class="muted">basic</td><td>搜索深度，影响扣费</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <h2>响应结构</h2>
+  <p class="card-sub">一次调用直接返回结构化结果，带相关性评分。</p>
+  <div class="code-block" data-copy><pre><code>{
+  "query": "FastAPI 怎么部署",
+  "answer": "FastAPI 可通过 uvicorn 部署，常见做法是配合 gunicorn…[0][2][3]",
+  "ai_generated": true,
+  "results": [
+    {
+      "url": "https://…",
+      "title": "…",
+      "content": "正文摘要片段…",
+      "score": 0.98,
+      "raw_content": "完整正文（仅 include_raw_content=true 时）"
+    }
+  ]
+}</code></pre></div>
+</div>
+
+<div class="card">
+  <h2>调用示例</h2>
+  <p class="card-sub">curl</p>
+  <div class="code-block mb" data-copy><pre><code>curl -X POST {{ request.base_url }}search \
+  -H "Authorization: Bearer sp-你的密钥" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"FastAPI 教程","max_results":5,"include_answer":true}'</code></pre></div>
+  <p class="card-sub">Python</p>
+  <div class="code-block mb" data-copy><pre><code>import httpx
+
+resp = httpx.post(
+    "{{ request.base_url }}search",
+    headers={"Authorization": "Bearer sp-你的密钥"},
+    json={"query": "FastAPI 教程", "max_results": 5, "include_answer": True},
+    timeout=60,
+)
+data = resp.json()
+print(data["answer"])
+for r in data["results"]:
+    print(r["score"], r["title"], r["url"])</code></pre></div>
+  <p class="card-sub">JavaScript</p>
+  <div class="code-block" data-copy><pre><code>const resp = await fetch("{{ request.base_url }}search", {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer sp-你的密钥",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({ query: "FastAPI 教程", max_results: 5, include_answer: true }),
+});
+const data = await resp.json();</code></pre></div>
+</div>
+
+<div class="card">
+  <h2>错误码</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>状态码</th><th>含义</th><th>处理建议</th></tr></thead>
+      <tbody>
+        <tr><td><code>400</code></td><td>输入/输出内容违规</td><td>调整查询内容；输出违规已自动退款</td></tr>
+        <tr><td><code>401</code></td><td>认证凭据缺失或无效</td><td>检查 API Key 是否正确、是否已吊销</td></tr>
+        <tr><td><code>402</code></td><td>积分不足</td><td><a href="/dashboard/billing">充值</a>后重试</td></tr>
+        <tr><td><code>429</code></td><td>触发限流</td><td>降低并发，稍后重试</td></tr>
+        <tr><td><code>502</code></td><td>检索源失败</td><td>已自动退款，可安全重试</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <h2>MCP 接入（Claude Code / Cursor）</h2>
+  <p class="card-sub">项目内置 MCP Server，搜索能力可作为工具直接给 AI 客户端使用：</p>
+  <div class="code-block" data-copy><pre><code># 项目内已配置 .mcp.json，Claude Code 中 /mcp 即可看到 SearchPipe
+# 工具名：ai_search_search（参数与 POST /search 一致）
+# 手动注册：
+uv run --directory /path/to/ai-search ai-search-mcp</code></pre></div>
+</div>
+{% endblock %}

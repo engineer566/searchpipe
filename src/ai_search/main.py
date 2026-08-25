@@ -1,0 +1,146 @@
+"""FastAPI 入口 —— 汇聚全部商业化后端模块。
+
+/search 端点依赖链（端点内显式调用，顺序明确）：
+  1. get_current_user_or_api_key  鉴权（JWT 或 API Key）
+  2. moderate_input               输入审核（命中违禁 400，不扣费）
+  3. charge_search                扣费（余额不足 402）
+  4. run_search                   搜索管线（零侵入）
+  5. check_output                 输出审核 + AI 标识
+  失败 → refund_search 退还（幂等）
+"""
+
+import logging
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+
+from .admin import router as admin_router
+from .api_keys import router as api_keys_router
+from .auth import router as auth_router
+from .auth.dependencies import AuthContext, get_current_user_or_api_key
+from .billing.dependencies import charge_search, refund_search
+from .billing.routes import router as billing_router
+from .billing.service import InsufficientCreditsError
+from .core.search_service import run_search
+from .dashboard import router as dashboard_router, site_router
+from .db.base import dispose_engine
+from .moderation.dependencies import moderate_input
+from .moderation.service import ModerationError, check_output
+from .payments import router as payments_router
+from .rate_limit import RateLimitMiddleware
+from .schemas import SearchRequest, SearchResponse
+from .usage import UsageLogMiddleware
+from .usage.routes import router as usage_router
+from .utils.logger import setup_logging
+
+setup_logging()
+logger = logging.getLogger(__name__)
+
+_STATIC_DIR = Path(__file__).parent / "dashboard" / "static"
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):  # noqa: ARG001
+    logger.info("SearchPipe 启动")
+    yield
+    logger.info("SearchPipe 关闭，释放 DB engine")
+    await dispose_engine()
+
+
+app = FastAPI(title="SearchPipe", version="0.2.0", lifespan=lifespan)
+
+# 中间件（外→内）：CORS → 限流 → 用量日志
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+app.add_middleware(UsageLogMiddleware)
+app.add_middleware(RateLimitMiddleware)
+
+# 静态资源（控制台 CSS/JS）
+app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
+
+# 路由器
+app.include_router(site_router)        # / 营销首页
+app.include_router(auth_router)        # /auth
+app.include_router(api_keys_router)    # /api-keys
+app.include_router(billing_router)     # /billing
+app.include_router(payments_router)    # /payments
+app.include_router(usage_router)       # /usage
+app.include_router(admin_router)       # /admin
+app.include_router(dashboard_router)   # /dashboard
+
+
+@app.get("/healthz")
+async def healthz() -> dict:
+    return {"status": "ok"}
+
+
+@app.post("/search", response_model=SearchResponse)
+async def search(
+    req: SearchRequest,
+    request: Request,
+    ctx: AuthContext = Depends(get_current_user_or_api_key),
+) -> SearchResponse:
+    """搜索 → 抓取 → 重排 → (可选摘要) → 输出审核 → 返回。
+
+    依赖链：鉴权 → 输入审核 → 扣费 → 搜索 → 输出审核/AI标识。
+    搜索失败退款（幂等）。
+    """
+    # 把搜索参数挂 state，供 UsageLog 中间件记录
+    request.state.search_query = req.query
+    request.state.search_max_results = req.max_results
+    request.state.search_depth = req.search_depth
+
+    # 1. 输入审核（命中违禁不扣费）
+    await moderate_input(req.query)
+
+    # 2. 扣费（需独立 session：扣费要提交，搜索不持有 db 事务）
+    from .db.base import async_session_factory
+
+    async with async_session_factory() as db:
+        try:
+            await charge_search(request, db, ctx, req.search_depth)
+            await db.commit()
+        except InsufficientCreditsError as e:
+            await db.rollback()
+            raise HTTPException(
+                status.HTTP_402_PAYMENT_REQUIRED,
+                f"积分不足：余额 {e.balance}，本次需要 {e.required}",
+            ) from e
+        except Exception:
+            await db.rollback()
+            raise
+
+    # 3. 搜索（管线零侵入）
+    try:
+        resp = await run_search(req)
+    except Exception as e:  # noqa: BLE001
+        logger.error("检索失败: %s", e)
+        # 退款
+        async with async_session_factory() as db:
+            await refund_search(request, db)
+            await db.commit()
+        raise HTTPException(status_code=502, detail=f"检索源失败: {e}") from e
+
+    # 4. 输出审核 + AI 标识（深度合成规定第16-17条）
+    if resp.answer:
+        try:
+            await check_output(resp.answer)
+        except ModerationError as e:
+            # 输出违规：退款（已扣费）
+            async with async_session_factory() as db:
+                await refund_search(request, db)
+                await db.commit()
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, f"输出内容违规: {e.labels}"
+            ) from e
+        resp.ai_generated = True
+
+    return resp

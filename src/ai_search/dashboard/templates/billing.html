@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}充值 · SearchPipe{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>充值与账单</h1>
+  <p>预付费充值，积分永久有效。内测期支付由虎皮椒过渡，后续接入官方商户。</p>
+</div>
+
+<div class="grid2 mb" style="align-items:start">
+  <div class="stat-card" style="padding:26px 28px">
+    <div class="stat-label">当前余额</div>
+    <div class="stat-value text-ok" style="font-size:38px">{{ balance }}</div>
+    <div class="stat-hint">积分 · 每次搜索按深度扣费，失败自动退款</div>
+  </div>
+  <div class="card" id="pending-card" style="display:none;margin:0">
+    <h2>待支付订单</h2>
+    <div id="pending-order"></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>充值套餐</h2>
+  <p class="card-sub">选择套餐后将跳转收银台完成支付，积分实时到账。</p>
+  <div class="pricing-grid" id="plans" style="max-width:none;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">
+    <div class="empty" style="grid-column:1/-1">加载中…</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>交易流水</h2>
+  {% if transactions %}
+  <div class="table-wrap mt">
+    <table>
+      <thead><tr><th>时间</th><th>类型</th><th>变动</th><th>余额</th><th>备注</th></tr></thead>
+      <tbody>
+      {% for t in transactions %}
+        <tr>
+          <td class="muted" style="white-space:nowrap">{{ t.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td>
+            {% if t.type=='recharge' %}<span class="tag tag-ok">充值</span>
+            {% elif t.type=='consume' %}<span class="tag tag-warn">消费</span>
+            {% elif t.type=='grant' %}<span class="tag tag-ok">赠送</span>
+            {% elif t.type=='refund' %}<span class="tag tag-ok">退款</span>
+            {% else %}<span class="tag tag-neutral">{{ t.type }}</span>{% endif %}
+          </td>
+          <td style="font-weight:600;font-variant-numeric:tabular-nums" class="{% if t.delta>0 %}text-ok{% else %}text-err{% endif %}">{{ '%+d'|format(t.delta) }}</td>
+          <td style="font-variant-numeric:tabular-nums">{{ t.balance_after }}</td>
+          <td class="muted">{{ t.remark or '—' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">暂无交易记录。</div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block script %}
+<script>
+// 加载套餐
+(async()=>{
+  const el=document.getElementById('plans');
+  try{
+    const plans=await AIS.api('/payments/packages');
+    if(!plans.length){ el.innerHTML='<div class="empty" style="grid-column:1/-1">暂无套餐（管理员未配置）</div>'; return; }
+    el.innerHTML=plans.map(p=>
+      '<div class="price-card"><h3>'+AIS.esc(p.name)+'</h3>'
+      +'<div class="price">¥'+p.price_yuan+'</div>'
+      +'<div class="muted" style="font-size:13px">'+p.credits+' 积分</div>'
+      +'<ul><li>积分永久有效</li><li>失败自动退款</li></ul>'
+      +'<button class="btn btn-block" onclick="buy(\''+p.id+'\',this)">购买</button></div>'
+    ).join('');
+  }catch(e){ el.innerHTML='<div class="empty" style="grid-column:1/-1">加载失败：'+AIS.esc(e.message)+'</div>'; }
+})();
+
+// 购买 → 创建订单 → 跳转支付页
+async function buy(planId,btn){
+  btn.disabled=true;
+  try{
+    const d=await AIS.api('/payments/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({plan_id:planId})});
+    document.getElementById('pending-card').style.display='block';
+    document.getElementById('pending-order').innerHTML='<div class="msg msg-ok" style="margin-top:10px">订单已创建（¥'+(d.amount_cents/100).toFixed(2)+' / '+d.credits+' 积分），<a href="'+d.pay_url+'" target="_blank" rel="noopener">点击前往支付 →</a></div>';
+    pollOrder(d.order_id);
+  }catch(e){ alert(e.message); }
+  finally{ btn.disabled=false; }
+}
+async function pollOrder(orderId){
+  for(let i=0;i<60;i++){
+    await new Promise(r=>setTimeout(r,3000));
+    try{
+      const d=await AIS.api('/payments/orders/'+orderId);
+      if(d.status==='paid'){
+        document.getElementById('pending-order').innerHTML='<div class="msg msg-ok" style="margin-top:10px">支付成功！积分已到账，正在刷新…</div>';
+        setTimeout(()=>location.reload(),2000);
+        return;
+      }
+    }catch(e){ /* 轮询失败继续 */ }
+  }
+}
+</script>
+{% endblock %}

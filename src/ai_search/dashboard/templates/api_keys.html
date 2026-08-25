@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}API Keys · SearchPipe{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>API Keys</h1>
+  <p>程序调用 <code>/search</code> 时使用 <code>sp-</code> 前缀的 Key 鉴权。明文仅在创建时显示一次，请妥善保存。</p>
+</div>
+
+<div class="card">
+  <h2>创建新 Key</h2>
+  <p class="card-sub">建议按环境区分命名，例如「生产环境」「本地调试」。</p>
+  <form id="create-form" class="row">
+    <input type="text" name="name" class="grow" placeholder="Key 名称" required>
+    <button type="submit" class="btn" id="create-btn">创建</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>我的 Keys</h2>
+  {% if keys %}
+  <div class="table-wrap mt">
+    <table>
+      <thead><tr><th>名称</th><th>前缀</th><th>最近使用</th><th>状态</th><th>创建时间</th><th></th></tr></thead>
+      <tbody>
+      {% for k in keys %}
+        <tr>
+          <td style="font-weight:500">{{ k.name }}</td>
+          <td><code>{{ k.key_prefix }}…</code></td>
+          <td class="muted">{{ k.last_used_at.strftime('%Y-%m-%d %H:%M') if k.last_used_at else '—' }}</td>
+          <td>{% if k.revoked_at %}<span class="tag tag-err">已吊销</span>{% else %}<span class="tag tag-ok">有效</span>{% endif %}</td>
+          <td class="muted">{{ k.created_at.strftime('%Y-%m-%d') }}</td>
+          <td style="text-align:right">{% if not k.revoked_at %}<button class="btn btn-danger btn-sm revoke-btn" data-id="{{ k.id }}">吊销</button>{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">还没有 API Key，先在上方创建一个吧。</div>
+  {% endif %}
+</div>
+
+<!-- 新 Key 模态 -->
+<div class="modal-mask" id="key-modal">
+  <div class="modal">
+    <h3>Key 已创建</h3>
+    <p class="muted" style="font-size:14px;margin:0 0 14px">请立即复制保存——出于安全考虑，完整 Key 不会再显示。</p>
+    <div class="code-block" data-copy><pre><code id="new-key-val"></code></pre></div>
+    <div class="row mt" style="justify-content:flex-end">
+      <button class="btn" onclick="location.reload()">我已保存</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block script %}
+<script>
+// 创建 Key
+document.getElementById('create-form').onsubmit=async e=>{
+  e.preventDefault();
+  const btn=document.getElementById('create-btn');
+  const name=new FormData(e.target).get('name');
+  btn.disabled=true;
+  try{
+    const d=await AIS.api('/api-keys',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name})});
+    document.getElementById('new-key-val').textContent=d.key;
+    const m=document.getElementById('key-modal');
+    m.classList.add('open');
+    AIS.initCopyBlocks();
+  }catch(e){ alert(e.message); }
+  finally{ btn.disabled=false; }
+};
+// 吊销
+document.querySelectorAll('.revoke-btn').forEach(b=>b.onclick=async()=>{
+  if(!confirm('确认吊销此 Key？吊销后立即失效且无法恢复。')) return;
+  try{ await AIS.api('/api-keys/'+b.dataset.id,{method:'DELETE'}); location.reload(); }
+  catch(e){ alert(e.message); }
+});
+</script>
+{% endblock %}

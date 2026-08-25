@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block title %}SearchPipe 控制台{% endblock %}</title>
+<script>
+// 防主题闪烁：渲染前决定主题
+(function(){try{var t=localStorage.getItem('searchpipe-theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
+</script>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand"><a href="/">🔍 SearchPipe</a></div>
+    <nav class="side-nav">
+      <a href="/dashboard" class="{% if active=='home' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/></svg>
+        概览</a>
+      <a href="/dashboard/api-keys" class="{% if active=='keys' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="m11 12 9-9"/><path d="m16 5 3 3"/></svg>
+        API Keys</a>
+      <a href="/dashboard/usage" class="{% if active=='usage' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15v3M12 10v8M17 6v12"/></svg>
+        用量</a>
+      <a href="/dashboard/billing" class="{% if active=='billing' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+        充值</a>
+      <a href="/dashboard/docs" class="{% if active=='docs' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        文档</a>
+    </nav>
+    <div class="side-foot">
+      <button class="theme-toggle" type="button"><span class="tt-icon"></span><span class="tt-label"></span></button>
+      <div class="side-user" title="{{ user.email or user.phone }}">{{ user.email or user.phone }}</div>
+      <a href="/dashboard/logout" class="muted" style="padding:0 12px;font-size:13px">退出登录</a>
+    </div>
+  </aside>
+
+  <div class="topbar">
+    <span class="brand">🔍 SearchPipe</span>
+    <a href="/dashboard" class="{% if active=='home' %}active{% endif %}">概览</a>
+    <a href="/dashboard/api-keys" class="{% if active=='keys' %}active{% endif %}">Keys</a>
+    <a href="/dashboard/usage" class="{% if active=='usage' %}active{% endif %}">用量</a>
+    <a href="/dashboard/billing" class="{% if active=='billing' %}active{% endif %}">充值</a>
+    <a href="/dashboard/docs" class="{% if active=='docs' %}active{% endif %}">文档</a>
+    <span style="flex:1"></span>
+    <button class="theme-toggle" type="button" style="width:auto;padding:5px 10px"><span class="tt-icon"></span></button>
+    <a href="/dashboard/logout">退出</a>
+  </div>
+
+  <main class="main">
+    <div class="main-inner">
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+</div>
+<script src="/static/app.js"></script>
+{% block script %}{% endblock %}
+</body>
+</html>

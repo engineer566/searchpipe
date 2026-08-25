@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}概览 · SearchPipe{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>概览</h1>
+  <p>欢迎回来，{{ user.email or user.phone }}</p>
+</div>
+
+<div class="stat-grid mb">
+  <div class="stat-card">
+    <div class="stat-label">积分余额</div>
+    <div class="stat-value text-ok">{{ balance }}</div>
+    <div class="stat-hint"><a href="/dashboard/billing">去充值 →</a></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">近 30 天调用</div>
+    <div class="stat-value" id="stat-calls">—</div>
+    <div class="stat-hint">次搜索请求</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">近 30 天消耗</div>
+    <div class="stat-value" id="stat-credits">—</div>
+    <div class="stat-hint">积分</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>快速搜索</h2>
+  <p class="card-sub">在线体验完整管线：检索 → 抓取 → LLM 重排 → 摘要（消耗积分，与 API 调用同价）</p>
+  <form id="quick-search">
+    <div class="row">
+      <input type="text" id="q" class="grow" placeholder="输入你的问题，例如：FastAPI 怎么部署" required>
+      <label style="display:flex;gap:6px;align-items:center;flex-shrink:0;font-weight:500"><input type="checkbox" id="ans" checked style="width:auto"> AI 摘要</label>
+      <button type="submit" class="btn" id="qs-btn">搜索</button>
+    </div>
+  </form>
+  <div id="qs-status" class="muted" style="margin-top:12px;font-size:13px;min-height:1.2em"></div>
+  <div id="qs-out"></div>
+</div>
+
+<div class="card">
+  <h2>快速上手</h2>
+  <p class="card-sub">程序调用请使用 API Key（<a href="/dashboard/api-keys">创建 Key</a>），详细参数见<a href="/dashboard/docs">开发文档</a>。</p>
+  <div class="code-block" data-copy><pre><code>curl -X POST {{ request.base_url }}search \
+  -H "Authorization: Bearer sp-你的密钥" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"FastAPI 教程","max_results":5,"include_answer":true}'</code></pre></div>
+</div>
+{% endblock %}
+{% block script %}
+<script>
+// 近 30 天统计
+(async()=>{
+  try{
+    const end=new Date(), start=new Date(end.getTime()-30*864e5);
+    const d=await AIS.api('/usage?granularity=day&start='+start.toISOString()+'&end='+end.toISOString());
+    const calls=d.points.reduce((s,p)=>s+p.count,0);
+    const credits=d.points.reduce((s,p)=>s+p.credits,0);
+    document.getElementById('stat-calls').textContent=calls;
+    document.getElementById('stat-credits').textContent=credits;
+  }catch(e){ /* 静默：统计失败不影响主功能 */ }
+})();
+
+// 快速搜索
+document.getElementById('quick-search').onsubmit=async e=>{
+  e.preventDefault();
+  const q=document.getElementById('q').value.trim();
+  if(!q) return;
+  const btn=document.getElementById('qs-btn'),st=document.getElementById('qs-status'),out=document.getElementById('qs-out');
+  btn.disabled=true; st.textContent='搜索中…通常需要 10–30 秒'; out.innerHTML='';
+  try{
+    const d=await AIS.api('/search',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({query:q,max_results:5,include_answer:document.getElementById('ans').checked})});
+    st.textContent='共 '+d.results.length+' 条结果';
+    let html='';
+    if(d.answer){
+      html+='<div class="card" style="border-left:3px solid var(--ok);margin:16px 0">'
+        +'<div class="stat-label" style="color:var(--ok);font-weight:600">AI 摘要'+(d.ai_generated?'<span class="tag tag-neutral" style="margin-left:8px">AI 生成</span>':'')+'</div>'
+        +'<div style="line-height:1.7;white-space:pre-wrap;font-size:14.5px">'+AIS.esc(d.answer)+'</div></div>';
+    }
+    html+=d.results.map(r=>
+      '<div class="card" style="margin:12px 0;padding:16px 20px">'
+      +'<div class="row" style="align-items:flex-start"><a href="'+AIS.esc(r.url)+'" target="_blank" rel="noopener" style="font-weight:600;font-size:15px" class="grow">'+AIS.esc(r.title||r.url)+'</a>'
+      +'<span class="tag tag-ok">'+Number(r.score).toFixed(2)+'</span></div>'
+      +'<div class="faint mono" style="font-size:12px;margin:5px 0 8px;word-break:break-all">'+AIS.esc(r.url)+'</div>'
+      +'<div class="muted" style="font-size:14px;line-height:1.6">'+AIS.esc(r.content)+'</div></div>'
+    ).join('');
+    out.innerHTML=html;
+  }catch(e){
+    st.textContent='';
+    out.innerHTML='<div class="msg msg-err">'+AIS.esc(e.message)+'</div>';
+  }finally{ btn.disabled=false; }
+};
+</script>
+{% endblock %}

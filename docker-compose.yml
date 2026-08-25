@@ -1,0 +1,77 @@
+services:
+  searxng:
+    image: searxng/searxng:latest
+    container_name: ai-search-searxng
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./searxng:/etc/searxng:rw
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8080/
+      - SEARXNG_SECRET=${SEARXNG_SECRET:-please-change-this-secret}
+    restart: unless-stopped
+    networks:
+      - ai-search-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: ai-search-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - ai-search-net
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: ai-search-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=ai
+      - POSTGRES_USER=ai
+      - POSTGRES_PASSWORD=ai
+    volumes:
+      - ai-search-pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ai -d ai"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - ai-search-net
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ai-search:latest
+    container_name: ai-search-app
+    ports:
+      # 宿主机 8000 被 docparse 占用，映射到 8001
+      - "8001:8000"
+    env_file:
+      - .env
+    environment:
+      # 容器内通过服务名访问同网络的 searxng / redis / postgres，覆盖 .env 里的 localhost
+      - SEARXNG_URL=http://searxng:8080
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql+asyncpg://ai:ai@postgres:5432/ai
+    depends_on:
+      searxng:
+        condition: service_started
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - ai-search-net
+
+volumes:
+  ai-search-pgdata:
+
+networks:
+  ai-search-net:
+    driver: bridge

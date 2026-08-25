@@ -1,0 +1,246 @@
+"""管理后台路由 —— /admin/* 。
+
+全部 Depends(get_current_admin)（role ∈ {owner, admin}）。
+- GET   /admin/users            用户列表
+- PATCH /admin/users/{id}       改 role/status
+- GET   /admin/credits          全平台积分概览
+- POST  /admin/credits/grant    手动发放额度
+- GET   /admin/orders           订单总览
+- GET   /admin/stats            概览统计
+"""
+
+import logging
+import uuid
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..auth.dependencies import get_current_admin
+from ..billing.service import grant_credits
+from ..db.models import CreditAccount, Order, OrderStatus, UsageLog, User
+from ..db.session import get_db
+
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+# ---------- Schemas ----------
+
+
+class AdminUserItem(BaseModel):
+    id: str
+    email: str | None
+    phone: str | None
+    role: str
+    status: str
+    created_at: datetime
+    last_login_at: datetime | None
+
+
+class AdminUserListResponse(BaseModel):
+    items: list[AdminUserItem]
+    total: int
+    page: int
+    size: int
+
+
+class UpdateUserRequest(BaseModel):
+    role: str | None = None  # owner/admin/member/user
+    status: str | None = None  # active/suspended
+
+
+class GrantCreditsRequest(BaseModel):
+    user_id: str
+    amount: int
+    remark: str | None = "管理员发放"
+
+
+class GrantCreditsResponse(BaseModel):
+    user_id: str
+    balance: int
+
+
+class AdminOrderItem(BaseModel):
+    id: str
+    user_id: str
+    credits: int
+    amount_cents: int
+    status: str
+    provider: str
+    provider_order_id: str | None
+    paid_at: datetime | None
+    created_at: datetime
+
+
+class AdminStatsResponse(BaseModel):
+    user_count: int
+    active_user_count: int
+    total_balance: int
+    total_searches: int
+    total_revenue_cents: int
+    paid_order_count: int
+
+
+# ---------- 用户管理 ----------
+
+
+@router.get("/users", response_model=AdminUserListResponse)
+async def list_users(
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> AdminUserListResponse:
+    total = (await db.execute(select(func.count()).select_from(User))).scalar_one()
+    stmt = (
+        select(User)
+        .order_by(User.created_at.desc())
+        .offset((page - 1) * size)
+        .limit(size)
+    )
+    users = (await db.execute(stmt)).scalars().all()
+    return AdminUserListResponse(
+        items=[
+            AdminUserItem(
+                id=str(u.id),
+                email=u.email,
+                phone=u.phone,
+                role=u.role,
+                status=u.status,
+                created_at=u.created_at,
+                last_login_at=u.last_login_at,
+            )
+            for u in users
+        ],
+        total=total,
+        page=page,
+        size=size,
+    )
+
+
+@router.patch("/users/{user_id}")
+async def update_user(
+    user_id: str,
+    req: UpdateUserRequest,
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    user = await db.get(User, user_id)
+    if not user:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "用户不存在")
+    if req.role is not None:
+        if req.role not in ("owner", "admin", "member", "user"):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "非法 role")
+        user.role = req.role
+    if req.status is not None:
+        if req.status not in ("active", "suspended"):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "非法 status")
+        user.status = req.status
+    await db.commit()
+    return {"msg": "已更新", "role": user.role, "status": user.status}
+
+
+# ---------- 积分管理 ----------
+
+
+@router.get("/credits")
+async def credits_overview(
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """全平台积分总余额 + 账户数。"""
+    total = (
+        await db.execute(select(func.coalesce(func.sum(CreditAccount.balance), 0)))
+    ).scalar_one()
+    count = (await db.execute(select(func.count()).select_from(CreditAccount))).scalar_one()
+    return {"total_balance": int(total), "account_count": count}
+
+
+@router.post("/credits/grant", response_model=GrantCreditsResponse)
+async def grant_credits_admin(
+    req: GrantCreditsRequest,
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> GrantCreditsResponse:
+    """管理员手动发放额度。"""
+    if req.amount <= 0:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "发放金额必须为正")
+    user = await db.get(User, req.user_id)
+    if not user:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "用户不存在")
+    balance = await grant_credits(
+        db, user_id=user.id, amount=req.amount, tx_type="grant", remark=req.remark
+    )
+    await db.commit()
+    return GrantCreditsResponse(user_id=str(user.id), balance=balance)
+
+
+# ---------- 订单 ----------
+
+
+@router.get("/orders", response_model=list[AdminOrderItem])
+async def list_orders(
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> list[AdminOrderItem]:
+    stmt = (
+        select(Order)
+        .order_by(Order.created_at.desc())
+        .offset((page - 1) * size)
+        .limit(size)
+    )
+    orders = (await db.execute(stmt)).scalars().all()
+    return [
+        AdminOrderItem(
+            id=str(o.id),
+            user_id=str(o.user_id),
+            credits=o.credits,
+            amount_cents=o.amount_cents,
+            status=o.status,
+            provider=o.provider,
+            provider_order_id=o.provider_order_id,
+            paid_at=o.paid_at,
+            created_at=o.created_at,
+        )
+        for o in orders
+    ]
+
+
+# ---------- 统计 ----------
+
+
+@router.get("/stats", response_model=AdminStatsResponse)
+async def stats(
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> AdminStatsResponse:
+    """概览统计：用户数、总积分、总搜索、收入。"""
+    user_count = (await db.execute(select(func.count()).select_from(User))).scalar_one()
+    active_user_count = (
+        await db.execute(select(func.count()).select_from(User).where(User.status == "active"))
+    ).scalar_one()
+    total_balance = (
+        await db.execute(select(func.coalesce(func.sum(CreditAccount.balance), 0)))
+    ).scalar_one()
+    total_searches = (
+        await db.execute(select(func.count()).select_from(UsageLog))
+    ).scalar_one()
+    paid_orders = (
+        await db.execute(
+            select(func.count(), func.coalesce(func.sum(Order.amount_cents), 0))
+            .where(Order.status == OrderStatus.PAID.value)
+        )
+    ).one()
+    return AdminStatsResponse(
+        user_count=user_count,
+        active_user_count=active_user_count,
+        total_balance=int(total_balance),
+        total_searches=total_searches,
+        total_revenue_cents=int(paid_orders[1]),
+        paid_order_count=paid_orders[0],
+    )

@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}用量 · SearchPipe{% endblock %}
+{% block content %}
+<div class="page-head row" style="align-items:flex-end">
+  <div class="grow">
+    <h1>用量统计</h1>
+    <p>调用次数、积分消耗与请求明细，支持导出对账。</p>
+  </div>
+  <a class="btn btn-ghost btn-sm" href="/usage/export" download>导出 CSV</a>
+</div>
+
+<div class="card">
+  <div class="row" style="align-items:center;margin-bottom:14px">
+    <h2 class="grow" style="margin:0">调用趋势</h2>
+    <div class="tabs" style="width:180px">
+      <button type="button" class="gran-btn active" data-gran="day">按天</button>
+      <button type="button" class="gran-btn" data-gran="hour">按小时</button>
+    </div>
+  </div>
+  <div id="chart"><div class="empty">加载中…</div></div>
+</div>
+
+<div class="card">
+  <h2>请求明细</h2>
+  <p class="card-sub">最近的搜索调用记录。</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>时间</th><th>查询</th><th>结果数</th><th>深度</th><th>消耗</th><th>耗时</th><th>状态</th></tr></thead>
+      <tbody id="logs-body"><tr><td colspan="7" class="empty">加载中…</td></tr></tbody>
+    </table>
+  </div>
+  <div class="row mt" style="justify-content:flex-end">
+    <span class="muted" id="page-info" style="font-size:13px"></span>
+    <button class="btn btn-ghost btn-sm" id="prev-page">上一页</button>
+    <button class="btn btn-ghost btn-sm" id="next-page">下一页</button>
+  </div>
+</div>
+{% endblock %}
+{% block script %}
+<script>
+let gran='day', page=1, size=15, total=0;
+
+async function loadChart(){
+  const el=document.getElementById('chart');
+  el.innerHTML='<div class="empty">加载中…</div>';
+  try{
+    const end=new Date();
+    const start=new Date(end.getTime()-(gran==='day'?30:2)*864e5);
+    const d=await AIS.api('/usage?granularity='+gran+'&start='+start.toISOString()+'&end='+end.toISOString());
+    AIS.renderBarChart(el,d.points,{key:'count',granularity:gran});
+  }catch(e){ el.innerHTML='<div class="empty">加载失败：'+AIS.esc(e.message)+'</div>'; }
+}
+
+async function loadLogs(){
+  const tb=document.getElementById('logs-body');
+  tb.innerHTML='<tr><td colspan="7" class="empty">加载中…</td></tr>';
+  try{
+    const d=await AIS.api('/usage/logs?page='+page+'&size='+size);
+    total=d.total;
+    if(!d.items.length){
+      tb.innerHTML='<tr><td colspan="7" class="empty">暂无调用记录</td></tr>';
+    }else{
+      tb.innerHTML=d.items.map(it=>{
+        const t=new Date(it.created_at);
+        const ts=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0')+' '+String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0');
+        const status=it.status==='ok'?'<span class="tag tag-ok">成功</span>':'<span class="tag tag-err" title="'+AIS.esc(it.error_msg||'')+'">失败</span>';
+        return '<tr><td class="muted" style="white-space:nowrap">'+ts+'</td>'
+          +'<td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+AIS.esc(it.query)+'">'+AIS.esc(it.query)+'</td>'
+          +'<td>'+it.max_results+'</td><td class="muted">'+AIS.esc(it.search_depth)+'</td>'
+          +'<td>'+it.credits_consumed+'</td>'
+          +'<td class="muted">'+(it.latency_ms!=null?(it.latency_ms/1000).toFixed(1)+'s':'—')+'</td>'
+          +'<td>'+status+'</td></tr>';
+      }).join('');
+    }
+    const pages=Math.max(1,Math.ceil(total/size));
+    document.getElementById('page-info').textContent='第 '+page+' / '+pages+' 页 · 共 '+total+' 条';
+    document.getElementById('prev-page').disabled=page<=1;
+    document.getElementById('next-page').disabled=page>=pages;
+  }catch(e){ tb.innerHTML='<tr><td colspan="7" class="empty">加载失败：'+AIS.esc(e.message)+'</td></tr>'; }
+}
+
+document.querySelectorAll('.gran-btn').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.gran-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active'); gran=b.dataset.gran; loadChart();
+});
+document.getElementById('prev-page').onclick=()=>{ if(page>1){page--;loadLogs();} };
+document.getElementById('next-page').onclick=()=>{ page++; loadLogs(); };
+
+loadChart(); loadLogs();
+</script>
+{% endblock %}

@@ -1,0 +1,34 @@
+# 版本控制与密钥
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+
+# Python 缓存与虚拟环境
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+.pytest_cache/
+dist/
+build/
+
+# 本地工具与编辑器
+.vscode/
+.idea/
+*.swp
+.mcp.json
+
+# 文档与笔记（不影响运行镜像）
+PROGRESS.md
+*.md
+!README.md
+
+# 测试
+tests/
+
+# 已容器化的依赖服务配置不入应用镜像（由 compose 单独挂载）
+# searxng/  docker-compose.yml 不 COPY 进应用镜像
+searxng/

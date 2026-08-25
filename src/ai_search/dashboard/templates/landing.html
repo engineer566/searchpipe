@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SearchPipe — 为 AI 而生的搜索 API</title>
+<meta name="description" content="一次调用完成检索、抓取、重排与摘要，直接为 LLM/RAG 提供结构化搜索结果。">
+<script>
+(function(){try{var t=localStorage.getItem('searchpipe-theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
+</script>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+
+<nav class="site-nav">
+  <a class="brand" href="/">🔍 SearchPipe</a>
+  <div class="nav-links">
+    <a href="#features">产品</a>
+    <a href="#api">API</a>
+    <a href="#pricing">定价</a>
+    <a href="/dashboard/docs">文档</a>
+  </div>
+  <div class="nav-actions">
+    <button class="theme-toggle" type="button" style="width:auto"><span class="tt-icon"></span><span class="tt-label"></span></button>
+    <a href="/dashboard/login" class="btn btn-ghost btn-sm">登录</a>
+    <a href="/dashboard/login" class="btn btn-sm">免费开始</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <span class="eyebrow">自建可控 · 面向 LLM/RAG · 开箱即用</span>
+  <h1>为 AI 而生的搜索 API</h1>
+  <p class="lead">一次调用，完成检索聚合、正文抓取、LLM 重排与摘要生成——直接返回大模型可消费的结构化结果，省去你自己维护爬虫和清洗管线。</p>
+  <div class="cta-row">
+    <a href="/dashboard/login" class="btn btn-lg">获取 API Key</a>
+    <a href="/dashboard/docs" class="btn btn-ghost btn-lg">查看文档</a>
+  </div>
+  <div class="code-block hero-code" data-copy><pre><code>curl -X POST https://searchpipe.tech/search \
+  -H "Authorization: Bearer sp-你的API密钥" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"FastAPI 怎么部署","max_results":5,"include_answer":true}'</code></pre></div>
+</header>
+
+<section class="section" id="features">
+  <div class="section-head">
+    <h2>一个端点，整条管线</h2>
+    <p>你发一个 query，我们在后台跑完搜索、抓取、打分、摘要四步，返回带相关性评分的干净结果。</p>
+  </div>
+  <div class="pipeline">
+    <div class="step"><div class="step-no">01</div><h3>多引擎检索</h3><p>聚合多个搜索引擎，自建可控，零第三方 API 费用。</p></div>
+    <div class="step"><div class="step-no">02</div><h3>正文抓取清洗</h3><p>自动抓取 Top-N 页面并提取正文，过滤导航、广告与噪声。</p></div>
+    <div class="step"><div class="step-no">03</div><h3>LLM 重排</h3><p>大模型按查询意图打相关性分（0–1），最相关的结果排在前面。</p></div>
+    <div class="step"><div class="step-no">04</div><h3>AI 摘要</h3><p>可选生成带引用标注的直接答案，RAG 场景开箱即用。</p></div>
+  </div>
+</section>
+
+<section class="section" id="api">
+  <div class="section-head">
+    <h2>为 Agent 和 RAG 设计</h2>
+    <p>一次调用直接拿到结构化结果；同时提供 MCP Server，Claude 等客户端可作为工具直接调用。</p>
+  </div>
+  <div class="grid2" style="align-items:start">
+    <div class="code-block" data-copy><pre><code>{
+  "query": "FastAPI 怎么部署",
+  "answer": "FastAPI 可通过 uvicorn 部署，
+    常见做法是配合 gunicorn…[0][2][3]",
+  "results": [
+    {
+      "url": "https://…",
+      "title": "…",
+      "content": "摘要片段…",
+      "score": 0.98
+    }
+  ]
+}</code></pre></div>
+    <div class="feature-grid" style="grid-template-columns:1fr">
+      <div class="feature">
+        <div class="f-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg></div>
+        <h3>一次调用，直接可用</h3>
+        <p>不再需要自己拼装搜索 API、爬虫、正文提取和排序模型，平均为你节省整条数据管线的维护成本。</p>
+      </div>
+      <div class="feature">
+        <div class="f-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="m8 10-2 2 2 2m4 0 2-2-2-2"/></svg></div>
+        <h3>MCP / Skill 原生支持</h3>
+        <p>内置 MCP Server，Claude Code、Cursor 等客户端零改造接入，搜索即工具。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="pricing">
+  <div class="section-head">
+    <h2>简单透明的积分制</h2>
+    <p>预付费充值，积分永久有效。注册即送免费额度，先跑通再付费。</p>
+  </div>
+  <div class="pricing-grid">
+    <div class="price-card">
+      <h3>免费额度</h3>
+      <div class="price">¥0</div>
+      <ul>
+        <li>注册即送内测积分</li>
+        <li>完整 API 能力</li>
+        <li>适合接入验证</li>
+      </ul>
+      <a href="/dashboard/login" class="btn btn-ghost btn-block">立即注册</a>
+    </div>
+    <div class="price-card featured">
+      <h3>按需充值</h3>
+      <div class="price">积分制</div>
+      <ul>
+        <li>按次扣费，失败自动退款</li>
+        <li>余额与流水实时可查</li>
+        <li>用量明细支持 CSV 导出</li>
+      </ul>
+      <a href="/dashboard/login" class="btn btn-block">开始充值</a>
+    </div>
+  </div>
+</section>
+
+<footer class="site-footer">
+  🔍 SearchPipe · 自建 AI 搜索 · 检索 → 抓取 → LLM 重排/摘要
+</footer>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
