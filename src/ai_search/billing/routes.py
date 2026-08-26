@@ -26,6 +26,7 @@ router = APIRouter(prefix="/billing", tags=["billing"])
 class BalanceResponse(BaseModel):
     balance: int
     free_tier_credits: int
+    unlimited: bool = False  # admin/owner 免扣费
 
 
 class TxItem(BaseModel):
@@ -69,6 +70,7 @@ async def balance(
     return BalanceResponse(
         balance=await get_balance(db, user.id),
         free_tier_credits=get_settings().free_tier_credits,
+        unlimited=user.role in ("owner", "admin"),
     )
 
 

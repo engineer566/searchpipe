@@ -30,6 +30,7 @@ from .billing.service import InsufficientCreditsError
 from .config import get_settings
 from .core.search_service import run_search
 from .db.base import async_session_factory
+from .db.models import UserRole
 from .moderation.service import ModerationError, check_input, check_output
 from .rate_limit.service import RateLimitExceeded, check_rate_limit
 from .schemas import SearchRequest, SearchResponse
@@ -124,10 +125,12 @@ async def ai_search_search(
             except AuthError as e:
                 raise ToolError(f"API Key 无效或已吊销: {e}") from e
 
-            try:
-                await check_rate_limit(f"key:{raw[:8]}")
-            except RateLimitExceeded as e:
-                raise ToolError(str(e)) from e
+            # 限流（admin/owner 豁免）
+            if not UserRole.is_admin(ctx.user.role):
+                try:
+                    await check_rate_limit(f"key:{raw[:8]}")
+                except RateLimitExceeded as e:
+                    raise ToolError(str(e)) from e
 
             # 输入审核（命中违禁不扣费）
             try:
@@ -135,7 +138,8 @@ async def ai_search_search(
             except ModerationError as e:
                 raise ToolError(f"输入内容违规: {e.labels}") from e
 
-            # 扣费（独立提交：搜索不持有 db 事务，镜像 /search 设计）
+            # 扣费（独立提交：搜索不持有 db 事务，镜像 /search 设计；
+            #   admin 已在 charge_credits 内短路为 cost=0）
             try:
                 charge = await charge_credits(db, ctx, req.search_depth)
                 await db.commit()

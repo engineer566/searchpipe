@@ -3,9 +3,10 @@
 /search 端点依赖链（端点内显式调用，顺序明确）：
   1. get_current_user_or_api_key  鉴权（JWT 或 API Key）
   2. moderate_input               输入审核（命中违禁 400，不扣费）
-  3. charge_search                扣费（余额不足 402）
-  4. run_search                   搜索管线（零侵入）
-  5. check_output                 输出审核 + AI 标识
+  3. check_rate_limit             限流（admin/owner 豁免，超限 429）
+  4. charge_search                扣费（余额不足 402；admin 已在 charge_credits 短路）
+  5. run_search                   搜索管线（零侵入）
+  6. check_output                 输出审核 + AI 标识
   失败 → refund_search 退还（幂等）
 """
 
@@ -27,11 +28,12 @@ from .billing.service import InsufficientCreditsError
 from .core.search_service import run_search
 from .dashboard import router as dashboard_router, site_router
 from .db.base import dispose_engine
+from .db.models import UserRole
 from .moderation.dependencies import moderate_input
 from .moderation.service import ModerationError, check_output
 from .mcp_server import mcp as mcp_server_obj
 from .payments import router as payments_router
-from .rate_limit import RateLimitMiddleware
+from .rate_limit.service import WINDOW_SEC, RateLimitExceeded, check_rate_limit
 from .schemas import SearchRequest, SearchResponse
 from .usage import UsageLogMiddleware
 from .usage.routes import router as usage_router
@@ -60,7 +62,8 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
 
 app = FastAPI(title="SearchPipe", version="0.2.0", lifespan=lifespan)
 
-# 中间件（外→内）：CORS → 限流 → 用量日志
+# 中间件（外→内）：CORS → 用量日志
+# 限流已下沉到 /search 端点内（需 ctx.user.role 判 admin 豁免），故不再注册中间件。
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -69,7 +72,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(UsageLogMiddleware)
-app.add_middleware(RateLimitMiddleware)
 
 # 静态资源（控制台 CSS/JS）
 app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
@@ -103,8 +105,8 @@ async def search(
 ) -> SearchResponse:
     """搜索 → 抓取 → 重排 → (可选摘要) → 输出审核 → 返回。
 
-    依赖链：鉴权 → 输入审核 → 扣费 → 搜索 → 输出审核/AI标识。
-    搜索失败退款（幂等）。
+    依赖链：鉴权 → 输入审核 → 限流 → 扣费 → 搜索 → 输出审核/AI标识。
+    admin/owner 豁免限流与扣费。搜索失败退款（幂等）。
     """
     # 把搜索参数挂 state，供 UsageLog 中间件记录
     request.state.search_query = req.query
@@ -114,7 +116,22 @@ async def search(
     # 1. 输入审核（命中违禁不扣费）
     await moderate_input(req.query)
 
-    # 2. 扣费（需独立 session：扣费要提交，搜索不持有 db 事务）
+    # 2. 限流（admin/owner 豁免；超限 429）
+    if not UserRole.is_admin(ctx.user.role):
+        identifier = (
+            f"key:{ctx.api_key_id}" if ctx.api_key_id else f"user:{ctx.user_id}"
+        )
+        try:
+            await check_rate_limit(identifier)
+        except RateLimitExceeded as e:
+            raise HTTPException(
+                status.HTTP_429_TOO_MANY_REQUESTS,
+                str(e),
+                headers={"Retry-After": str(WINDOW_SEC)},
+            ) from e
+
+    # 3. 扣费（需独立 session：扣费要提交，搜索不持有 db 事务；
+    #    admin 已在 charge_credits 内短路为 cost=0）
     from .db.base import async_session_factory
 
     async with async_session_factory() as db:
@@ -131,7 +148,7 @@ async def search(
             await db.rollback()
             raise
 
-    # 3. 搜索（管线零侵入）
+    # 4. 搜索（管线零侵入）
     try:
         resp = await run_search(req)
     except Exception as e:  # noqa: BLE001
@@ -142,7 +159,7 @@ async def search(
             await db.commit()
         raise HTTPException(status_code=502, detail=f"检索源失败: {e}") from e
 
-    # 4. 输出审核 + AI 标识（深度合成规定第16-17条）
+    # 5. 输出审核 + AI 标识（深度合成规定第16-17条）
     if resp.answer:
         try:
             await check_output(resp.answer)
