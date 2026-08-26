@@ -21,6 +21,7 @@ import time
 
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
+from fastmcp.server.dependencies import get_http_request
 
 from .auth.core import resolve_api_key
 from .auth.errors import AuthError
@@ -42,17 +43,38 @@ mcp = FastMCP("ai-search")
 
 
 def _resolve_raw_key(api_key: str | None) -> str:
-    """取本次调用用的 API Key：参数优先，其次 SEARCHPIPE_API_KEY 环境变量。
+    """取本次调用用的 API Key，优先级：参数 > HTTP 头 > 环境变量。
+
+    远程 HTTP 传输下，Claude Code 等客户端通过 Authorization: Bearer <key>
+    或 X-API-Key 头传 key；stdio 传输下无 HTTP 请求，回退到环境变量。
 
     mcp_require_api_key=True 时必须返回 sp- 开头的 key，否则抛 ToolError。
     """
     settings = get_settings()
-    raw = (api_key or os.getenv("SEARCHPIPE_API_KEY") or "").strip()
+    raw = (api_key or "").strip()
+
+    # 远程 HTTP：从 Authorization / X-API-Key 头取
+    if not raw:
+        try:
+            req = get_http_request()
+        except RuntimeError:
+            req = None  # stdio 上下文，无 HTTP 请求（get_http_request 抛 RuntimeError）
+        if req is not None:
+            auth = req.headers.get("authorization", "")
+            if auth.lower().startswith("bearer "):
+                raw = auth[7:].strip()
+            if not raw:
+                raw = (req.headers.get("x-api-key") or "").strip()
+
+    # 兜底：环境变量（stdio 场景的主力来源）
+    if not raw:
+        raw = (os.getenv("SEARCHPIPE_API_KEY") or "").strip()
+
     if not settings.mcp_require_api_key:
         return raw  # 本地 dev 旁路：允许空 key（裸调 run_search）
     if not raw.startswith("sp-"):
         raise ToolError(
-            "缺少有效的 sp- API Key（传 api_key 参数或设 SEARCHPIPE_API_KEY 环境变量）"
+            "缺少有效的 sp- API Key（传 api_key 参数 / Authorization 头 / 设 SEARCHPIPE_API_KEY 环境变量）"
         )
     return raw
 

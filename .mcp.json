@@ -1,10 +1,10 @@
 {
   "mcpServers": {
-    "ai-search": {
-      "command": "uv",
-      "args": ["run", "--directory", "/home/wuyuming/Projects/searchpipe", "ai-search-mcp"],
-      "env": {
-        "SEARCHPIPE_API_KEY": "sp-在此填入你的key"
+    "searchpipe": {
+      "type": "http",
+      "url": "https://searchpipe.tech/mcp/",
+      "headers": {
+        "Authorization": "Bearer sp-G4U6x8SObqIspiKKuuFTVwO45iFvkbNO"
       }
     }
   }

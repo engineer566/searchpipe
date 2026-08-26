@@ -29,6 +29,7 @@ from .dashboard import router as dashboard_router, site_router
 from .db.base import dispose_engine
 from .moderation.dependencies import moderate_input
 from .moderation.service import ModerationError, check_output
+from .mcp_server import mcp as mcp_server_obj
 from .payments import router as payments_router
 from .rate_limit import RateLimitMiddleware
 from .schemas import SearchRequest, SearchResponse
@@ -41,11 +42,18 @@ logger = logging.getLogger(__name__)
 
 _STATIC_DIR = Path(__file__).parent / "dashboard" / "static"
 
+# MCP streamable-http ASGI 子应用 —— 必须在构造 lifespan 前创建，
+# 以便把它的 lifespan 合并进 FastAPI 的 lifespan（FastMCP 的 SessionManager
+# 需在启动时初始化 task group，否则 /mcp 请求报 "Task group is not initialized"）。
+_mcp_app = mcp_server_obj.http_app(transport="streamable-http", path="/")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # noqa: ARG001
     logger.info("SearchPipe 启动")
-    yield
+    # 进入 MCP 子应用的 lifespan（初始化 streamable-http session manager）
+    async with _mcp_app.lifespan(_mcp_app):
+        yield
     logger.info("SearchPipe 关闭，释放 DB engine")
     await dispose_engine()
 
@@ -65,6 +73,11 @@ app.add_middleware(RateLimitMiddleware)
 
 # 静态资源（控制台 CSS/JS）
 app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
+
+# MCP 远程端点（streamable-http）——与 /search 共用同一进程/容器，
+# 复用 mcp_server.py 的 ai_search_search tool（含完整商业管线：鉴权→扣费→…）。
+# 客户端（Claude Code）经 https://searchpipe.tech/mcp 连接，Authorization 头传 sp- key。
+app.mount("/mcp", _mcp_app)
 
 # 路由器
 app.include_router(site_router)        # / 营销首页
