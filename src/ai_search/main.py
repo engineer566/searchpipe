@@ -16,9 +16,11 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
 from .admin import router as admin_router
+from .agent_setup import render_skill_md
 from .api_keys import router as api_keys_router
 from .auth import router as auth_router
 from .auth.dependencies import AuthContext, get_current_user_or_api_key
@@ -95,6 +97,12 @@ app.include_router(dashboard_router)   # /dashboard
 @app.get("/healthz")
 async def healthz() -> dict:
     return {"status": "ok"}
+
+
+@app.get("/agent-setup/SKILL.md", response_class=PlainTextResponse)
+async def agent_setup_skill() -> str:
+    """一句话 MCP 配置指南：AI Agent 自动配置 SearchPipe MCP 的 SKILL.md。"""
+    return render_skill_md()
 
 
 @app.post("/search", response_model=SearchResponse)
