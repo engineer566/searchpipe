@@ -7,24 +7,30 @@
 - POST  /admin/credits/grant    手动发放额度
 - GET   /admin/orders           订单总览
 - GET   /admin/stats            概览统计
+- GET   /admin/monitor          运营监控（SSR 页面）
 """
 
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from pathlib import Path
 
 from ..auth.dependencies import get_current_admin
 from ..billing.service import grant_credits
-from ..db.models import CreditAccount, Order, OrderStatus, UsageLog, User
+from ..db.models import CreditAccount, CreditTransaction, Order, OrderStatus, UsageLog, User
 from ..db.session import get_db
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+_TEMPLATES_DIR = Path(__file__).parent.parent / "dashboard" / "templates"
+templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 
 
 # ---------- Schemas ----------
@@ -243,4 +249,116 @@ async def stats(
         total_searches=total_searches,
         total_revenue_cents=int(paid_orders[1]),
         paid_order_count=paid_orders[0],
+    )
+
+
+# ---------- 监控 ----------
+
+
+@router.get("/monitor")
+async def monitor_page(
+    request: Request,
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> object:
+    """运营监控 SSR 页面：聚合关键指标与近 24h 趋势。"""
+    now = datetime.now(timezone.utc)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_ago = now - timedelta(hours=24)
+
+    # 用户指标
+    user_count = (await db.execute(select(func.count()).select_from(User))).scalar_one()
+    users_today = (
+        await db.execute(
+            select(func.count()).select_from(User).where(User.created_at >= today_start)
+        )
+    ).scalar_one()
+    active_24h = (
+        await db.execute(
+            select(func.count(func.distinct(UsageLog.user_id))).where(UsageLog.created_at >= day_ago)
+        )
+    ).scalar_one()
+
+    # 请求指标（今日 + 近 24h 按小时）
+    searches_today = (
+        await db.execute(
+            select(func.count()).select_from(UsageLog).where(UsageLog.created_at >= today_start)
+        )
+    ).scalar_one()
+    searches_ok_today = (
+        await db.execute(
+            select(func.count())
+            .select_from(UsageLog)
+            .where(UsageLog.created_at >= today_start, UsageLog.status == "ok")
+        )
+    ).scalar_one()
+    searches_err_today = searches_today - searches_ok_today
+
+    # 近 24h 按小时趋势
+    hour_trunc = func.date_trunc("hour", UsageLog.created_at).label("bucket")
+    hourly_rows = (
+        await db.execute(
+            select(
+                hour_trunc,
+                func.count().label("cnt"),
+            )
+            .where(UsageLog.created_at >= day_ago)
+            .group_by(hour_trunc)
+            .order_by(hour_trunc)
+        )
+    ).all()
+    hourly = [{"bucket": r.bucket.isoformat() if r.bucket else None, "count": r.cnt} for r in hourly_rows]
+
+    # 积分指标
+    credits_consumed_today = (
+        await db.execute(
+            select(func.coalesce(func.sum(UsageLog.credits_consumed), 0))
+            .where(UsageLog.created_at >= today_start)
+        )
+    ).scalar_one()
+    orders_today = (
+        await db.execute(
+            select(func.count(), func.coalesce(func.sum(Order.amount_cents), 0))
+            .where(Order.created_at >= today_start, Order.status == OrderStatus.PAID.value)
+        )
+    ).one()
+
+    # 系统：最近用量日志 / 错误
+    recent_logs_stmt = (
+        select(UsageLog)
+        .order_by(UsageLog.created_at.desc())
+        .limit(20)
+    )
+    recent_logs = (await db.execute(recent_logs_stmt)).scalars().all()
+
+    recent_errors_stmt = (
+        select(UsageLog)
+        .where(UsageLog.status == "error")
+        .order_by(UsageLog.created_at.desc())
+        .limit(10)
+    )
+    recent_errors = (await db.execute(recent_errors_stmt)).scalars().all()
+
+    return templates.TemplateResponse(
+        request,
+        "admin_monitor.html",
+        {
+            "user": admin,
+            "active": "monitor",
+            "metrics": {
+                "user_count": user_count,
+                "users_today": users_today,
+                "active_24h": active_24h,
+                "searches_today": searches_today,
+                "searches_ok_today": searches_ok_today,
+                "searches_err_today": searches_err_today,
+                "credits_consumed_today": int(credits_consumed_today),
+                "orders_today_count": orders_today[0],
+                "orders_today_amount_cents": int(orders_today[1]),
+                "hourly": hourly,
+            },
+            "recent_logs": recent_logs,
+            "recent_errors": recent_errors,
+            "now": now,
+        },
     )

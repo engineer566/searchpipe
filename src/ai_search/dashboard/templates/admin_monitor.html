@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}运营监控 · SearchPipe{% endblock %}
+{% block content %}
+<div class="page-head row" style="align-items:flex-end">
+  <div class="grow">
+    <h1>运营监控</h1>
+    <p>关键指标实时看板 · 自动刷新</p>
+  </div>
+  <span class="muted" style="font-size:13px">{{ now.strftime('%Y-%m-%d %H:%M') }} UTC</span>
+</div>
+
+<!-- 用户 -->
+<div class="stat-grid mb">
+  <div class="stat-card">
+    <div class="stat-label">用户总数</div>
+    <div class="stat-value">{{ metrics.user_count }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">今日新增</div>
+    <div class="stat-value text-ok">{{ metrics.users_today }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">近 24h 活跃</div>
+    <div class="stat-value">{{ metrics.active_24h }}</div>
+    <div class="stat-hint">有搜索请求的去重用户数</div>
+  </div>
+</div>
+
+<!-- 请求 -->
+<div class="card mb">
+  <h2>搜索请求</h2>
+  <p class="card-sub">今日调用量与成功率</p>
+  <div class="stat-grid" style="margin-bottom:18px">
+    <div class="stat-card" style="border-left:3px solid var(--accent)">
+      <div class="stat-label">今日调用</div>
+      <div class="stat-value">{{ metrics.searches_today }}</div>
+    </div>
+    <div class="stat-card" style="border-left:3px solid var(--ok)">
+      <div class="stat-label">成功</div>
+      <div class="stat-value text-ok">{{ metrics.searches_ok_today }}</div>
+    </div>
+    <div class="stat-card" style="border-left:3px solid var(--err)">
+      <div class="stat-label">失败</div>
+      <div class="stat-value text-err">{{ metrics.searches_err_today }}</div>
+    </div>
+  </div>
+
+  <h3 style="font-size:14px;color:var(--muted);margin:0 0 10px">近 24h 每小时趋势</h3>
+  <div id="hourly-chart">{% if metrics.hourly %}<div class="empty">加载中…</div>{% else %}<div class="empty">暂无数据</div>{% endif %}</div>
+</div>
+
+<!-- 积分 -->
+<div class="card mb">
+  <h2>积分与订单</h2>
+  <p class="card-sub">今日消耗与充值</p>
+  <div class="stat-grid">
+    <div class="stat-card" style="border-left:3px solid var(--warn)">
+      <div class="stat-label">今日消耗积分</div>
+      <div class="stat-value">{{ metrics.credits_consumed_today }}</div>
+    </div>
+    <div class="stat-card" style="border-left:3px solid var(--accent)">
+      <div class="stat-label">今日充值订单</div>
+      <div class="stat-value text-ok">{{ metrics.orders_today_count }}</div>
+    </div>
+    <div class="stat-card" style="border-left:3px solid var(--accent)">
+      <div class="stat-label">今日充值金额</div>
+      <div class="stat-value">¥{{ "%.2f"|format(metrics.orders_today_amount_cents/100) }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- 系统日志 -->
+<div class="grid2">
+  <div class="card">
+    <h2>最近用量日志</h2>
+    <p class="card-sub">最近 20 条</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>时间</th><th>用户</th><th>查询</th><th>状态</th></tr></thead>
+        <tbody>
+          {% for log in recent_logs %}
+          <tr>
+            <td class="muted" style="white-space:nowrap;font-size:12px">{{ log.created_at.strftime('%m-%d %H:%M') }}</td>
+            <td class="mono" style="font-size:12px">{{ log.user_id|string|truncate(8, True, '') }}</td>
+            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px" title="{{ log.query }}">{{ log.query }}</td>
+            <td>{% if log.status == 'ok' %}<span class="tag tag-ok">成功</span>{% else %}<span class="tag tag-err" title="{{ log.error_msg or '' }}">失败</span>{% endif %}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="empty">暂无记录</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>最近错误</h2>
+    <p class="card-sub">最近 10 条失败日志</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>时间</th><th>用户</th><th>查询</th><th>错误</th></tr></thead>
+        <tbody>
+          {% for log in recent_errors %}
+          <tr>
+            <td class="muted" style="white-space:nowrap;font-size:12px">{{ log.created_at.strftime('%m-%d %H:%M') }}</td>
+            <td class="mono" style="font-size:12px">{{ log.user_id|string|truncate(8, True, '') }}</td>
+            <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px" title="{{ log.query }}">{{ log.query }}</td>
+            <td class="text-err" style="font-size:12px" title="{{ log.error_msg or '' }}">{{ log.error_msg or '—' }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="empty">暂无错误</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+// 近 24h 每小时柱状图（纯 CSS/SVG，无外部库）
+(function(){
+  var data = {{ metrics.hourly|tojson }};
+  var el = document.getElementById('hourly-chart');
+  if (!data || !data.length) { el.innerHTML = '<div class="empty">暂无数据</div>'; return; }
+  // 补齐 24 个小时槽
+  var now = new Date();
+  var slots = [];
+  for (var i = 23; i >= 0; i--) {
+    var d = new Date(now.getTime() - i * 3600e3);
+    d.setMinutes(0, 0, 0);
+    var iso = d.toISOString().slice(0, 13) + ':00:00';
+    var found = data.find(function(x){ return x.bucket && x.bucket.slice(0,13) === iso.slice(0,13); });
+    slots.push({ bucket: iso, count: found ? found.count : 0 });
+  }
+  var max = Math.max.apply(null, slots.map(function(s){ return s.count; }).concat([1]));
+  var W = 720, H = 180, padL = 36, padB = 30, padT = 10, padR = 10;
+  var iw = W - padL - padR, ih = H - padT - padB;
+  var n = slots.length;
+  var bw = Math.min(18, (iw / n) * 0.7);
+  var step = iw / n;
+  var accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#4f46e5';
+  var border = getComputedStyle(document.documentElement).getPropertyValue('--border').trim() || '#e5e7eb';
+  var faint = getComputedStyle(document.documentElement).getPropertyValue('--faint').trim() || '#9aa3b2';
+
+  var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" preserveAspectRatio="xMidYMid meet" role="img">';
+  for (var i = 0; i <= 4; i++) {
+    var y = padT + ih - (ih * i / 4);
+    var v = Math.round(max * i / 4);
+    svg += '<line x1="' + padL + '" y1="' + y + '" x2="' + (W - padR) + '" y2="' + y + '" stroke="' + border + '" stroke-width="1"' + (i === 0 ? '' : ' stroke-dasharray="3 4"') + '/>';
+    svg += '<text x="' + (padL - 6) + '" y="' + (y + 4) + '" text-anchor="end" font-size="10" fill="' + faint + '">' + v + '</text>';
+  }
+  slots.forEach(function(s, i){
+    var x = padL + step * i + (step - bw) / 2;
+    var h = Math.max(1, ih * (s.count / max));
+    var y = padT + ih - h;
+    var hour = new Date(s.bucket).getHours();
+    var label = hour + ':00';
+    svg += '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="2" fill="' + accent + '" opacity="0.85"><title>' + label + '：' + s.count + ' 次</title></rect>';
+    if (i % 4 === 0) {
+      svg += '<text x="' + (padL + step * i + step / 2) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="10" fill="' + faint + '">' + label + '</text>';
+    }
+  });
+  svg += '</svg>';
+  el.innerHTML = svg;
+})();
+
+// 自动刷新：60 秒
+setTimeout(function(){ location.reload(); }, 60000);
+</script>
+{% endblock %}

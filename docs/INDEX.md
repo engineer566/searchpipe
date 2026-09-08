@@ -40,7 +40,7 @@ searchpipe/
 │   ├── usage/                # 用量日志中间件 + 统计/导出（middleware 75 行）
 │   ├── rate_limit/           # Redis ZSET 滑动窗口限流（service 42 行）
 │   ├── moderation/           # 阿里云内容安全（输入/输出审核）（aliyun 109 行）
-│   ├── admin/                # 管理端：用户/积分/订单/统计（routes 246 行）
+│   ├── admin/                # 管理端：用户/积分/订单/统计/监控（routes 252+ 行）
 │   ├── search/               # 检索编排：SearXNG 客户端 + 多引擎聚合（orchestrator 53 行）
 │   ├── extract/              # trafilatura 正文抓取（fetcher 229 行）
 │   ├── rerank/               # LLM 重排（llm_reranker 136 行）
@@ -81,7 +81,7 @@ searchpipe/
 
 ## 路由速查
 
-**API（JWT/API Key）**：`/auth/register|login|refresh|forgot-password|reset-password|me`（auth/routes.py:153-305）· `/api-keys` CRUD · `/billing/balance|transactions|plans` · `/payments/packages|orders|callback` · `/usage|/usage/logs|/usage/export` · `/admin/users|credits|orders|stats` · `POST /search`（main.py:100）
+**API（JWT/API Key）**：`/auth/register|login|refresh|forgot-password|reset-password|me`（auth/routes.py:153-305）· `/api-keys` CRUD · `/billing/balance|transactions|plans` · `/payments/packages|orders|callback` · `/usage|/usage/logs|/usage/export` · `/admin/users|credits|orders|stats|monitor` · `POST /search`（main.py:100）
 
 **控制台（session cookie）**：`GET /` 营销页 · `/dashboard/login|register|forgot-password|reset-password|logout` · `/dashboard[|/api-keys|/usage|/billing|/docs]`（dashboard/routes.py:119-376）
 
