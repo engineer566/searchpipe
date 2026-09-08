@@ -46,6 +46,7 @@ entrypoint 自动 `alembic upgrade head`；`docker compose` 插件可用（v5.5.
 ## 部署记录
 
 - **2026-09-08 二次部署（dev adb398b）**：history/20260908.txt 五项需求——服务条款页 /terms + 登录/注册 agree_terms 勾选、/agent-setup/SKILL.md 一句话 MCP 配置、SEO（meta/OG/robots.txt/sitemap.xml）、反馈工单（POST/GET /feedback + /dashboard/feedback + /admin/feedback）、管理员监控页 /admin/monitor。新增迁移 6f04c661a041（feedback_tickets 表），entrypoint 自动 upgrade。验证（SSH 内网 curl 全过）：条款页含「概不退款」、未勾选登录被拒并重渲染、SKILL.md 200 含 /mcp 配置、robots/sitemap 正常、工单提交/列表/越权 403/管理员关闭全通、监控页 200 含指标区块。管理员验证需先 `UPDATE users SET role='owner'` 提权（系统无 owner 引导流程）。
+- **2026-09-08 三次部署（dev a1919b5）**：MCP 接入改为 Tavily 式 URL 内嵌 Key——`_resolve_raw_key` 新增 `?api_key=` query 鉴权（优先级：工具参数 > Authorization/X-API-Key 头 > URL query > 环境变量）；SKILL.md 与 docs 页全部改为 `{APP_BASE_URL}/mcp?api_key=sp-…` 主推荐；API Keys 页创建弹窗直接给完整 MCP 链接，列表行显示链接格式。E2E 验证：curl 走完 initialize → notifications/initialized → tools/call 全流程，URL Key 拿到真实搜索结果；坏 key 报「无效或已吊销」、无 key 报「缺少有效的 sp- API Key」。**注意：/mcp 挂载点 307 到 /mcp/（尾斜杠），curl 验证要加 -L 或直接打 /mcp/。**
 
 ## 本机容器管理
 
