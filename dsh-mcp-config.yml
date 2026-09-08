@@ -1,0 +1,19 @@
+# dsh MCP 配置 —— 接入 SearchPipe 远程 MCP Server
+# 将此配置添加到 ~/.dsh/profiles/web/cordis.patch.yml
+
+- id: mcp-searchpipe
+  name: '@deepseek-ai/dsh-mcp-client'
+  config:
+    serverName: searchpipe
+    transport: streamable-http
+    url: http://47.98.124.167:8001/mcp/
+    headers:
+      Authorization: !!js '`Bearer ${process.env.SEARCHPIPE_API_KEY}`'
+    # 可选：调整超时和重连策略
+    # toolCallTimeoutMs: 60000
+    # failOnStartupError: false
+    # reconnect:
+    #   enabled: true
+    #   initialDelayMs: 500
+    #   maxDelayMs: 30000
+    #   maxAttempts: 10

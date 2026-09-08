@@ -20,8 +20,7 @@ COPY README.md* ./
 COPY src/ ./src/
 
 # 同步依赖到 .venv（--frozen 保证按 lockfile 精确安装，不改写）
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev
 
 # ---- 运行阶段：精简运行镜像 ----
 FROM python:${PYTHON_VERSION}-slim-bookworm AS runtime
