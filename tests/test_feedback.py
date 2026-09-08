@@ -227,7 +227,7 @@ def test_feedback_page_logged_in(client):
     email = _unique_email()
     resp = client.post(
         "/dashboard/register",
-        data={"email": email, "password": _PW, "password_confirm": _PW},
+        data={"email": email, "password": _PW, "password_confirm": _PW, "agree_terms": "on"},
         follow_redirects=False,
     )
     assert resp.status_code == 303

@@ -174,7 +174,7 @@ def test_dashboard_register_success(client):
     email = _unique_email()
     resp = client.post(
         "/dashboard/register",
-        data={"email": email, "password": _PW, "password_confirm": _PW},
+        data={"email": email, "password": _PW, "password_confirm": _PW, "agree_terms": "on"},
         follow_redirects=False,
     )
     assert resp.status_code == 303, resp.text
@@ -189,7 +189,7 @@ def test_dashboard_register_duplicate_email(client):
     _register(client, email)
     resp = client.post(
         "/dashboard/register",
-        data={"email": email, "password": _PW, "password_confirm": _PW},
+        data={"email": email, "password": _PW, "password_confirm": _PW, "agree_terms": "on"},
     )
     assert resp.status_code == 200
     assert "该邮箱已注册" in resp.text
@@ -202,6 +202,7 @@ def test_dashboard_register_password_mismatch(client):
             "email": _unique_email(),
             "password": _PW,
             "password_confirm": "different-99",
+            "agree_terms": "on",
         },
     )
     assert resp.status_code == 200
@@ -212,7 +213,7 @@ def test_dashboard_login_wrong_password_renders_error(client):
     email = _unique_email()
     _register(client, email)
     resp = client.post(
-        "/dashboard/login", data={"email": email, "password": "wrong-pass-1"}
+        "/dashboard/login", data={"email": email, "password": "wrong-pass-1", "agree_terms": "on"}
     )
     assert resp.status_code == 200  # 页面内报错，而非裸 401
     assert "密码错误" in resp.text
@@ -222,7 +223,7 @@ def test_dashboard_login_wrong_password_renders_error(client):
 def test_dashboard_login_unregistered_email_hint(client):
     """控制台显式区分：未注册邮箱提示去注册（API 仍统一 401 防枚举）。"""
     resp = client.post(
-        "/dashboard/login", data={"email": _unique_email(), "password": _PW}
+        "/dashboard/login", data={"email": _unique_email(), "password": _PW, "agree_terms": "on"}
     )
     assert resp.status_code == 200
     assert "该邮箱未注册" in resp.text

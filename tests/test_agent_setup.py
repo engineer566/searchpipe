@@ -43,7 +43,7 @@ def test_docs_page_has_agent_setup_hint(client: TestClient):
     email = f"setup-{uuid.uuid4().hex[:8]}@example.com"
     resp = client.post(
         "/dashboard/register",
-        data={"email": email, "password": "test-pass-1234", "password_confirm": "test-pass-1234"},
+        data={"email": email, "password": "test-pass-1234", "password_confirm": "test-pass-1234", "agree_terms": "on"},
         follow_redirects=False,
     )
     assert resp.status_code == 303
