@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}反馈工单 · SearchPipe{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>反馈与工单</h1>
+  <p>遇到问题或有功能建议？提交工单，我们会尽快处理。</p>
+</div>
+
+<div class="card mb">
+  <h2>提交工单</h2>
+  <form id="feedback-form">
+    <div class="row" style="gap:12px;flex-wrap:wrap">
+      <select id="fb-category" required style="min-width:140px">
+        <option value="bug">Bug 反馈</option>
+        <option value="feature">功能建议</option>
+        <option value="billing">计费问题</option>
+        <option value="other" selected>其他</option>
+      </select>
+      <input type="text" id="fb-subject" class="grow" placeholder="简要描述问题（最多 255 字）" required maxlength="255">
+    </div>
+    <textarea id="fb-content" rows="4" placeholder="详细描述…（最多 5000 字）" required maxlength="5000" style="margin-top:10px;width:100%;resize:vertical"></textarea>
+    <div class="row" style="margin-top:10px;justify-content:flex-end">
+      <span id="fb-status" class="muted" style="flex:1"></span>
+      <button type="submit" class="btn" id="fb-btn">提交</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>我的工单</h2>
+  <div id="ticket-list"><div class="empty">加载中…</div></div>
+</div>
+{% endblock %}
+{% block script %}
+<script>
+// 提交工单
+const catMap={bug:'Bug',feature:'功能建议',billing:'计费问题',other:'其他'};
+const statusMap={open:'处理中',closed:'已关闭'};
+
+document.getElementById('feedback-form').onsubmit=async e=>{
+  e.preventDefault();
+  const btn=document.getElementById('fb-btn'),st=document.getElementById('fb-status');
+  btn.disabled=true; st.textContent='提交中…';
+  try{
+    await AIS.api('/feedback',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        category:document.getElementById('fb-category').value,
+        subject:document.getElementById('fb-subject').value.trim(),
+        content:document.getElementById('fb-content').value.trim(),
+      })});
+    st.textContent='提交成功！';
+    document.getElementById('fb-subject').value='';
+    document.getElementById('fb-content').value='';
+    loadTickets();
+  }catch(e){
+    st.textContent=e.message;
+  }finally{ btn.disabled=false; }
+};
+
+// 加载工单列表
+async function loadTickets(){
+  const el=document.getElementById('ticket-list');
+  try{
+    const d=await AIS.api('/feedback');
+    if(!d.items.length){ el.innerHTML='<div class="empty">暂无工单。</div>'; return; }
+    el.innerHTML='<div class="table-wrap"><table><thead><tr><th>时间</th><th>类型</th><th>主题</th><th>状态</th></tr></thead><tbody>'
+      + d.items.map(t=>`<tr>
+        <td class="muted" style="white-space:nowrap">${t.created_at.slice(0,16).replace('T',' ')}</td>
+        <td><span class="tag tag-neutral">${catMap[t.category]||t.category}</span></td>
+        <td style="max-width:360px;overflow:hidden;text-overflow:ellipsis" title="${AIS.esc(t.content)}">${AIS.esc(t.subject)}</td>
+        <td><span class="tag ${t.status==='open'?'tag-warn':'tag-ok'}">${statusMap[t.status]||t.status}</span></td>
+      </tr>`).join('')
+      + '</tbody></table></div>';
+  }catch(e){ el.innerHTML='<div class="empty">加载失败：'+AIS.esc(e.message)+'</div>'; }
+}
+loadTickets();
+</script>
+{% endblock %}
