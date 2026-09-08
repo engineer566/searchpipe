@@ -4,7 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>SearchPipe — 为 AI 而生的搜索 API</title>
-<meta name="description" content="一次调用完成检索、抓取、重排与摘要，直接为 LLM/RAG 提供结构化搜索结果。">
+<meta name="description" content="SearchPipe 是自建 AI 搜索 API（Tavily 风格）：一次调用完成 SearXNG 多引擎检索、正文抓取、LLM 重排与摘要。支持 MCP Server 接入，为 Claude、Cursor 等 Agent 提供原生搜索工具。">
+<meta name="keywords" content="AI搜索,搜索API,Tavily,MCP,LLM,RAG,搜索引擎,API,Claude,Cursor,Agent">
+<link rel="canonical" href="{{ base_url }}">
+<meta property="og:title" content="SearchPipe — 为 AI 而生的搜索 API">
+<meta property="og:description" content="SearchPipe 是自建 AI 搜索 API（Tavily 风格）：一次调用完成 SearXNG 多引擎检索、正文抓取、LLM 重排与摘要。支持 MCP Server 接入，为 Claude、Cursor 等 Agent 提供原生搜索工具。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="{{ base_url }}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="SearchPipe — 为 AI 而生的搜索 API">
+<meta name="twitter:description" content="SearchPipe 是自建 AI 搜索 API（Tavily 风格）：一次调用完成 SearXNG 多引擎检索、正文抓取、LLM 重排与摘要。支持 MCP Server 接入，为 Claude、Cursor 等 Agent 提供原生搜索工具。">
 <script>
 (function(){try{var t=localStorage.getItem('searchpipe-theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
 </script>
@@ -12,7 +21,7 @@
 </head>
 <body>
 
-<nav class="site-nav">
+<nav class="site-nav" aria-label="主导航">
   <a class="brand" href="/">🔍 SearchPipe</a>
   <div class="nav-links">
     <a href="#features">产品</a>
@@ -41,9 +50,10 @@
   -d '{"query":"FastAPI 怎么部署","max_results":5,"include_answer":true}'</code></pre></div>
 </header>
 
-<section class="section" id="features">
+<main>
+<section class="section" id="features" aria-labelledby="features-heading">
   <div class="section-head">
-    <h2>一个端点，整条管线</h2>
+    <h2 id="features-heading">一个端点，整条管线</h2>
     <p>你发一个 query，我们在后台跑完搜索、抓取、打分、摘要四步，返回带相关性评分的干净结果。</p>
   </div>
   <div class="pipeline">
@@ -54,9 +64,9 @@
   </div>
 </section>
 
-<section class="section" id="api">
+<section class="section" id="api" aria-labelledby="api-heading">
   <div class="section-head">
-    <h2>为 Agent 和 RAG 设计</h2>
+    <h2 id="api-heading">为 Agent 和 RAG 设计</h2>
     <p>一次调用直接拿到结构化结果；同时提供 MCP Server，Claude 等客户端可作为工具直接调用。</p>
   </div>
   <div class="grid2" style="align-items:start">
@@ -88,9 +98,9 @@
   </div>
 </section>
 
-<section class="section" id="pricing">
+<section class="section" id="pricing" aria-labelledby="pricing-heading">
   <div class="section-head">
-    <h2>简单透明的积分制</h2>
+    <h2 id="pricing-heading">简单透明的积分制</h2>
     <p>预付费充值，积分永久有效。注册即送免费额度，先跑通再付费。</p>
   </div>
   <div class="pricing-grid">
@@ -116,6 +126,7 @@
     </div>
   </div>
 </section>
+</main>
 
 <footer class="site-footer">
   🔍 SearchPipe · 自建 AI 搜索 · 检索 → 抓取 → LLM 重排/摘要

@@ -5,6 +5,8 @@
 
 路由：
 - GET /                          营销首页（site_router，公开）
+- GET /robots.txt                搜索引擎爬虫规则
+- GET /sitemap.xml               站点地图
 - GET /dashboard/auth?token=xxx    OAuth/JWT 登录后落地：把 token 换成 session cookie → 302 到 /dashboard
 - GET /dashboard/login             登录页（仅邮箱密码；第三方登录前端不开放）
 - POST /dashboard/login            邮箱密码登录 → 设 cookie → 302 /dashboard
@@ -27,7 +29,7 @@ from datetime import datetime, timezone
 
 from email_validator import EmailNotValidError, validate_email
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, status
-from fastapi.responses import RedirectResponse
+from fastapi.responses import PlainTextResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -57,6 +59,22 @@ _TEMPLATES_DIR = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 
 
+def _get_base_url() -> str:
+    """从配置读取对外基址。"""
+    from ..config import get_settings
+
+    return get_settings().app_base_url.rstrip("/")
+
+
+def _render_with_base(
+    request: Request, template: str, context: dict | None = None
+) -> object:
+    """渲染模板并注入 base_url（供 SEO canonical/og:url 使用）。"""
+    ctx = dict(context or {})
+    ctx.setdefault("base_url", _get_base_url())
+    return templates.TemplateResponse(request, template, ctx)
+
+
 async def _user_from_session(request: Request, db: AsyncSession) -> User | None:
     """从 session cookie 解出当前用户。无效/过期返回 None。"""
     user_id = read_session_cookie(request)
@@ -74,7 +92,52 @@ async def _user_from_session(request: Request, db: AsyncSession) -> User | None:
 @site_router.get("/")
 async def landing(request: Request) -> object:
     """营销首页：产品定位 + 特性 + API 示例 + 定价锚点。"""
-    return templates.TemplateResponse(request, "landing.html", {})
+    return _render_with_base(request, "landing.html", {})
+
+
+# ---------- SEO ----------
+
+
+@site_router.get("/robots.txt", response_class=PlainTextResponse)
+async def robots_txt() -> str:
+    """搜索引擎爬虫规则：允许收录公开页，禁止后台与 API。"""
+    base = _get_base_url()
+    return (
+        f"User-agent: *\n"
+        f"Allow: /\n"
+        f"Disallow: /dashboard\n"
+        f"Disallow: /admin\n"
+        f"Disallow: /api\n"
+        f"Disallow: /auth\n"
+        f"Disallow: /mcp\n"
+        f"Sitemap: {base}/sitemap.xml\n"
+    )
+
+
+@site_router.get("/sitemap.xml", response_class=PlainTextResponse)
+async def sitemap_xml() -> str:
+    """站点地图：列出公开可索引的页面。"""
+    base = _get_base_url()
+    urls = [
+        f"{base}/",
+        f"{base}/dashboard/login",
+        f"{base}/dashboard/register",
+        f"{base}/dashboard/docs",
+    ]
+    url_entries = "\n".join(
+        f"  <url>\n"
+        f"    <loc>{url}</loc>\n"
+        f"    <changefreq>weekly</changefreq>\n"
+        f"    <priority>{'1.0' if url == base + '/' else '0.6'}</priority>\n"
+        f"  </url>"
+        for url in urls
+    )
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        f"{url_entries}\n"
+        "</urlset>"
+    )
 
 
 # ---------- 登录/注册入口 ----------

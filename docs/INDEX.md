@@ -71,7 +71,7 @@ searchpipe/
 | `auth/routes.py` | 307 | 注册/登录/refresh/忘记密码/重置密码/OAuth stub/me |
 | `auth/dependencies.py` | 139 | JWT/API Key/cookie 三通道 DI |
 | `auth/password_reset.py` | 87 | Redis 一次性重置 token（`pwdreset:token:*`）+ 冷却（`pwdreset:cooldown:*`） |
-| `dashboard/routes.py` | 376 | SSR 页面 + 表单登录/注册/密码重置（失败重渲染，不裸 4xx） |
+| `dashboard/routes.py` | 445 | SSR 页面 + /robots.txt + /sitemap.xml + 表单登录/注册/密码重置（失败重渲染，不裸 4xx） |
 | `billing/service.py` | 175 | 积分账户：grant/deduct/refund/流水（幂等靠 ref 唯一） |
 | `payments/xunhupay.py` | 86 | 虎皮椒签名/下单/回调验签 |
 | `usage/middleware.py` | 75 | BaseHTTPMiddleware 用量日志（注意 task group 约束） |
@@ -83,7 +83,7 @@ searchpipe/
 
 **API（JWT/API Key）**：`/auth/register|login|refresh|forgot-password|reset-password|me`（auth/routes.py:153-305）· `/api-keys` CRUD · `/billing/balance|transactions|plans` · `/payments/packages|orders|callback` · `/usage|/usage/logs|/usage/export` · `/admin/users|credits|orders|stats` · `POST /search`（main.py:100）
 
-**控制台（session cookie）**：`GET /` 营销页 · `/dashboard/login|register|forgot-password|reset-password|logout` · `/dashboard[|/api-keys|/usage|/billing|/docs]`（dashboard/routes.py:119-376）
+**控制台（session cookie）**：`GET /` 营销页 · `GET /robots.txt` · `GET /sitemap.xml` · `/dashboard/login|register|forgot-password|reset-password|logout` · `/dashboard[|/api-keys|/usage|/billing|/docs]`（dashboard/routes.py:119-445）
 
 ## 按任务跳转表
 
@@ -91,7 +91,7 @@ searchpipe/
 |----------|------|----------|
 | 改鉴权/登录态 | 本表 + `docs/memory/searchpipe-auth-design.md` | `auth/routes.py` / `auth/dependencies.py` |
 | 改注册/忘记密码邮件 | `docs/memory/searchpipe-auth-design.md` | `auth/password_reset.py` + `utils/mailer.py` |
-| 改控制台页面 | `dashboard/routes.py` 头部 docstring 路由表 | 对应 `dashboard/templates/*.html` |
+| 改控制台页面/SEO | `dashboard/routes.py` 头部 docstring 路由表 | 对应 `dashboard/templates/*.html` |
 | 改搜索管线 | `core/search_service.py` | `search/orchestrator.py` → `extract/fetcher.py` → `rerank/llm_reranker.py` |
 | 改计费/退款 | `billing/service.py` 头部 docstring | `billing/pipeline.py` + `main.py` /search 依赖链 |
 | 加测试 | `tests/conftest.py` 头部 docstring（loop 隔离硬约束） | 现有 `tests/test_auth.py` 作范式 |
