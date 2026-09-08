@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>登录 · SearchPipe</title>
+<title>注册 · SearchPipe</title>
 <script>
 (function(){try{var t=localStorage.getItem('searchpipe-theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
 </script>
@@ -14,35 +14,34 @@
   <div class="auth-card">
     <div class="auth-brand">
       <div class="logo">🔍 SearchPipe</div>
-      <p>为 AI 而生的搜索 API · 内测免费额度</p>
+      <p>注册即送内测免费额度</p>
     </div>
 
     <div class="card">
-      {% if info %}
-      <div class="form-ok">{{ info }}</div>
-      {% endif %}
       {% if error %}
       <div class="form-error">{{ error }}</div>
       {% endif %}
 
-      <form action="/dashboard/login" method="post">
+      <form action="/dashboard/register" method="post">
         <div class="mb"><label>邮箱</label>
           <input type="email" name="email" placeholder="you@example.com" value="{{ email or '' }}" required>
         </div>
         <div class="mb"><label>密码</label>
-          <input type="password" name="password" placeholder="••••••••" required>
+          <input type="password" name="password" placeholder="至少 8 位" minlength="8" required>
         </div>
-        <button type="submit" class="btn btn-block">登录</button>
+        <div class="mb"><label>确认密码</label>
+          <input type="password" name="password_confirm" placeholder="再输入一次密码" minlength="8" required>
+        </div>
+        <button type="submit" class="btn btn-block">注册</button>
       </form>
 
       <div class="auth-links">
-        <a href="/dashboard/forgot-password">忘记密码？</a>
-        <a href="/dashboard/register">没有账号？立即注册</a>
+        <a href="/dashboard/login">已有账号？去登录</a>
       </div>
     </div>
 
     <div class="auth-foot">
-      登录即代表同意服务条款 · <a href="/">返回首页</a>
+      注册即代表同意服务条款 · <a href="/">返回首页</a>
     </div>
   </div>
 </div>

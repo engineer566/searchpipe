@@ -68,6 +68,16 @@ class Settings(BaseSettings):
     rate_limit_rpm: int = 100        # 每 key 每分钟
     rate_limit_burst: int = 20
 
+    # --- 邮件（密码重置等事务邮件）---
+    # smtp_host 为空表示未配置：mailer 降级为日志输出，不阻断流程。
+    smtp_host: str = ""
+    smtp_port: int = 465
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""              # 留空则用 smtp_user
+    smtp_use_tls: bool = True        # 465 走 SSL；587 需 STARTTLS 时置 false 另配
+    app_base_url: str = "http://localhost:8001"  # 对外基址，用于拼密码重置链接
+
     # --- MCP server（第二协议入口）---
     # True：MCP tool 必须带 sp- API Key、走计费扣积分（对齐 Tavily，方案 A）。
     # False：本地 dev 旁路，裸调 run_search 不扣费（便于无 key 测试）。

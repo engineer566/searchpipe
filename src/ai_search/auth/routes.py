@@ -4,6 +4,8 @@
   - POST /auth/register        邮箱+密码注册（注册即送免费额度）
   - POST /auth/login           邮箱+密码登录 → access+refresh
   - POST /auth/refresh         refresh token 换新 access
+  - POST /auth/forgot-password 忘记密码 → 发重置邮件（防枚举，统一话术）
+  - POST /auth/reset-password  一次性 token + 新密码 → 重置
   - GET  /auth/oauth/github    跳转 GitHub 授权
   - GET  /auth/oauth/github/callback   GitHub 回调 → 建/绑 OAuthAccount → 签发 JWT
   - GET  /auth/oauth/wechat    微信扫码（stub，501）
@@ -18,6 +20,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_settings
@@ -27,6 +30,7 @@ from .dependencies import get_current_user
 from .jwt_handler import create_access_token, create_refresh_token, decode_token
 from .oauth import GitHubOAuth, WeChatOAuth
 from .password import hash_password, verify_password
+from .password_reset import consume_reset_token, request_password_reset
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -53,6 +57,15 @@ class LoginRequest(BaseModel):
 
 class RefreshRequest(BaseModel):
     refresh_token: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(..., min_length=8, max_length=128)
 
 
 class UserInfo(BaseModel):
@@ -129,29 +142,40 @@ async def _get_or_create_user_by_oauth(
     return user
 
 
+def _normalize_email(email: str) -> str:
+    """邮箱规范化：去空格 + 小写，防大小写/空格变体造成重复账号。"""
+    return email.strip().lower()
+
+
 # ---------- 邮箱+密码 ----------
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)) -> TokenResponse:
     """邮箱+密码注册。注册即签发 token 并赠送免费额度。"""
+    email = _normalize_email(req.email)
     existing = (
-        await db.execute(select(User).where(User.email == req.email))
+        await db.execute(select(User).where(User.email == email))
     ).scalar_one_or_none()
     if existing:
         raise HTTPException(status.HTTP_409_CONFLICT, "该邮箱已注册")
 
     user = User(
-        email=req.email,
+        email=email,
         password_hash=hash_password(req.password),
         role=UserRole.USER.value,
         status=UserStatus.ACTIVE.value,
     )
     db.add(user)
-    await db.flush()
-    await _grant_free_credits(db, user)
-    await _touch_login(db, user)
-    await db.commit()
+    try:
+        await db.flush()
+        await _grant_free_credits(db, user)
+        await _touch_login(db, user)
+        await db.commit()
+    except IntegrityError as e:
+        # 并发重复注册竞态：唯一索引兜底
+        await db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, "该邮箱已注册") from e
     return _issue_tokens(user)
 
 
@@ -159,7 +183,7 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)) -> 
 async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)) -> TokenResponse:
     """邮箱+密码登录。"""
     user = (
-        await db.execute(select(User).where(User.email == req.email))
+        await db.execute(select(User).where(User.email == _normalize_email(req.email)))
     ).scalar_one_or_none()
     if not user or not verify_password(req.password, user.password_hash):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "邮箱或密码错误")
@@ -180,6 +204,34 @@ async def refresh(req: RefreshRequest, db: AsyncSession = Depends(get_db)) -> To
     if not user or user.status != UserStatus.ACTIVE.value:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "用户不存在或已停用")
     return _issue_tokens(user)
+
+
+# ---------- 忘记密码 / 重置密码 ----------
+
+
+@router.post("/forgot-password")
+async def forgot_password(
+    req: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)
+) -> dict:
+    """忘记密码：存在则发重置邮件。无论邮箱是否注册都返回同一话术（防枚举）。"""
+    await request_password_reset(db, req.email)
+    return {"detail": "如该邮箱已注册，重置邮件已发送，请查收（1 小时内有效）"}
+
+
+@router.post("/reset-password")
+async def reset_password(
+    req: ResetPasswordRequest, db: AsyncSession = Depends(get_db)
+) -> dict:
+    """一次性 token + 新密码 → 重置。token 无效/过期/复用均 400。"""
+    user_id = await consume_reset_token(req.token)
+    if not user_id:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "重置链接无效或已过期，请重新发起")
+    user = await db.get(User, user_id)
+    if not user:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "重置链接无效或已过期，请重新发起")
+    user.password_hash = hash_password(req.new_password)
+    await db.commit()
+    return {"detail": "密码已重置，请使用新密码登录"}
 
 
 # ---------- GitHub OAuth ----------

@@ -6,8 +6,14 @@
 路由：
 - GET /                          营销首页（site_router，公开）
 - GET /dashboard/auth?token=xxx    OAuth/JWT 登录后落地：把 token 换成 session cookie → 302 到 /dashboard
-- GET /dashboard/login             登录页（邮箱密码、GitHub OAuth）
+- GET /dashboard/login             登录页（仅邮箱密码；第三方登录前端不开放）
 - POST /dashboard/login            邮箱密码登录 → 设 cookie → 302 /dashboard
+- GET /dashboard/register          注册页
+- POST /dashboard/register         邮箱注册 → 送免费额度 → 设 cookie → 302 /dashboard
+- GET /dashboard/forgot-password   忘记密码页
+- POST /dashboard/forgot-password  发重置邮件（统一话术防枚举）
+- GET /dashboard/reset-password    重置密码页（预检 token）
+- POST /dashboard/reset-password   校验 token 改密 → 302 登录页
 - GET /dashboard/logout            清 cookie → 302 /dashboard/login
 - GET /dashboard                   主面板（余额/用量/快速搜索）
 - GET /dashboard/api-keys          API Key 管理
@@ -17,23 +23,30 @@
 """
 
 import logging
+from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
+from email_validator import EmailNotValidError, validate_email
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from pathlib import Path
 
 from ..auth.jwt_handler import decode_token
-from ..auth.password import verify_password
+from ..auth.password import hash_password, verify_password
+from ..auth.password_reset import (
+    consume_reset_token,
+    peek_reset_token,
+    request_password_reset,
+)
 from ..auth.session import (
     clear_session_cookie,
     read_session_cookie,
     set_session_cookie,
 )
-from ..config import get_settings
-from ..db.models import User, UserStatus
+from ..db.models import User, UserRole, UserStatus
 from ..db.session import get_db
 
 logger = logging.getLogger(__name__)
@@ -64,7 +77,43 @@ async def landing(request: Request) -> object:
     return templates.TemplateResponse(request, "landing.html", {})
 
 
-# ---------- 登录入口 ----------
+# ---------- 登录/注册入口 ----------
+
+
+def _render_login(
+    request: Request, error: str | None = None, email: str = "", info: str | None = None
+) -> object:
+    """渲染登录页（可带错误/提示与邮箱回填）。"""
+    return templates.TemplateResponse(
+        request, "login.html", {"error": error, "email": email, "info": info}
+    )
+
+
+def _render_register(request: Request, error: str | None = None, email: str = "") -> object:
+    """渲染注册页（可带错误与邮箱回填）。"""
+    return templates.TemplateResponse(
+        request, "register.html", {"error": error, "email": email}
+    )
+
+
+def _validate_email(email: str) -> str | None:
+    """校验邮箱格式，返回错误文案或 None。"""
+    try:
+        validate_email(email, check_deliverability=False)
+    except EmailNotValidError:
+        return "邮箱格式不正确"
+    return None
+
+
+def _validate_password(password: str, password_confirm: str | None = None) -> str | None:
+    """校验密码强度（≥8 位）与确认密码一致性，返回错误文案或 None。"""
+    if len(password) < 8:
+        return "密码至少 8 位"
+    if len(password) > 128:
+        return "密码最长 128 位"
+    if password_confirm is not None and password != password_confirm:
+        return "两次输入的密码不一致"
+    return None
 
 
 @router.get("/auth")
@@ -86,38 +135,154 @@ async def auth_landing(
 
 
 @router.get("/login")
-async def login_page(request: Request) -> object:
-    """登录页（邮箱密码 / GitHub OAuth）。"""
-    settings = get_settings()
-    return templates.TemplateResponse(
-        request,
-        "login.html",
-        {
-            "github_oauth_enabled": bool(
-                settings.oauth_github_client_id and settings.oauth_github_client_secret
-            ),
-            "wechat_enabled": False,
-        },
-    )
+async def login_page(request: Request, reset: int = 0) -> object:
+    """登录页（仅邮箱密码）。?reset=1 时显示「密码已重置」提示。"""
+    info = "密码已重置，请使用新密码登录" if reset else None
+    return _render_login(request, info=info)
 
 
 @router.post("/login")
 async def login_submit(
+    request: Request,
     email: str = Form(...),
     password: str = Form(...),
     db: AsyncSession = Depends(get_db),
-) -> RedirectResponse:
-    """邮箱密码登录 → 设 cookie → /dashboard。"""
+) -> object:
+    """邮箱密码登录 → 设 cookie → /dashboard。失败重渲染登录页并提示。"""
+    email = email.strip().lower()
     user = (
         await db.execute(select(User).where(User.email == email))
     ).scalar_one_or_none()
     if not user or not verify_password(password, user.password_hash):
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "邮箱或密码错误")
+        return _render_login(request, error="邮箱或密码错误", email=email)
     if user.status != UserStatus.ACTIVE.value:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "账号已被停用")
+        return _render_login(request, error="账号已被停用，请联系客服", email=email)
+    user.last_login_at = datetime.now(timezone.utc)
+    await db.commit()
     resp = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
     set_session_cookie(resp, str(user.id))
     return resp
+
+
+@router.get("/register")
+async def register_page(request: Request) -> object:
+    """注册页（仅邮箱密码）。"""
+    return _render_register(request)
+
+
+@router.post("/register")
+async def register_submit(
+    request: Request,
+    email: str = Form(...),
+    password: str = Form(...),
+    password_confirm: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+) -> object:
+    """邮箱注册 → 送免费额度 → 设 cookie → /dashboard。失败重渲染注册页并提示。"""
+    email = email.strip().lower()
+    if err := _validate_email(email):
+        return _render_register(request, error=err, email=email)
+    if err := _validate_password(password, password_confirm):
+        return _render_register(request, error=err, email=email)
+
+    existing = (
+        await db.execute(select(User).where(User.email == email))
+    ).scalar_one_or_none()
+    if existing:
+        return _render_register(request, error="该邮箱已注册，请直接登录", email=email)
+
+    user = User(
+        email=email,
+        password_hash=hash_password(password),
+        role=UserRole.USER.value,
+        status=UserStatus.ACTIVE.value,
+    )
+    db.add(user)
+    try:
+        await db.flush()
+        # 惰性导入防循环依赖（billing.service 依赖鉴权层）
+        from ..billing.service import grant_credits
+
+        from ..config import get_settings
+
+        await grant_credits(
+            db,
+            user_id=user.id,
+            amount=get_settings().free_tier_credits,
+            tx_type="grant",
+            remark="内测免费额度",
+        )
+        user.last_login_at = datetime.now(timezone.utc)
+        await db.commit()
+    except IntegrityError:
+        # 并发重复注册竞态：唯一索引兜底
+        await db.rollback()
+        return _render_register(request, error="该邮箱已注册，请直接登录", email=email)
+
+    resp = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+    set_session_cookie(resp, str(user.id))
+    return resp
+
+
+# ---------- 忘记密码 / 重置密码 ----------
+
+
+@router.get("/forgot-password")
+async def forgot_password_page(request: Request) -> object:
+    """忘记密码页。"""
+    return templates.TemplateResponse(request, "forgot_password.html", {"sent": False})
+
+
+@router.post("/forgot-password")
+async def forgot_password_submit(
+    request: Request,
+    email: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+) -> object:
+    """发重置邮件。无论邮箱是否注册都展示同一话术（防枚举）。"""
+    await request_password_reset(db, email)
+    return templates.TemplateResponse(
+        request, "forgot_password.html", {"sent": True, "email": email.strip().lower()}
+    )
+
+
+@router.get("/reset-password")
+async def reset_password_page(
+    request: Request, token: str = Query(...)
+) -> object:
+    """重置密码页：预检 token 有效性，无效直接提示链接失效。"""
+    valid = (await peek_reset_token(token)) is not None
+    return templates.TemplateResponse(
+        request, "reset_password.html", {"token": token, "invalid": not valid}
+    )
+
+
+@router.post("/reset-password")
+async def reset_password_submit(
+    request: Request,
+    token: str = Form(...),
+    password: str = Form(...),
+    password_confirm: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+) -> object:
+    """校验 token 改密 → 302 登录页（带重置成功提示）。"""
+    if err := _validate_password(password, password_confirm):
+        return templates.TemplateResponse(
+            request, "reset_password.html", {"token": token, "error": err}
+        )
+    user_id = await consume_reset_token(token)
+    user = await db.get(User, user_id) if user_id else None
+    if not user:
+        return templates.TemplateResponse(
+            request,
+            "reset_password.html",
+            {"token": token, "invalid": True},
+        )
+    user.password_hash = hash_password(password)
+    await db.commit()
+    return RedirectResponse(
+        url="/dashboard/login?reset=1", status_code=status.HTTP_303_SEE_OTHER
+    )
 
 
 @router.get("/logout")

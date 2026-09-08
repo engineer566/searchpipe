@@ -7,8 +7,12 @@ ARG PYTHON_VERSION=3.13
 FROM ghcr.io/astral-sh/uv:python${PYTHON_VERSION}-bookworm-slim AS builder
 
 ENV UV_LINK_MODE=copy \
-    UV_COMPILE_BYTECODE=1 \
     UV_PYTHON_DOWNLOADS=never
+
+# 字节码预编译（dockerd 默认 nofile=1024 的宿主上 uv 并行编译可能耗尽 fd，
+# 可用 --build-arg UV_COMPILE_BYTECODE=0 关闭；缺 .pyc 仅影响容器冷启动速度）
+ARG UV_COMPILE_BYTECODE=1
+ENV UV_COMPILE_BYTECODE=${UV_COMPILE_BYTECODE}
 
 WORKDIR /app
 

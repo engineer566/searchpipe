@@ -124,5 +124,6 @@ def pytest_collection_modifyitems(config, items):  # noqa: ARG001
         "tests/test_mcp_server.py": 0,
         "tests/test_search.py": 1,
         "tests/test_admin_unlimited.py": 2,
+        "tests/test_auth.py": 3,
     }
     items.sort(key=lambda it: order.get(_file_key(it), 99))

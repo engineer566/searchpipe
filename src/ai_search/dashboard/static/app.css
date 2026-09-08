@@ -301,6 +301,9 @@ tbody tr:hover { background: var(--surface-2); }
 }
 .oauth-btn:hover { background: var(--surface-2); text-decoration: none; }
 .auth-foot { text-align: center; margin-top: 20px; font-size: 13px; color: var(--faint); }
+.auth-links { display: flex; justify-content: space-between; margin-top: 14px; font-size: 13px; }
+.form-error { background: var(--err-soft); color: var(--err); font-size: 13px; padding: 10px 12px; border-radius: var(--radius-sm); margin-bottom: 14px; }
+.form-ok { background: var(--ok-soft); color: var(--ok); font-size: 13px; padding: 10px 12px; border-radius: var(--radius-sm); margin-bottom: 14px; }
 
 /* ---------- 模态 ---------- */
 .modal-mask {
