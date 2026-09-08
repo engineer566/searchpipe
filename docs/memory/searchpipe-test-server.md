@@ -40,6 +40,12 @@ entrypoint 自动 `alembic upgrade head`；`docker compose` 插件可用（v5.5.
 4. `pkill -f 'docker compose'` 会匹配到自身 ssh 远程命令行把自己杀掉，别用。
 5. 本机 dockerd 的坑（nofile=1024 需 UV_COMPILE_BYTECODE=0、compose 用 `-p ai-search`、venv shebang 失效用 `python -m`）仅适用于本机容器场景，本机默认不跑这套栈，只起依赖容器跑测试。
 6. **测试服在境内（阿里云），google/brave/wikipedia/wikidata 全不可达（必超时）**；baidu/sogou/360search 直连 <0.5s。SearXNG 采用双环境配置：`settings.yml`=境外默认、`settings.cn.yml`=境内，compose 通过 `SEARXNG_SETTINGS_PATH` 环境变量选用（境内服在 `.env` 设 `/etc/searxng/settings.cn.yml`）。baidu 机房 IP 偶发 CAPTCHA，靠 SearXNG 自动 Suspended 降级。（2026-09-08 排查 "Qwen3.8-27B" 召回差实锤后落地）
+7. **测试服 Postgres 用户/库名是 `ai`/`ai`，不是 postgres**（compose 里 POSTGRES_USER=ai）。登库用 `docker exec ai-search-postgres psql -U ai -d ai`。（2026-09-08 二次部署实测）
+8. 验证一律 SSH 登进去 `curl 127.0.0.1:8001`；公网 8001 只对白名单 IP 放行，本机 IP 变了就会超时（000），不是服务挂了。
+
+## 部署记录
+
+- **2026-09-08 二次部署（dev adb398b）**：history/20260908.txt 五项需求——服务条款页 /terms + 登录/注册 agree_terms 勾选、/agent-setup/SKILL.md 一句话 MCP 配置、SEO（meta/OG/robots.txt/sitemap.xml）、反馈工单（POST/GET /feedback + /dashboard/feedback + /admin/feedback）、管理员监控页 /admin/monitor。新增迁移 6f04c661a041（feedback_tickets 表），entrypoint 自动 upgrade。验证（SSH 内网 curl 全过）：条款页含「概不退款」、未勾选登录被拒并重渲染、SKILL.md 200 含 /mcp 配置、robots/sitemap 正常、工单提交/列表/越权 403/管理员关闭全通、监控页 200 含指标区块。管理员验证需先 `UPDATE users SET role='owner'` 提权（系统无 owner 引导流程）。
 
 ## 本机容器管理
 
