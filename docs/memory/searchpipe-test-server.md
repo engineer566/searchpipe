@@ -39,7 +39,7 @@ entrypoint 自动 `alembic upgrade head`；`docker compose` 插件可用（v5.5.
 3. 服务器 1.6G 内存：原生构建实测可用（uv sync 期间可用 ~500Mi），无需 swap；若将来 OOM 先加 swapfile。
 4. `pkill -f 'docker compose'` 会匹配到自身 ssh 远程命令行把自己杀掉，别用。
 5. 本机 dockerd 的坑（nofile=1024 需 UV_COMPILE_BYTECODE=0、compose 用 `-p ai-search`、venv shebang 失效用 `python -m`）仅适用于本机容器场景，本机默认不跑这套栈，只起依赖容器跑测试。
-6. **测试服在境内（阿里云），google/brave/wikipedia/wikidata 全不可达（必超时）**；baidu/sogou/360search 直连 <0.5s。SearXNG 引擎配置必须按境内网络裁剪（2026-09-08 排查 "Qwen3.8-27B" 召回差实锤：当时仅 bing 一个网页引擎可用）。baidu 机房 IP 偶发 CAPTCHA，靠 SearXNG 自动 Suspended 降级。
+6. **测试服在境内（阿里云），google/brave/wikipedia/wikidata 全不可达（必超时）**；baidu/sogou/360search 直连 <0.5s。SearXNG 采用双环境配置：`settings.yml`=境外默认、`settings.cn.yml`=境内，compose 通过 `SEARXNG_SETTINGS_PATH` 环境变量选用（境内服在 `.env` 设 `/etc/searxng/settings.cn.yml`）。baidu 机房 IP 偶发 CAPTCHA，靠 SearXNG 自动 Suspended 降级。（2026-09-08 排查 "Qwen3.8-27B" 召回差实锤后落地）
 
 ## 本机容器管理
 

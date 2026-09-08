@@ -9,6 +9,9 @@ services:
     environment:
       - SEARXNG_BASE_URL=http://localhost:8080/
       - SEARXNG_SECRET=${SEARXNG_SECRET:-please-change-this-secret}
+      # 双环境配置：境外默认 settings.yml；境内主机在 .env 设
+      # SEARXNG_SETTINGS_PATH=/etc/searxng/settings.cn.yml
+      - SEARXNG_SETTINGS_PATH=${SEARXNG_SETTINGS_PATH:-/etc/searxng/settings.yml}
     restart: unless-stopped
     networks:
       - ai-search-net
