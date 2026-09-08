@@ -215,7 +215,21 @@ def test_dashboard_login_wrong_password_renders_error(client):
         "/dashboard/login", data={"email": email, "password": "wrong-pass-1"}
     )
     assert resp.status_code == 200  # 页面内报错，而非裸 401
-    assert "邮箱或密码错误" in resp.text
+    assert "密码错误" in resp.text
+    assert email in resp.text  # 邮箱回填
+
+
+def test_dashboard_login_unregistered_email_hint(client):
+    """控制台显式区分：未注册邮箱提示去注册（API 仍统一 401 防枚举）。"""
+    resp = client.post(
+        "/dashboard/login", data={"email": _unique_email(), "password": _PW}
+    )
+    assert resp.status_code == 200
+    assert "该邮箱未注册" in resp.text
+    # API 层保持统一话术
+    resp = client.post("/auth/login", json={"email": _unique_email(), "password": _PW})
+    assert resp.status_code == 401
+    assert resp.json()["detail"] == "邮箱或密码错误"
 
 
 def test_dashboard_forgot_and_reset_pages(client, sent_mails):

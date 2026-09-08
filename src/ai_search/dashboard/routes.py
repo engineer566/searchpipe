@@ -148,13 +148,19 @@ async def login_submit(
     password: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ) -> object:
-    """邮箱密码登录 → 设 cookie → /dashboard。失败重渲染登录页并提示。"""
+    """邮箱密码登录 → 设 cookie → /dashboard。失败重渲染登录页并提示。
+
+    控制台面向真实用户，显式区分「邮箱未注册」与「密码错误」；
+    API 层（/auth/login）仍返回统一 401 防脚本枚举。
+    """
     email = email.strip().lower()
     user = (
         await db.execute(select(User).where(User.email == email))
     ).scalar_one_or_none()
-    if not user or not verify_password(password, user.password_hash):
-        return _render_login(request, error="邮箱或密码错误", email=email)
+    if not user:
+        return _render_login(request, error="该邮箱未注册，请先注册", email=email)
+    if not verify_password(password, user.password_hash):
+        return _render_login(request, error="密码错误，请重新输入", email=email)
     if user.status != UserStatus.ACTIVE.value:
         return _render_login(request, error="账号已被停用，请联系客服", email=email)
     user.last_login_at = datetime.now(timezone.utc)
