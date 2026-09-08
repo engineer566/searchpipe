@@ -5,6 +5,7 @@
 
 路由：
 - GET /                          营销首页（site_router，公开）
+- GET /terms                     服务条款页（site_router，公开）
 - GET /dashboard/auth?token=xxx    OAuth/JWT 登录后落地：把 token 换成 session cookie → 302 到 /dashboard
 - GET /dashboard/login             登录页（仅邮箱密码；第三方登录前端不开放）
 - POST /dashboard/login            邮箱密码登录 → 设 cookie → 302 /dashboard
@@ -77,6 +78,12 @@ async def landing(request: Request) -> object:
     return templates.TemplateResponse(request, "landing.html", {})
 
 
+@site_router.get("/terms")
+async def terms_page(request: Request) -> object:
+    """服务条款页（公开可访问）。"""
+    return templates.TemplateResponse(request, "terms.html", {})
+
+
 # ---------- 登录/注册入口 ----------
 
 
@@ -146,6 +153,7 @@ async def login_submit(
     request: Request,
     email: str = Form(...),
     password: str = Form(...),
+    agree_terms: str = Form(""),
     db: AsyncSession = Depends(get_db),
 ) -> object:
     """邮箱密码登录 → 设 cookie → /dashboard。失败重渲染登录页并提示。
@@ -154,6 +162,8 @@ async def login_submit(
     API 层（/auth/login）仍返回统一 401 防脚本枚举。
     """
     email = email.strip().lower()
+    if agree_terms != "on":
+        return _render_login(request, error="请先阅读并同意《服务条款》", email=email)
     user = (
         await db.execute(select(User).where(User.email == email))
     ).scalar_one_or_none()
@@ -182,10 +192,13 @@ async def register_submit(
     email: str = Form(...),
     password: str = Form(...),
     password_confirm: str = Form(...),
+    agree_terms: str = Form(""),
     db: AsyncSession = Depends(get_db),
 ) -> object:
     """邮箱注册 → 送免费额度 → 设 cookie → /dashboard。失败重渲染注册页并提示。"""
     email = email.strip().lower()
+    if agree_terms != "on":
+        return _render_register(request, error="请先阅读并同意《服务条款》", email=email)
     if err := _validate_email(email):
         return _render_register(request, error=err, email=email)
     if err := _validate_password(password, password_confirm):

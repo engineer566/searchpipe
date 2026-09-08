@@ -12,11 +12,10 @@
 ```
 searchpipe/
 ├── src/ai_search/
-│   ├── main.py               # FastAPI 入口：中间件/路由汇聚 + /search 依赖链 + /healthz + /agent-setup/SKILL.md（186 行）
+│   ├── main.py               # FastAPI 入口：中间件/路由汇聚 + /search 依赖链 + /healthz（176 行）
 │   ├── config.py             # pydantic-settings 全部配置（含 SMTP、OAuth、支付、审核、限流）（89 行）
 │   ├── schemas.py            # /search 请求/响应模型
 │   ├── mcp_server.py         # FastMCP streamable-http 子应用（/mcp，共用商业管线）（214 行）
-│   ├── agent_setup.py        # Agent 一键配置 SKILL.md 生成（APP_BASE_URL 动态拼接）（~90 行）
 │   ├── auth/                 # 鉴权：JWT + session cookie + API Key 三通道
 │   │   ├── routes.py         # /auth/*：注册/登录/refresh/忘记密码/重置/OAuth stub/me（307 行）
 │   │   ├── dependencies.py   # get_current_user 等 DI 依赖（cookie 兜底）（139 行）
@@ -28,8 +27,8 @@ searchpipe/
 │   │   ├── oauth.py          # GitHub/微信 OAuth 客户端（106 行）
 │   │   └── errors.py         # AuthError（17 行）
 │   ├── dashboard/            # 控制台（Jinja2 SSR + session cookie）
-│   │   ├── routes.py         # /dashboard/* 页面 + 登录/注册/忘记密码表单处理（376 行；2026-09-08 新增注册与密码重置页）
-│   │   ├── templates/        # base/landing/login/register/forgot_password/reset_password/dashboard/api_keys/usage/billing/docs（11 个模板）
+│   │   ├── routes.py         # /dashboard/* 页面 + 登录/注册/忘记密码表单处理（389 行；2026-09-08 新增注册与密码重置页、服务条款页）
+│   │   ├── templates/        # base/landing/login/register/forgot_password/reset_password/dashboard/api_keys/usage/billing/docs/terms（12 个模板）
 │   │   └── static/           # app.css（双主题设计系统）+ app.js
 │   ├── db/
 │   │   ├── base.py           # engine/session 工厂 + dispose_engine（44 行）
@@ -68,11 +67,11 @@ searchpipe/
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
-| `main.py` | 186 | 入口汇聚 + /search 依赖链编排 + /agent-setup/SKILL.md |
+| `main.py` | 176 | 入口汇聚 + /search 依赖链编排 |
 | `auth/routes.py` | 307 | 注册/登录/refresh/忘记密码/重置密码/OAuth stub/me |
 | `auth/dependencies.py` | 139 | JWT/API Key/cookie 三通道 DI |
 | `auth/password_reset.py` | 87 | Redis 一次性重置 token（`pwdreset:token:*`）+ 冷却（`pwdreset:cooldown:*`） |
-| `dashboard/routes.py` | 376 | SSR 页面 + 表单登录/注册/密码重置（失败重渲染，不裸 4xx） |
+| `dashboard/routes.py` | 389 | SSR 页面 + 表单登录/注册/密码重置（失败重渲染，不裸 4xx）+ 服务条款页 |
 | `billing/service.py` | 175 | 积分账户：grant/deduct/refund/流水（幂等靠 ref 唯一） |
 | `payments/xunhupay.py` | 86 | 虎皮椒签名/下单/回调验签 |
 | `usage/middleware.py` | 75 | BaseHTTPMiddleware 用量日志（注意 task group 约束） |
@@ -82,9 +81,9 @@ searchpipe/
 
 ## 路由速查
 
-**API（JWT/API Key）**：`/auth/register|login|refresh|forgot-password|reset-password|me`（auth/routes.py:153-305）· `/api-keys` CRUD · `/billing/balance|transactions|plans` · `/payments/packages|orders|callback` · `/usage|/usage/logs|/usage/export` · `/admin/users|credits|orders|stats` · `POST /search`（main.py:100）· `GET /agent-setup/SKILL.md`（main.py:103）
+**API（JWT/API Key）**：`/auth/register|login|refresh|forgot-password|reset-password|me`（auth/routes.py:153-305）· `/api-keys` CRUD · `/billing/balance|transactions|plans` · `/payments/packages|orders|callback` · `/usage|/usage/logs|/usage/export` · `/admin/users|credits|orders|stats` · `POST /search`（main.py:100）
 
-**控制台（session cookie）**：`GET /` 营销页 · `/dashboard/login|register|forgot-password|reset-password|logout` · `/dashboard[|/api-keys|/usage|/billing|/docs]`（dashboard/routes.py:119-382）
+**控制台（session cookie）**：`GET /` 营销页 · `/terms` 服务条款 · `/dashboard/login|register|forgot-password|reset-password|logout` · `/dashboard[|/api-keys|/usage|/billing|/docs]`（dashboard/routes.py:119-389）
 
 ## 按任务跳转表
 
@@ -95,7 +94,7 @@ searchpipe/
 | 改控制台页面 | `dashboard/routes.py` 头部 docstring 路由表 | 对应 `dashboard/templates/*.html` |
 | 改搜索管线 | `core/search_service.py` | `search/orchestrator.py` → `extract/fetcher.py` → `rerank/llm_reranker.py` |
 | 改计费/退款 | `billing/service.py` 头部 docstring | `billing/pipeline.py` + `main.py` /search 依赖链 |
-| 加测试 | `tests/conftest.py` 头部 docstring（loop 隔离硬约束） | 现有 `tests/test_auth.py` 作范式；新增文件需在 conftest order 表登记 |
+| 加测试 | `tests/conftest.py` 头部 docstring（loop 隔离硬约束） | 现有 `tests/test_auth.py` 作范式 |
 | 部署到测试服 | `docs/memory/searchpipe-test-server.md` | `Dockerfile` / `docker-compose.test.yml` |
 | 改配置/环境变量 | `config.py` | `.env.example`（同步更新） |
 
