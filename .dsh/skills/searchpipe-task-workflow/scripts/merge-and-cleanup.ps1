@@ -1,19 +1,19 @@
-﻿<#
+<#
 .SYNOPSIS
-  aitrendwatch 需求闭环：把一批 codex/taskN-<slug> worktree 分支依次 --no-ff 合并进 dev，
+  SearchPipe 需求闭环：把一批 codex/taskN-<slug> worktree 分支依次 --no-ff 合并进 dev，
   成功后删除对应 worktree 与分支（把「合并后清理」纪律机械执行，避免遗留 worktree/分支）。
 
 .DESCRIPTION
-  - 分支命名约定：codex/taskN-<slug>；worktree 路径约定：<WorktreeRoot>/aitw-taskN-<slug>/aitrendwatch
+  - 分支命名约定：codex/taskN-<slug>；worktree 路径约定：<WorktreeRoot>/sp-taskN-<slug>/searchpipe
   - 任一分支合并冲突时立即停止（不做任何清理），由 agent 手工解决并 commit 后，带剩余分支重跑
   - 默认合并全部成功后执行清理；-SkipCleanup 只合并不清理（供行号重核/回归通过后再清）
   - -DryRun 只打印将执行的命令，不落地
 
 .EXAMPLE
-  .\skills\aitrendwatch-task-workflow\scripts\merge-and-cleanup.ps1 -Branches codex/task1-language,codex/task2-stopwords
+  .\skills\searchpipe-task-workflow\scripts\merge-and-cleanup.ps1 -Branches codex/task1-auth,codex/task2-billing
 
 .EXAMPLE
-  .\skills\aitrendwatch-task-workflow\scripts\merge-and-cleanup.ps1 -Branches codex/task1-language -SkipCleanup -DryRun
+  .\skills\searchpipe-task-workflow\scripts\merge-and-cleanup.ps1 -Branches codex/task1-auth -SkipCleanup -DryRun
 #>
 param(
   [Parameter(Mandatory = $true)][string[]]$Branches,
@@ -56,15 +56,15 @@ foreach ($b in $Branches) {
 # --- 2) 合并后必做提醒 ---
 Write-Host ''
 Write-Host '==> 合并完成。接下来必做（勿跳）：'
-Write-Host '  1) 重核 docs/INDEX.md 与 docs/index/*.md 的 file:行号 锚点（git-merge-doc-line-refs 教训）'
-Write-Host '  2) dev 全量回归：pytest（严禁 DEEPSEEK_API_KEY，断言降级路径）'
+Write-Host '  1) 重核 docs/INDEX.md 的 file:行号 锚点'
+Write-Host '  2) dev 全量回归：.venv/bin/python -m pytest tests/ -q（真实 PG/Redis，外部 API mock）'
 Write-Host '  3) 修复/索引改动在 dev 提交后，再执行清理'
 
 # --- 3) 清理 worktree 与分支 ---
 if ($SkipCleanup) { Write-Host '==> -SkipCleanup：跳过清理。'; Pop-Location; return }
 foreach ($b in $Branches) {
   $name = $b -replace '^codex/', ''
-  $wt = Join-Path $WorktreeRoot "aitw-$name\aitrendwatch"
+  $wt = Join-Path $WorktreeRoot "sp-$name\searchpipe"
   if (Test-Path $wt) {
     Write-Host "==> 删除 worktree $wt"
     Invoke-Git @('worktree', 'remove', '--force', $wt)

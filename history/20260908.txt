@@ -1,0 +1,5 @@
+1. 添加服务条款，包含已经售出概不退款的声明，并需要用户在登录时主动勾选
+2. 一句话MCP配置，让Agent自动配置MCP，最好能像Tavily那样，出一个skill，参考tavily.com/agent-setup/SKILL.md
+3. 优化SEO
+4. 添加反馈渠道（提交工单）
+5. 帮我做一个管理员监控页面
