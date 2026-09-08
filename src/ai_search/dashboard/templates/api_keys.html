@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-head">
   <h1>API Keys</h1>
-  <p>程序调用 <code>/search</code> 时使用 <code>sp-</code> 前缀的 Key 鉴权；MCP 接入直接把 Key 编进链接（<code>{{ base_url }}/mcp?api_key=sp-…</code>）。明文仅在创建时显示一次，请妥善保存。</p>
+  <p>创建 Key 后：<strong>MCP 接入（推荐）</strong>直接把 Key 编进链接（<code>{{ base_url }}/mcp?api_key=sp-…</code>），Claude Code / Cursor 填入即用；程序直接调用 <code>/search</code> 时用 <code>sp-</code> 前缀的 Key 鉴权。明文仅在创建时显示一次，请妥善保存。</p>
 </div>
 
 <div class="card">

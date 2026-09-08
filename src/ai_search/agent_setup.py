@@ -11,12 +11,12 @@ from .config import get_settings
 SKILL_TEMPLATE = """\
 ---
 name: searchpipe-search
-description: Web search, online search, real-time search, internet search, search the web, lookup online, find information, research, 查询, 搜索, 联网搜索, 实时搜索, 网络查询, 资料查找, 信息检索. SearchPipe AI Search API for optimized, real-time web search results for RAG and LLM agents.
+description: Web search, online search, real-time search, internet search, search the web, lookup online, find information, research, 查询, 搜索, 联网搜索, 实时搜索, 网络查询, 资料查找, 信息检索. SearchPipe real-time web search API built for AI agents via MCP.
 ---
 
 # SearchPipe Search Skill (MCP-based)
 
-This skill utilizes the SearchPipe MCP server, providing clean, real-time web search results optimized for LLMs and RAG pipelines.
+This skill utilizes the SearchPipe MCP server, providing clean, real-time web search results purpose-built for AI agents.
 
 ## MCP Endpoint
 
@@ -161,7 +161,7 @@ Agent 应能成功调用 `ai_search_search` 并返回结构化搜索结果。
 
 ---
 
-*SearchPipe — 自建 AI 搜索 API · {base_url}*
+*SearchPipe — 为 AI Agent 而生的联网搜索 · {base_url}*
 """
 
 

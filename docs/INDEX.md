@@ -29,7 +29,7 @@ searchpipe/
 │   │   └── errors.py         # AuthError（17 行）
 │   ├── dashboard/            # 控制台（Jinja2 SSR + session cookie）
 │   │   ├── routes.py         # /dashboard/* 页面 + 登录/注册/忘记密码表单处理 + 服务条款页 + 反馈工单页
-│   │   ├── templates/        # base/landing/login/register/forgot_password/reset_password/dashboard/api_keys/usage/billing/docs/terms/feedback/admin_monitor（14 个模板）
+│   │   ├── templates/        # base/landing/login/register/forgot_password/reset_password/dashboard/api_keys/usage/billing/docs/terms/feedback/admin_monitor（14 个模板；2026-09-08 改版为 Agent-first 定位：落地页首屏 MCP 接入，弱化 RAG 叙事）
 │   │   └── static/           # app.css（双主题设计系统）+ app.js
 │   ├── db/
 │   │   ├── base.py           # engine/session 工厂 + dispose_engine（44 行）

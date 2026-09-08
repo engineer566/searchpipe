@@ -60,3 +60,19 @@ def test_landing_meta_tags(client):
     assert "<main>" in text
     assert "</main>" in text
     assert 'aria-labelledby=' in text
+
+
+def test_landing_agent_first_positioning(client):
+    """落地页以 Agent 接入为第一卖点：首屏是 MCP 配置，不再宣传 RAG。"""
+    resp = client.get("/")
+    assert resp.status_code == 200
+    text = resp.text
+
+    # 首屏 Hero 即给出 MCP 一键接入命令
+    assert "claude mcp add --transport http searchpipe" in text
+    # Agent 自服务配置入口
+    assert "/agent-setup/SKILL.md" in text
+    # MCP 链接内嵌 Key
+    assert "/mcp?api_key=" in text
+    # 弱化 RAG：不再作为卖点出现
+    assert "RAG" not in text

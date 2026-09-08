@@ -26,7 +26,7 @@
 
 <div class="card">
   <h2>快速搜索</h2>
-  <p class="card-sub">在线体验完整管线：检索 → 抓取 → LLM 重排 → 摘要（消耗积分，与 API 调用同价）</p>
+  <p class="card-sub">在线体验 Agent 获得的完整能力：检索 → 抓取 → LLM 重排 → 摘要（消耗积分，与 API / MCP 调用同价）</p>
   <form id="quick-search">
     <div class="row">
       <input type="text" id="q" class="grow" placeholder="输入你的问题，例如：FastAPI 怎么部署" required>
@@ -39,8 +39,14 @@
 </div>
 
 <div class="card">
-  <h2>快速上手</h2>
-  <p class="card-sub">程序调用请使用 API Key（<a href="/dashboard/api-keys">创建 Key</a>），详细参数见<a href="/dashboard/docs">开发文档</a>。</p>
+  <h2>接入你的 Agent</h2>
+  <p class="card-sub">先在「<a href="/dashboard/api-keys">API Keys</a>」页创建 Key（创建弹窗会给出完整 MCP 链接），然后一条命令接入 Claude Code / Cursor，详细参数见<a href="/dashboard/docs">开发文档</a>。</p>
+  <p class="card-sub">MCP 接入（推荐）</p>
+  <div class="code-block mb" data-copy><pre><code>claude mcp add --transport http searchpipe \
+  "{{ request.base_url }}mcp?api_key=sp-你的密钥"</code></pre></div>
+  <p class="card-sub">或者把下面的链接发给你的 AI Agent，自动完成配置</p>
+  <div class="code-block mb" data-copy><pre><code>{{ request.base_url }}agent-setup/SKILL.md</code></pre></div>
+  <p class="card-sub">REST API（程序直接调用）</p>
   <div class="code-block" data-copy><pre><code>curl -X POST {{ request.base_url }}search \
   -H "Authorization: Bearer sp-你的密钥" \
   -H "Content-Type: application/json" \
