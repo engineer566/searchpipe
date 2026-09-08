@@ -12,7 +12,7 @@
 ```
 searchpipe/
 ├── src/ai_search/
-│   ├── main.py               # FastAPI 入口：中间件/路由汇聚 + /search 依赖链 + /healthz（176 行）
+│   ├── main.py               # FastAPI 入口：中间件/路由汇聚 + /search 依赖链 + /healthz + /agent-setup/SKILL.md（186 行）
 │   ├── config.py             # pydantic-settings 全部配置（含 SMTP、OAuth、支付、审核、限流）（89 行）
 │   ├── schemas.py            # /search 请求/响应模型
 │   ├── mcp_server.py         # FastMCP streamable-http 子应用（/mcp，共用商业管线）（214 行）
@@ -28,7 +28,7 @@ searchpipe/
 │   │   └── errors.py         # AuthError（17 行）
 │   ├── dashboard/            # 控制台（Jinja2 SSR + session cookie）
 │   │   ├── routes.py         # /dashboard/* 页面 + 登录/注册/忘记密码表单处理 + 服务条款页 + 反馈工单页
-│   │   ├── templates/        # base/landing/login/register/forgot_password/reset_password/dashboard/api_keys/usage/billing/docs/terms/feedback（13 个模板）
+│   │   ├── templates/        # base/landing/login/register/forgot_password/reset_password/dashboard/api_keys/usage/billing/docs/terms/feedback/admin_monitor（14 个模板）
 │   │   └── static/           # app.css（双主题设计系统）+ app.js
 │   ├── db/
 │   │   ├── base.py           # engine/session 工厂 + dispose_engine（44 行）
@@ -41,7 +41,7 @@ searchpipe/
 │   ├── rate_limit/           # Redis ZSET 滑动窗口限流（service 42 行）
 │   ├── moderation/           # 阿里云内容安全（输入/输出审核）（aliyun 109 行）
 │   ├── admin/                # 管理端：用户/积分/订单/统计/反馈工单/运营监控页
-│   ├── feedback/             # 用户反馈工单：提交/列表/管理侧关闭（routes 120 行）
+│   ├── feedback/             # 用户反馈工单：提交/列表/管理侧关闭（__init__ 162 行）
 │   ├── search/               # 检索编排：SearXNG 客户端 + 多引擎聚合（orchestrator 53 行）
 │   ├── extract/              # trafilatura 正文抓取（fetcher 229 行）
 │   ├── rerank/               # LLM 重排（llm_reranker 136 行）
@@ -68,13 +68,13 @@ searchpipe/
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
-| `main.py` | 176 | 入口汇聚 + /search 依赖链编排 |
+| `main.py` | 186 | 入口汇聚 + /search 依赖链编排 + /agent-setup/SKILL.md |
 | `auth/routes.py` | 307 | 注册/登录/refresh/忘记密码/重置密码/OAuth stub/me |
 | `auth/dependencies.py` | 139 | JWT/API Key/cookie 三通道 DI |
 | `auth/password_reset.py` | 87 | Redis 一次性重置 token（`pwdreset:token:*`）+ 冷却（`pwdreset:cooldown:*`） |
-| `dashboard/routes.py` | - | SSR 页面 + /robots.txt + /sitemap.xml + /terms 服务条款页 + 表单登录/注册/密码重置/反馈工单（失败重渲染，不裸 4xx） |
-| `feedback/__init__.py` | 120 | 用户反馈工单：POST/GET /feedback + Redis 频率限制 |
-| `admin/routes.py` | 320 | 管理端：用户/积分/订单/统计/反馈工单列表与关闭 |
+| `dashboard/routes.py` | 472 | SSR 页面 + /robots.txt + /sitemap.xml + /terms 服务条款页 + 表单登录/注册/密码重置/反馈工单（失败重渲染，不裸 4xx） |
+| `feedback/__init__.py` | 162 | 用户反馈工单：POST/GET /feedback + Redis 频率限制 |
+| `admin/routes.py` | 451 | 管理端：用户/积分/订单/统计/反馈工单/运营监控 SSR 页 |
 | `billing/service.py` | 175 | 积分账户：grant/deduct/refund/流水（幂等靠 ref 唯一） |
 | `payments/xunhupay.py` | 86 | 虎皮椒签名/下单/回调验签 |
 | `usage/middleware.py` | 75 | BaseHTTPMiddleware 用量日志（注意 task group 约束） |
@@ -84,7 +84,7 @@ searchpipe/
 
 ## 路由速查
 
-**API（JWT/API Key）**：`/auth/register|login|refresh|forgot-password|reset-password|me`（auth/routes.py:153-305）· `/api-keys` CRUD · `/billing/balance|transactions|plans` · `/payments/packages|orders|callback` · `/usage|/usage/logs|/usage/export` · `/feedback` 提交/列表 · `/admin/users|credits|orders|stats|feedback|monitor` · `POST /search`（main.py:100）
+**API（JWT/API Key）**：`/auth/register|login|refresh|forgot-password|reset-password|me`（auth/routes.py:153-305）· `/api-keys` CRUD · `/billing/balance|transactions|plans` · `/payments/packages|orders|callback` · `/usage|/usage/logs|/usage/export` · `/feedback` 提交/列表 · `/admin/users|credits|orders|stats|feedback|monitor` · `POST /search`（main.py:110）· `GET /agent-setup/SKILL.md`（main.py:104）
 
 **控制台（session cookie）**：`GET /` 营销页 · `GET /robots.txt` · `GET /sitemap.xml` · `/terms` 服务条款 · `/dashboard/login|register|forgot-password|reset-password|logout` · `/dashboard[|/api-keys|/usage|/billing|/docs|/feedback]`（dashboard/routes.py）
 
