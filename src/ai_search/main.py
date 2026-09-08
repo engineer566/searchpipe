@@ -81,7 +81,8 @@ app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 
 # MCP 远程端点（streamable-http）——与 /search 共用同一进程/容器，
 # 复用 mcp_server.py 的 ai_search_search tool（含完整商业管线：鉴权→扣费→…）。
-# 客户端（Claude Code）经 https://searchpipe.tech/mcp 连接，Authorization 头传 sp- key。
+# 客户端经 {APP_BASE_URL}/mcp?api_key=sp-xxx 连接（Tavily 式 URL 内嵌 Key），
+# 也兼容 Authorization: Bearer 头鉴权。
 app.mount("/mcp", _mcp_app)
 
 # 路由器

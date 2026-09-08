@@ -19,6 +19,8 @@ def test_agent_setup_skill_md(client: TestClient):
     text = resp.text
     # 必须包含 MCP 端点
     assert "/mcp" in text
+    # 必须推荐 URL 内嵌 API Key 的 MCP 链接（Tavily 式远程 MCP）
+    assert "/mcp?api_key=sp-" in text
     # 必须包含 API Key 获取指引
     assert "sp-" in text
     # 必须包含各客户端配置示例
@@ -54,3 +56,19 @@ def test_docs_page_has_agent_setup_hint(client: TestClient):
     # 引导文案
     assert "一句话配置" in text or "agent-setup" in text
     assert "SKILL.md" in text
+
+
+def test_api_keys_page_shows_mcp_link(client: TestClient):
+    """API Keys 页展示 MCP 链接（URL 内嵌 Key 格式）。"""
+    import uuid
+    email = f"mcpkeys-{uuid.uuid4().hex[:8]}@example.com"
+    resp = client.post(
+        "/dashboard/register",
+        data={"email": email, "password": "test-pass-1234", "password_confirm": "test-pass-1234", "agree_terms": "on"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    resp = client.get("/dashboard/api-keys")
+    assert resp.status_code == 200
+    # 页面头部与创建弹窗均应包含 MCP 链接格式说明
+    assert "/mcp?api_key=" in resp.text

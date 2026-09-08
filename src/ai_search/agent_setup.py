@@ -22,47 +22,38 @@ This skill utilizes the SearchPipe MCP server, providing clean, real-time web se
 
 | 项目 | 值 |
 |------|-----|
-| **传输协议** | streamable-http |
-| **MCP URL** | `{base_url}/mcp` |
+| **传输协议** | streamable-http（远程 MCP） |
+| **MCP URL** | `{base_url}/mcp?api_key=sp-你的API密钥` |
 | **工具名** | `ai_search_search` |
 
-## API Key 获取步骤
+SearchPipe 是**远程 MCP Server**：API Key 直接内嵌在 MCP URL 的 `api_key` 参数里
+（与 Tavily 的 `?tavilyApiKey=` 同款），任何支持 streamable-http 的客户端都能直接用，
+不需要自定义请求头。
+
+## API Key 与 MCP 链接获取步骤
 
 1. 访问 `{base_url}/dashboard/register` 注册账号（注册即送免费额度）。
 2. 登录后进入「API Keys」页面：`{base_url}/dashboard/api-keys`。
-3. 点击「创建」，复制以 `sp-` 开头的 API Key。
-4. 将 API Key 配置到 MCP 客户端（见下方配置示例）。
+3. 点击「创建」生成 `sp-` 开头的 API Key——创建成功弹窗里会直接给出完整的
+   **MCP 链接**（`{base_url}/mcp?api_key=sp-...`），复制即可。
+4. 把该 MCP 链接配置到客户端（见下方配置示例）。
 
 ## MCP 客户端配置示例
 
 ### Claude Code
 
-在项目根目录创建 `.mcp.json`：
-
-```json
-{{
-  "mcpServers": {{
-    "searchpipe": {{
-      "command": "npx",
-      "args": ["-y", "@anthropic-ai/mcp@latest"],
-      "env": {{
-        "SEARCHPIPE_API_KEY": "sp-你的API密钥"
-      }}
-    }}
-  }}
-}}
+```bash
+claude mcp add --transport http searchpipe "{base_url}/mcp?api_key=sp-你的API密钥"
 ```
 
-或使用 streamable-http 直连（Claude Code 2025-06+ 支持）：
+或手工编辑 `.mcp.json`：
 
 ```json
 {{
   "mcpServers": {{
     "searchpipe": {{
-      "url": "{base_url}/mcp",
-      "headers": {{
-        "Authorization": "Bearer sp-你的API密钥"
-      }}
+      "type": "http",
+      "url": "{base_url}/mcp?api_key=sp-你的API密钥"
     }}
   }}
 }}
@@ -76,10 +67,7 @@ This skill utilizes the SearchPipe MCP server, providing clean, real-time web se
 {{
   "mcpServers": {{
     "searchpipe": {{
-      "url": "{base_url}/mcp",
-      "headers": {{
-        "Authorization": "Bearer sp-你的API密钥"
-      }}
+      "url": "{base_url}/mcp?api_key=sp-你的API密钥"
     }}
   }}
 }}
@@ -87,13 +75,25 @@ This skill utilizes the SearchPipe MCP server, providing clean, real-time web se
 
 ### 其他支持 streamable-http 的 MCP 客户端
 
-通用配置格式：
+通用配置格式（URL 内嵌 Key）：
 
 ```json
 {{
   "mcpServers": {{
     "searchpipe": {{
       "transport": "streamable-http",
+      "url": "{base_url}/mcp?api_key=sp-你的API密钥"
+    }}
+  }}
+}}
+```
+
+如果客户端支持自定义请求头，也可以用 Header 鉴权（与 URL 方式二选一）：
+
+```json
+{{
+  "mcpServers": {{
+    "searchpipe": {{
       "url": "{base_url}/mcp",
       "headers": {{
         "Authorization": "Bearer sp-你的API密钥"

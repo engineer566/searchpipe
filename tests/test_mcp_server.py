@@ -127,6 +127,56 @@ async def mcp_client():
 # --- 鉴权不变量 -----------------------------------------------------------
 
 
+class _FakeRequest:
+    """模拟 fastmcp get_http_request 返回的 Starlette Request（仅本单测用到的字段）。"""
+
+    def __init__(self, headers: dict | None = None, query: str = ""):
+        self.headers = headers or {}
+        # Starlette QueryParams 接口：.get(key)
+        from starlette.datastructures import QueryParams
+
+        self.query_params = QueryParams(query)
+
+
+def test_resolve_raw_key_from_query_param(monkeypatch):
+    """URL 内嵌 ?api_key=sp-xxx（Tavily 式 MCP 链接）应被识别。"""
+    from ai_search import mcp_server
+
+    monkeypatch.delenv("SEARCHPIPE_API_KEY", raising=False)
+    monkeypatch.setattr(
+        mcp_server, "get_http_request",
+        lambda: _FakeRequest(query="api_key=sp-querykey123"),
+    )
+    assert mcp_server._resolve_raw_key(None) == "sp-querykey123"
+
+
+def test_resolve_raw_key_header_beats_query(monkeypatch):
+    """Authorization 头优先于 URL query 参数。"""
+    from ai_search import mcp_server
+
+    monkeypatch.delenv("SEARCHPIPE_API_KEY", raising=False)
+    monkeypatch.setattr(
+        mcp_server, "get_http_request",
+        lambda: _FakeRequest(
+            headers={"authorization": "Bearer sp-headerkey"}, query="api_key=sp-querykey"
+        ),
+    )
+    assert mcp_server._resolve_raw_key(None) == "sp-headerkey"
+
+
+def test_resolve_raw_key_no_key_raises(monkeypatch):
+    """既无头也无 query → ToolError 提示含 ?api_key= 用法。"""
+    from fastmcp.exceptions import ToolError as TE
+
+    from ai_search import mcp_server
+
+    monkeypatch.delenv("SEARCHPIPE_API_KEY", raising=False)
+    monkeypatch.setattr(mcp_server, "get_http_request", lambda: _FakeRequest())
+    with pytest.raises(TE) as exc:
+        mcp_server._resolve_raw_key(None)
+    assert "api_key" in str(exc.value)
+
+
 async def test_mcp_requires_api_key(mcp_client: Client):
     """不带 key → tool error「缺少有效的 sp- API Key」。"""
     with pytest.raises(ToolError) as exc:

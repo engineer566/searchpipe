@@ -100,17 +100,21 @@ const data = await resp.json();</code></pre></div>
 
 <div class="card">
   <h2>MCP 接入（Claude Code / Cursor）</h2>
-  <p class="card-sub">项目内置 MCP Server，搜索能力可作为工具直接给 AI 客户端使用：</p>
-  <div class="code-block" data-copy><pre><code># 项目内已配置 .mcp.json，Claude Code 中 /mcp 即可看到 SearchPipe
-# 工具名：ai_search_search（参数与 POST /search 一致）
-# 手动注册：
-uv run --directory /path/to/ai-search ai-search-mcp</code></pre></div>
+  <p class="card-sub">SearchPipe 是远程 MCP Server（streamable-http）。到「API Keys」页创建 Key，创建弹窗会直接给出完整 MCP 链接，把它填进客户端即可：</p>
+  <div class="code-block" data-copy><pre><code># MCP 链接格式（Key 内嵌在 URL，无需配置请求头）：
+{{ request.base_url }}mcp?api_key=sp-你的API密钥
+
+# Claude Code 一键添加：
+claude mcp add --transport http searchpipe "{{ request.base_url }}mcp?api_key=sp-你的API密钥"
+
+# 工具名：ai_search_search（参数与 POST /search 一致）</code></pre></div>
+  <p class="card-sub">支持自定义请求头的客户端也可以二选一：URL 用 <code>{{ request.base_url }}mcp</code>，加 <code>Authorization: Bearer sp-…</code> 头。</p>
 </div>
 
 <div class="card">
   <h2>一句话配置 MCP</h2>
   <p class="card-sub">把下面的链接发给你的 AI Agent，即可自动完成 SearchPipe MCP 配置：</p>
   <div class="code-block" data-copy><pre><code>{{ request.base_url }}agent-setup/SKILL.md</code></pre></div>
-  <p class="card-sub">支持 Claude Code、Cursor 及其他兼容 MCP streamable-http 的客户端。配置后 Agent 会自动获取 API Key 并完成 MCP 注册。</p>
+  <p class="card-sub">支持 Claude Code、Cursor 及其他兼容 MCP streamable-http 的客户端。Agent 会引导你创建 API Key，并把 Key 内嵌进 MCP URL 完成注册。</p>
 </div>
 {% endblock %}

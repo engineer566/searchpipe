@@ -44,17 +44,19 @@ mcp = FastMCP("ai-search")
 
 
 def _resolve_raw_key(api_key: str | None) -> str:
-    """取本次调用用的 API Key，优先级：参数 > HTTP 头 > 环境变量。
+    """取本次调用用的 API Key，优先级：参数 > HTTP 头 > URL query > 环境变量。
 
-    远程 HTTP 传输下，Claude Code 等客户端通过 Authorization: Bearer <key>
-    或 X-API-Key 头传 key；stdio 传输下无 HTTP 请求，回退到环境变量。
+    远程 HTTP 传输下，客户端可三选一传 key（对齐 Tavily 远程 MCP 模型）：
+    - Authorization: Bearer <key> 或 X-API-Key 头
+    - MCP URL 内嵌：`/mcp?api_key=sp-xxx`（不支持自定义头的客户端用此方式）
+    stdio 传输下无 HTTP 请求，回退到环境变量。
 
     mcp_require_api_key=True 时必须返回 sp- 开头的 key，否则抛 ToolError。
     """
     settings = get_settings()
     raw = (api_key or "").strip()
 
-    # 远程 HTTP：从 Authorization / X-API-Key 头取
+    # 远程 HTTP：从 Authorization / X-API-Key 头取，其次 URL query（?api_key=）
     if not raw:
         try:
             req = get_http_request()
@@ -66,6 +68,8 @@ def _resolve_raw_key(api_key: str | None) -> str:
                 raw = auth[7:].strip()
             if not raw:
                 raw = (req.headers.get("x-api-key") or "").strip()
+            if not raw:
+                raw = (req.query_params.get("api_key") or "").strip()
 
     # 兜底：环境变量（stdio 场景的主力来源）
     if not raw:
@@ -75,7 +79,8 @@ def _resolve_raw_key(api_key: str | None) -> str:
         return raw  # 本地 dev 旁路：允许空 key（裸调 run_search）
     if not raw.startswith("sp-"):
         raise ToolError(
-            "缺少有效的 sp- API Key（传 api_key 参数 / Authorization 头 / 设 SEARCHPIPE_API_KEY 环境变量）"
+            "缺少有效的 sp- API Key（MCP URL 内嵌 ?api_key=sp-xxx / Authorization 头 / "
+            "传 api_key 参数 / 设 SEARCHPIPE_API_KEY 环境变量）"
         )
     return raw
 

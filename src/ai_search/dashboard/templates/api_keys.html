@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-head">
   <h1>API Keys</h1>
-  <p>程序调用 <code>/search</code> 时使用 <code>sp-</code> 前缀的 Key 鉴权。明文仅在创建时显示一次，请妥善保存。</p>
+  <p>程序调用 <code>/search</code> 时使用 <code>sp-</code> 前缀的 Key 鉴权；MCP 接入直接把 Key 编进链接（<code>{{ base_url }}/mcp?api_key=sp-…</code>）。明文仅在创建时显示一次，请妥善保存。</p>
 </div>
 
 <div class="card">
@@ -20,12 +20,13 @@
   {% if keys %}
   <div class="table-wrap mt">
     <table>
-      <thead><tr><th>名称</th><th>前缀</th><th>最近使用</th><th>状态</th><th>创建时间</th><th></th></tr></thead>
+      <thead><tr><th>名称</th><th>前缀</th><th>MCP 链接</th><th>最近使用</th><th>状态</th><th>创建时间</th><th></th></tr></thead>
       <tbody>
       {% for k in keys %}
         <tr>
           <td style="font-weight:500">{{ k.name }}</td>
           <td><code>{{ k.key_prefix }}…</code></td>
+          <td><code class="muted">{{ base_url }}/mcp?api_key={{ k.key_prefix }}…</code><div class="muted" style="font-size:12px">完整链接在创建时展示</div></td>
           <td class="muted">{{ k.last_used_at.strftime('%Y-%m-%d %H:%M') if k.last_used_at else '—' }}</td>
           <td>{% if k.revoked_at %}<span class="tag tag-err">已吊销</span>{% else %}<span class="tag tag-ok">有效</span>{% endif %}</td>
           <td class="muted">{{ k.created_at.strftime('%Y-%m-%d') }}</td>
@@ -46,6 +47,9 @@
     <h3>Key 已创建</h3>
     <p class="muted" style="font-size:14px;margin:0 0 14px">请立即复制保存——出于安全考虑，完整 Key 不会再显示。</p>
     <div class="code-block" data-copy><pre><code id="new-key-val"></code></pre></div>
+    <h3 class="mt">MCP 链接（远程接入）</h3>
+    <p class="muted" style="font-size:14px;margin:0 0 14px">Claude Code / Cursor 等客户端直接填这个 URL 即可完成 MCP 配置：</p>
+    <div class="code-block" data-copy><pre><code id="new-mcp-url"></code></pre></div>
     <div class="row mt" style="justify-content:flex-end">
       <button class="btn" onclick="location.reload()">我已保存</button>
     </div>
@@ -63,6 +67,7 @@ document.getElementById('create-form').onsubmit=async e=>{
   try{
     const d=await AIS.api('/api-keys',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name})});
     document.getElementById('new-key-val').textContent=d.key;
+    document.getElementById('new-mcp-url').textContent='{{ base_url }}/mcp?api_key='+d.key;
     const m=document.getElementById('key-modal');
     m.classList.add('open');
     AIS.initCopyBlocks();

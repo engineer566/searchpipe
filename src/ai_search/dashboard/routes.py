@@ -406,7 +406,7 @@ async def dashboard_api_keys(
     from ..api_keys.service import list_keys
 
     keys = await list_keys(db, user.id)
-    return templates.TemplateResponse(
+    return _render_with_base(
         request, "api_keys.html", {"user": user, "keys": keys, "active": "keys"}
     )
 

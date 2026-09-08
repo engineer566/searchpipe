@@ -15,7 +15,8 @@ searchpipe/
 │   ├── main.py               # FastAPI 入口：中间件/路由汇聚 + /search 依赖链 + /healthz + /agent-setup/SKILL.md（186 行）
 │   ├── config.py             # pydantic-settings 全部配置（含 SMTP、OAuth、支付、审核、限流）（89 行）
 │   ├── schemas.py            # /search 请求/响应模型
-│   ├── mcp_server.py         # FastMCP streamable-http 子应用（/mcp，共用商业管线）（214 行）
+│   ├── mcp_server.py         # FastMCP streamable-http 子应用（/mcp，共用商业管线；鉴权支持 URL ?api_key= / Authorization 头 / 工具参数）（219 行）
+│   ├── agent_setup.py        # /agent-setup/SKILL.md 生成：Tavily 式 URL 内嵌 Key 的 MCP 接入指南（172 行）
 │   ├── auth/                 # 鉴权：JWT + session cookie + API Key 三通道
 │   │   ├── routes.py         # /auth/*：注册/登录/refresh/忘记密码/重置/OAuth stub/me（307 行）
 │   │   ├── dependencies.py   # get_current_user 等 DI 依赖（cookie 兜底）（139 行）
