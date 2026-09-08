@@ -27,20 +27,21 @@ searchpipe/
 │   │   ├── oauth.py          # GitHub/微信 OAuth 客户端（106 行）
 │   │   └── errors.py         # AuthError（17 行）
 │   ├── dashboard/            # 控制台（Jinja2 SSR + session cookie）
-│   │   ├── routes.py         # /dashboard/* 页面 + 登录/注册/忘记密码表单处理（376 行；2026-09-08 新增注册与密码重置页）
-│   │   ├── templates/        # base/landing/login/register/forgot_password/reset_password/dashboard/api_keys/usage/billing/docs（11 个模板）
+│   │   ├── routes.py         # /dashboard/* 页面 + 登录/注册/忘记密码表单处理（396 行；2026-09-08 新增反馈工单页）
+│   │   ├── templates/        # base/landing/login/register/forgot_password/reset_password/dashboard/api_keys/usage/billing/docs/feedback（12 个模板）
 │   │   └── static/           # app.css（双主题设计系统）+ app.js
 │   ├── db/
 │   │   ├── base.py           # engine/session 工厂 + dispose_engine（44 行）
 │   │   ├── session.py        # get_db 依赖
-│   │   └── models/           # user(含 OAuthAccount)/api_key/billing/credit/usage
+│   │   └── models/           # user(含 OAuthAccount)/api_key/billing/credit/usage/feedback_ticket
 │   ├── billing/              # 积分计费：扣费/退款/赠送/流水（service 175 行；pipeline 88 行）
 │   ├── payments/             # 虎皮椒支付：下单/回调/状态查询（routes 136 行）
 │   ├── api_keys/             # sp- 前缀 API Key CRUD（service 91 行）
 │   ├── usage/                # 用量日志中间件 + 统计/导出（middleware 75 行）
 │   ├── rate_limit/           # Redis ZSET 滑动窗口限流（service 42 行）
 │   ├── moderation/           # 阿里云内容安全（输入/输出审核）（aliyun 109 行）
-│   ├── admin/                # 管理端：用户/积分/订单/统计（routes 246 行）
+│   ├── admin/                # 管理端：用户/积分/订单/统计/反馈工单（routes 246 行）
+│   ├── feedback/             # 用户反馈工单：提交/列表/管理侧关闭（routes 120 行）
 │   ├── search/               # 检索编排：SearXNG 客户端 + 多引擎聚合（orchestrator 53 行）
 │   ├── extract/              # trafilatura 正文抓取（fetcher 229 行）
 │   ├── rerank/               # LLM 重排（llm_reranker 136 行）
@@ -71,7 +72,9 @@ searchpipe/
 | `auth/routes.py` | 307 | 注册/登录/refresh/忘记密码/重置密码/OAuth stub/me |
 | `auth/dependencies.py` | 139 | JWT/API Key/cookie 三通道 DI |
 | `auth/password_reset.py` | 87 | Redis 一次性重置 token（`pwdreset:token:*`）+ 冷却（`pwdreset:cooldown:*`） |
-| `dashboard/routes.py` | 376 | SSR 页面 + 表单登录/注册/密码重置（失败重渲染，不裸 4xx） |
+| `dashboard/routes.py` | 396 | SSR 页面 + 表单登录/注册/密码重置/反馈工单（失败重渲染，不裸 4xx） |
+| `feedback/__init__.py` | 120 | 用户反馈工单：POST/GET /feedback + Redis 频率限制 |
+| `admin/routes.py` | 320 | 管理端：用户/积分/订单/统计/反馈工单列表与关闭 |
 | `billing/service.py` | 175 | 积分账户：grant/deduct/refund/流水（幂等靠 ref 唯一） |
 | `payments/xunhupay.py` | 86 | 虎皮椒签名/下单/回调验签 |
 | `usage/middleware.py` | 75 | BaseHTTPMiddleware 用量日志（注意 task group 约束） |
@@ -81,9 +84,9 @@ searchpipe/
 
 ## 路由速查
 
-**API（JWT/API Key）**：`/auth/register|login|refresh|forgot-password|reset-password|me`（auth/routes.py:153-305）· `/api-keys` CRUD · `/billing/balance|transactions|plans` · `/payments/packages|orders|callback` · `/usage|/usage/logs|/usage/export` · `/admin/users|credits|orders|stats` · `POST /search`（main.py:100）
+**API（JWT/API Key）**：`/auth/register|login|refresh|forgot-password|reset-password|me`（auth/routes.py:153-305）· `/api-keys` CRUD · `/billing/balance|transactions|plans` · `/payments/packages|orders|callback` · `/usage|/usage/logs|/usage/export` · `/feedback` 提交/列表 · `/admin/users|credits|orders|stats|feedback` · `POST /search`（main.py:100）
 
-**控制台（session cookie）**：`GET /` 营销页 · `/dashboard/login|register|forgot-password|reset-password|logout` · `/dashboard[|/api-keys|/usage|/billing|/docs]`（dashboard/routes.py:119-376）
+**控制台（session cookie）**：`GET /` 营销页 · `/dashboard/login|register|forgot-password|reset-password|logout` · `/dashboard[|/api-keys|/usage|/billing|/docs|/feedback]`（dashboard/routes.py:119-396）
 
 ## 按任务跳转表
 
@@ -94,7 +97,7 @@ searchpipe/
 | 改控制台页面 | `dashboard/routes.py` 头部 docstring 路由表 | 对应 `dashboard/templates/*.html` |
 | 改搜索管线 | `core/search_service.py` | `search/orchestrator.py` → `extract/fetcher.py` → `rerank/llm_reranker.py` |
 | 改计费/退款 | `billing/service.py` 头部 docstring | `billing/pipeline.py` + `main.py` /search 依赖链 |
-| 加测试 | `tests/conftest.py` 头部 docstring（loop 隔离硬约束） | 现有 `tests/test_auth.py` 作范式 |
+| 加测试 | `tests/conftest.py` 头部 docstring（loop 隔离硬约束） | 现有 `tests/test_auth.py` / `tests/test_feedback.py` 作范式 |
 | 部署到测试服 | `docs/memory/searchpipe-test-server.md` | `Dockerfile` / `docker-compose.test.yml` |
 | 改配置/环境变量 | `config.py` | `.env.example`（同步更新） |
 

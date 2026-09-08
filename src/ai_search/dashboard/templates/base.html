@@ -30,6 +30,9 @@
       <a href="/dashboard/docs" class="{% if active=='docs' %}active{% endif %}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
         文档</a>
+      <a href="/dashboard/feedback" class="{% if active=='feedback' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        反馈</a>
     </nav>
     <div class="side-foot">
       <button class="theme-toggle" type="button"><span class="tt-icon"></span><span class="tt-label"></span></button>
@@ -45,6 +48,7 @@
     <a href="/dashboard/usage" class="{% if active=='usage' %}active{% endif %}">用量</a>
     <a href="/dashboard/billing" class="{% if active=='billing' %}active{% endif %}">充值</a>
     <a href="/dashboard/docs" class="{% if active=='docs' %}active{% endif %}">文档</a>
+    <a href="/dashboard/feedback" class="{% if active=='feedback' %}active{% endif %}">反馈</a>
     <span style="flex:1"></span>
     <button class="theme-toggle" type="button" style="width:auto;padding:5px 10px"><span class="tt-icon"></span></button>
     <a href="/dashboard/logout">退出</a>

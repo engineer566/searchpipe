@@ -380,3 +380,17 @@ async def dashboard_docs(
     return templates.TemplateResponse(
         request, "docs.html", {"user": user, "active": "docs"}
     )
+
+
+@router.get("/feedback")
+async def dashboard_feedback(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> object:
+    """反馈工单页：提交表单 + 我的工单列表。"""
+    user = await _user_from_session(request, db)
+    if not user:
+        return RedirectResponse(url="/dashboard/login", status_code=status.HTTP_303_SEE_OTHER)
+    return templates.TemplateResponse(
+        request, "feedback.html", {"user": user, "active": "feedback"}
+    )

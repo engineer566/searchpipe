@@ -7,6 +7,8 @@
 - POST  /admin/credits/grant    手动发放额度
 - GET   /admin/orders           订单总览
 - GET   /admin/stats            概览统计
+- GET   /admin/feedback         工单列表（可按 status 过滤）
+- POST  /admin/feedback/{id}/close 关闭工单
 """
 
 import logging
@@ -15,12 +17,12 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..auth.dependencies import get_current_admin
 from ..billing.service import grant_credits
-from ..db.models import CreditAccount, Order, OrderStatus, UsageLog, User
+from ..db.models import CreditAccount, FeedbackTicket, Order, OrderStatus, TicketStatus, UsageLog, User
 from ..db.session import get_db
 
 logger = logging.getLogger(__name__)
@@ -82,6 +84,24 @@ class AdminStatsResponse(BaseModel):
     total_searches: int
     total_revenue_cents: int
     paid_order_count: int
+
+
+class AdminFeedbackItem(BaseModel):
+    id: str
+    user_id: str
+    category: str
+    subject: str
+    content: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class AdminFeedbackListResponse(BaseModel):
+    items: list[AdminFeedbackItem]
+    total: int
+    page: int
+    size: int
 
 
 # ---------- 用户管理 ----------
@@ -244,3 +264,70 @@ async def stats(
         total_revenue_cents=int(paid_orders[1]),
         paid_order_count=paid_orders[0],
     )
+
+
+# ---------- 工单管理 ----------
+
+
+@router.get("/feedback", response_model=AdminFeedbackListResponse)
+async def list_feedback(
+    ticket_status: str | None = Query(default=None, alias="status"),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> AdminFeedbackListResponse:
+    """列全部工单，可按 status 过滤（open/closed）。"""
+    if ticket_status is not None and ticket_status not in ("open", "closed"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "status 必须是 open 或 closed")
+
+    base_stmt = select(FeedbackTicket)
+    if ticket_status:
+        base_stmt = base_stmt.where(FeedbackTicket.status == ticket_status)
+
+    total = (
+        await db.execute(select(func.count()).select_from(base_stmt.subquery()))
+    ).scalar_one()
+
+    stmt = (
+        base_stmt.order_by(desc(FeedbackTicket.created_at))
+        .offset((page - 1) * size)
+        .limit(size)
+    )
+    rows = (await db.execute(stmt)).scalars().all()
+
+    return AdminFeedbackListResponse(
+        items=[
+            AdminFeedbackItem(
+                id=str(r.id),
+                user_id=str(r.user_id),
+                category=r.category,
+                subject=r.subject,
+                content=r.content,
+                status=r.status,
+                created_at=r.created_at,
+                updated_at=r.updated_at,
+            )
+            for r in rows
+        ],
+        total=total,
+        page=page,
+        size=size,
+    )
+
+
+@router.post("/feedback/{ticket_id}/close")
+async def close_feedback(
+    ticket_id: str,
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """关闭工单。"""
+    ticket = await db.get(FeedbackTicket, ticket_id)
+    if not ticket:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "工单不存在")
+    if ticket.status == TicketStatus.CLOSED.value:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "工单已关闭")
+    ticket.status = TicketStatus.CLOSED.value
+    await db.commit()
+    return {"msg": "工单已关闭", "id": ticket_id}
