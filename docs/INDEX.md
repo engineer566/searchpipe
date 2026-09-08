@@ -48,7 +48,7 @@ searchpipe/
 │   └── utils/                # cache（Redis 懒连接单例 97 行）/ mailer（smtplib+to_thread，SMTP 未配置降级日志，54 行；2026-09-08）/ logger
 ├── alembic/                  # DB 迁移（入口 entrypoint.sh 自动 upgrade head）
 ├── tests/                    # pytest；真实 PG/Redis；conftest 有 loop 隔离硬约束（必读）
-├── searxng/                  # SearXNG 配置（bing+baidu，已开 JSON API）
+├── searxng/                  # SearXNG 配置（bing+baidu+sogou+360search，已开 JSON API；google/brave/wiki 系境内不可达已禁用）
 ├── history/                  # 需求/任务备忘（按日期）
 ├── docs/                     # 本索引 + 项目记忆
 ├── Dockerfile / entrypoint.sh / docker-compose.yml / docker-compose.test.yml

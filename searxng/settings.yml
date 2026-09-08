@@ -302,7 +302,8 @@ engines:
     engine: 360search
     shortcut: 360so
     timeout: 20.0
-    disabled: true
+    # 境内可达，启用补中文召回
+    disabled: false
 
   - name: 360search videos
     engine: 360search_videos
@@ -536,8 +537,9 @@ engines:
     categories: [general]
     engine: baidu
     shortcut: bd
-    # 海外主机访问 baidu 频发 CAPTCHA → Suspended，禁用
-    disabled: true
+    # 测试服在境内（阿里云），baidu 直连 ~0.1s，启用补中文召回；
+    # 机房 IP 偶发 CAPTCHA → SearXNG 自动 Suspended 1h 后重试，优雅降级不阻塞查询
+    disabled: false
 
   - name: baidu images
     baidu_category: images
@@ -556,6 +558,8 @@ engines:
   - name: wikipedia
     engine: wikipedia
     shortcut: wp
+    # 测试服在境内，wikipedia 不可达（必超时），禁用
+    disabled: true
     # add "list" to the array to get results in the results list
     display_type: ["infobox"]
     categories: [general]
@@ -846,6 +850,8 @@ engines:
     shortcut: wd
     timeout: 3.0
     weight: 2
+    # 测试服在境内，wikidata 不可达（必超时），禁用
+    disabled: true
     # add "list" to the array to get results in the results list
     display_type: ["infobox"]
     categories: [general]
@@ -1222,7 +1228,7 @@ engines:
     engine: google
     shortcut: go
     # google（非 cse）在海外裸 IP 上频发 CAPTCHA → Suspended，禁用避免无效请求；
-    # 检索实际由 google cse + bing + brave 提供
+    # 且测试服在境内，google 全系不可达；检索实际由 bing + baidu + sogou + 360search 提供
     disabled: true
 
   - name: google images
@@ -1233,6 +1239,8 @@ engines:
   - name: google news
     engine: google_news
     shortcut: gon
+    # 境内不可达，禁用
+    disabled: true
 
   - name: google videos
     engine: google_videos
@@ -1242,16 +1250,21 @@ engines:
   - name: google cse
     engine: google_cse
     shortcut: goc
+    # 境内不可达（必超时），禁用；网页召回由 bing + baidu + sogou + 360search 提供
+    disabled: true
 
   - name: google cse images
     engine: google_cse
     categories: [images, web]
     google_categ: image
     shortcut: goci
+    disabled: true
 
   - name: google scholar
     engine: google_scholar
     shortcut: gos
+    # 境内不可达，禁用
+    disabled: true
 
   - name: google play apps
     engine: google_play
@@ -2218,7 +2231,8 @@ engines:
   - name: sogou
     engine: sogou
     shortcut: sogou
-    disabled: true
+    # 境内可达，启用补中文召回
+    disabled: false
 
   - name: sogou images
     engine: sogou_images
@@ -3253,6 +3267,8 @@ engines:
     categories: [general, web]
     brave_category: search
     # brave_spellcheck: true
+    # 测试服在境内，brave 不可达（必超时），禁用
+    disabled: true
 
   - name: brave.images
     engine: brave
@@ -3260,6 +3276,7 @@ engines:
     shortcut: brimg
     categories: [images, web]
     brave_category: images
+    disabled: true
 
   - name: brave.videos
     engine: brave
@@ -3267,6 +3284,7 @@ engines:
     shortcut: brvid
     categories: [videos, web]
     brave_category: videos
+    disabled: true
 
   - name: brave.news
     engine: brave
@@ -3274,6 +3292,7 @@ engines:
     shortcut: brnews
     categories: news
     brave_category: news
+    disabled: true
 
   # - name: brave.goggles
   #   engine: brave
