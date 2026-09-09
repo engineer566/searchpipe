@@ -52,7 +52,7 @@ searchpipe/
 ├── tests/                    # pytest；真实 PG/Redis；conftest 有 loop 隔离硬约束（必读）
 ├── searxng/                  # SearXNG 双环境配置：settings.yml=境外默认（bing+google cse+brave+wiki 系）；settings.cn.yml=境内（bing+baidu+sogou+360search），compose 按 SEARXNG_SETTINGS_PATH 选用
 ├── history/                  # 需求/任务备忘（按日期）
-├── docs/                     # 本索引 + 项目记忆
+├── docs/                     # 本索引 + 项目记忆 + REGRESSION_CHECKLIST.md（MVP 全量回归测试清单，版本迭代上线前必跑）
 ├── Dockerfile / entrypoint.sh / docker-compose.yml / docker-compose.test.yml
 └── AGENTS.md                 # Agent 入口规则（DSH 自动加载）
 ```
@@ -101,6 +101,7 @@ searchpipe/
 | 改计费/退款/订阅 | `billing/service.py` 头部 docstring | `billing/subscription.py` + `billing/pipeline.py` + `payments/service.py` |
 | 加测试 | `tests/conftest.py` 头部 docstring（loop 隔离硬约束） | 现有 `tests/test_auth.py` / `tests/test_feedback.py` 作范式 |
 | 部署到测试服 | `docs/memory/searchpipe-test-server.md` | `Dockerfile` / `docker-compose.test.yml` |
+| 版本迭代上线前全量回归 | `docs/REGRESSION_CHECKLIST.md`（随功能变更同步更新） | 路由核对用上方「路由速查」 |
 | 改配置/环境变量 | `config.py` | `.env.example`（同步更新） |
 
 ## Agent 使用约定
