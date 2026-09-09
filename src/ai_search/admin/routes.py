@@ -7,8 +7,10 @@
 - POST  /admin/credits/grant    手动发放额度
 - GET   /admin/orders           订单总览
 - GET   /admin/stats            概览统计
-- GET   /admin/feedback         工单列表（可按 status 过滤）
+- GET   /admin/feedback         工单列表（可按 status 过滤；Accept: text/html 时渲染管理页）
 - POST  /admin/feedback/{id}/close 关闭工单
+- GET   /admin/messages         站内信 SSR 页（发送表单 + 已发批次已读统计；支持 ?to= 邮箱 / ?ticket= 工单预填）
+- POST  /admin/messages         发送站内信（定向按邮箱 / 全局广播，一行一收件人）
 - GET   /admin/monitor          运营监控（SSR 页面）
 """
 
@@ -16,7 +18,8 @@ import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, status
+from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from sqlalchemy import desc, func, select
@@ -25,7 +28,19 @@ from pathlib import Path
 
 from ..auth.dependencies import get_current_admin
 from ..billing.service import grant_credits
-from ..db.models import CreditAccount, CreditTransaction, FeedbackTicket, Order, OrderStatus, TicketStatus, UsageLog, User
+from ..db.models import (
+    CreditAccount,
+    CreditTransaction,
+    FeedbackTicket,
+    MessageKind,
+    Order,
+    OrderStatus,
+    SiteMessage,
+    TicketStatus,
+    UsageLog,
+    User,
+    UserStatus,
+)
 from ..db.session import get_db
 
 logger = logging.getLogger(__name__)
@@ -281,15 +296,42 @@ async def stats(
 
 @router.get("/feedback", response_model=AdminFeedbackListResponse)
 async def list_feedback(
+    request: Request,
     ticket_status: str | None = Query(default=None, alias="status"),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
-) -> AdminFeedbackListResponse:
-    """列全部工单，可按 status 过滤（open/closed）。"""
+) -> object:
+    """列全部工单，可按 status 过滤（open/closed）。
+
+    浏览器直接访问（Accept: text/html）时渲染工单管理 SSR 页
+    （含「通知该用户」入口，跳转 /admin/messages 预填收件人）；
+    程序调用（fetch/API）返回 JSON。
+    """
     if ticket_status is not None and ticket_status not in ("open", "closed"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "status 必须是 open 或 closed")
+
+    if "text/html" in request.headers.get("accept", ""):
+        stmt = (
+            select(FeedbackTicket, User.email)
+            .join(User, FeedbackTicket.user_id == User.id)
+            .order_by(desc(FeedbackTicket.created_at))
+            .limit(100)
+        )
+        if ticket_status:
+            stmt = stmt.where(FeedbackTicket.status == ticket_status)
+        rows = (await db.execute(stmt)).all()
+        return templates.TemplateResponse(
+            request,
+            "admin_feedback.html",
+            {
+                "user": admin,
+                "active": "feedback",
+                "tickets": [{"ticket": t, "email": email} for t, email in rows],
+                "filter_status": ticket_status or "",
+            },
+        )
 
     base_stmt = select(FeedbackTicket)
     if ticket_status:
@@ -341,6 +383,160 @@ async def close_feedback(
     ticket.status = TicketStatus.CLOSED.value
     await db.commit()
     return {"msg": "工单已关闭", "id": ticket_id}
+
+
+# ---------- 站内信 ----------
+
+
+async def _render_admin_messages(
+    request: Request,
+    admin: User,
+    db: AsyncSession,
+    *,
+    prefill_to: str = "",
+    prefill_title: str = "",
+    prefill_content: str = "",
+    error: str | None = None,
+    sent: int | None = None,
+) -> object:
+    """渲染站内信管理页：发送表单 + 已发批次（含已读统计）。"""
+    batch_stmt = (
+        select(
+            SiteMessage.batch_id,
+            SiteMessage.kind,
+            SiteMessage.title,
+            func.count().label("total"),
+            func.count(SiteMessage.read_at).label("read_count"),
+            func.min(SiteMessage.created_at).label("created_at"),
+        )
+        .group_by(SiteMessage.batch_id, SiteMessage.kind, SiteMessage.title)
+        .order_by(desc(func.min(SiteMessage.created_at)))
+        .limit(50)
+    )
+    batches = (await db.execute(batch_stmt)).all()
+    return templates.TemplateResponse(
+        request,
+        "admin_messages.html",
+        {
+            "user": admin,
+            "active": "messages",
+            "batches": batches,
+            "prefill_to": prefill_to,
+            "prefill_title": prefill_title,
+            "prefill_content": prefill_content,
+            "error": error,
+            "sent": sent,
+        },
+    )
+
+
+@router.get("/messages")
+async def admin_messages_page(
+    request: Request,
+    to: str = Query(""),
+    ticket: str = Query(""),
+    sent: int | None = Query(None),
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> object:
+    """站内信管理页。支持 ?to=邮箱 预填收件人、?ticket=工单ID 预填回复文案。"""
+    prefill_to, prefill_title, prefill_content = to.strip(), "", ""
+    if ticket:
+        try:
+            ticket_id = uuid.UUID(ticket)
+        except ValueError:
+            ticket_id = None
+        ticket_obj = await db.get(FeedbackTicket, ticket_id) if ticket_id else None
+        if ticket_obj:
+            ticket_user = await db.get(User, ticket_obj.user_id)
+            if ticket_user and ticket_user.email and not prefill_to:
+                prefill_to = ticket_user.email
+            prefill_title = f"回复：工单「{ticket_obj.subject}」"
+            prefill_content = (
+                f"您好，关于您提交的工单「{ticket_obj.subject}」"
+                f"（编号 {ticket_obj.id}）：\n\n"
+            )
+    return await _render_admin_messages(
+        request,
+        admin,
+        db,
+        prefill_to=prefill_to,
+        prefill_title=prefill_title,
+        prefill_content=prefill_content,
+        sent=sent,
+    )
+
+
+@router.post("/messages")
+async def admin_send_message(
+    request: Request,
+    target_type: str = Form(...),
+    target_email: str = Form(""),
+    title: str = Form(...),
+    content: str = Form(...),
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> object:
+    """发送站内信：target_type=user 定向（按邮箱）/ broadcast 全局广播。
+
+    广播为每个活跃用户写一行（MVP 用户量小，简单可靠）。失败重渲染表单页提示。
+    """
+    title, content = title.strip(), content.strip()
+    target_email = target_email.strip().lower()
+
+    async def _fail(msg: str) -> object:
+        return await _render_admin_messages(
+            request,
+            admin,
+            db,
+            prefill_to=target_email,
+            prefill_title=title,
+            prefill_content=content,
+            error=msg,
+        )
+
+    if target_type not in (MessageKind.USER, MessageKind.BROADCAST):
+        return await _fail("非法的发送类型")
+    if not title or len(title) > 255:
+        return await _fail("标题不能为空且最长 255 字符")
+    if not content or len(content) > 5000:
+        return await _fail("内容不能为空且最长 5000 字符")
+
+    if target_type == MessageKind.BROADCAST:
+        recipients = (
+            (await db.execute(select(User).where(User.status == UserStatus.ACTIVE.value)))
+            .scalars()
+            .all()
+        )
+        if not recipients:
+            return await _fail("当前没有可接收的活跃用户")
+    else:
+        if not target_email:
+            return await _fail("请填写收件人邮箱")
+        recipient = (
+            await db.execute(select(User).where(User.email == target_email))
+        ).scalar_one_or_none()
+        if not recipient:
+            return await _fail(f"邮箱 {target_email} 未注册")
+        recipients = [recipient]
+
+    batch_id = uuid.uuid4()
+    for u in recipients:
+        db.add(
+            SiteMessage(
+                user_id=u.id,
+                sender_id=admin.id,
+                batch_id=batch_id,
+                kind=target_type,
+                title=title,
+                content=content,
+            )
+        )
+    await db.commit()
+    return RedirectResponse(
+        url=f"/admin/messages?sent={len(recipients)}",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
 
 
 # ---------- 监控 ----------

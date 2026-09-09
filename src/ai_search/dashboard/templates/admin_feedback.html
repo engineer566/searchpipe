@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}工单管理 · SearchPipe{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>工单管理</h1>
+  <p>用户反馈工单列表。可通过「通知该用户」向工单提交者发送站内信。</p>
+</div>
+
+<div class="card">
+  <div class="row" style="margin-bottom:12px;gap:8px">
+    <a class="tag {{ 'tag-ok' if not filter_status else 'tag-neutral' }}" href="/admin/feedback">全部</a>
+    <a class="tag {{ 'tag-ok' if filter_status == 'open' else 'tag-neutral' }}" href="/admin/feedback?status=open">处理中</a>
+    <a class="tag {{ 'tag-ok' if filter_status == 'closed' else 'tag-neutral' }}" href="/admin/feedback?status=closed">已关闭</a>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>时间</th><th>用户</th><th>类型</th><th>主题</th><th>状态</th><th>操作</th></tr></thead>
+      <tbody>
+        {% for row in tickets %}
+        {% set t = row.ticket %}
+        <tr>
+          <td class="muted" style="white-space:nowrap;font-size:12px">{{ t.created_at.strftime('%m-%d %H:%M') }}</td>
+          <td style="font-size:13px">{{ row.email or (t.user_id|string|truncate(8, True, '')) }}</td>
+          <td><span class="tag tag-neutral">{{ {'bug': 'Bug', 'feature': '功能建议', 'billing': '计费', 'other': '其他'}.get(t.category, t.category) }}</span></td>
+          <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ t.content }}">{{ t.subject }}</td>
+          <td>{% if t.status == 'open' %}<span class="tag tag-warn">处理中</span>{% else %}<span class="tag tag-ok">已关闭</span>{% endif %}</td>
+          <td style="white-space:nowrap">
+            <a href="/admin/messages?to={{ row.email or '' }}&ticket={{ t.id }}">通知该用户</a>
+            {% if t.status == 'open' %}
+            · <a href="#" onclick="closeTicket('{{ t.id }}');return false">关闭</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="empty">暂无工单</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block script %}
+<script>
+async function closeTicket(id){
+  try{
+    await AIS.api('/admin/feedback/'+id+'/close',{method:'POST'});
+    location.reload();
+  }catch(e){ alert(e.message); }
+}
+</script>
+{% endblock %}

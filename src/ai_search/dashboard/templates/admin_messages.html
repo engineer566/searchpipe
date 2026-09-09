@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}站内信管理 · SearchPipe{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>站内信</h1>
+  <p>向指定用户或全站用户发送通知（如工单回复、系统公告）。</p>
+</div>
+
+{% if error %}
+<div class="card mb" style="border-left:3px solid var(--err)"><span class="text-err">{{ error }}</span></div>
+{% endif %}
+{% if sent %}
+<div class="card mb" style="border-left:3px solid var(--ok)"><span class="text-ok">发送成功，共投递 {{ sent }} 个用户。</span></div>
+{% endif %}
+
+<div class="card mb">
+  <h2>发送站内信</h2>
+  <form method="post" action="/admin/messages">
+    <div class="row" style="gap:16px;flex-wrap:wrap;margin-bottom:10px">
+      <label style="display:flex;align-items:center;gap:6px">
+        <input type="radio" name="target_type" value="user" checked onchange="document.getElementById('msg-email-row').style.display=this.checked?'':'none'">
+        指定用户（按邮箱）
+      </label>
+      <label style="display:flex;align-items:center;gap:6px">
+        <input type="radio" name="target_type" value="broadcast" onchange="document.getElementById('msg-email-row').style.display=this.checked?'none':''">
+        全局广播
+      </label>
+    </div>
+    <div class="row" id="msg-email-row" style="margin-bottom:10px">
+      <input type="email" name="target_email" class="grow" placeholder="收件人邮箱" value="{{ prefill_to }}" style="width:100%">
+    </div>
+    <div class="row" style="margin-bottom:10px">
+      <input type="text" name="title" class="grow" placeholder="标题（最多 255 字）" required maxlength="255" value="{{ prefill_title }}" style="width:100%">
+    </div>
+    <textarea name="content" rows="5" placeholder="内容…（最多 5000 字）" required maxlength="5000" style="width:100%;resize:vertical">{{ prefill_content }}</textarea>
+    <div class="row" style="margin-top:10px;justify-content:flex-end">
+      <button type="submit" class="btn">发送</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>已发消息</h2>
+  <p class="card-sub">按发送批次聚合（最近 50 批），含已读统计</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>时间</th><th>类型</th><th>标题</th><th>投递数</th><th>已读</th></tr></thead>
+      <tbody>
+        {% for b in batches %}
+        <tr>
+          <td class="muted" style="white-space:nowrap;font-size:12px">{{ b.created_at.strftime('%m-%d %H:%M') }}</td>
+          <td>{% if b.kind == 'broadcast' %}<span class="tag tag-warn">广播</span>{% else %}<span class="tag tag-neutral">定向</span>{% endif %}</td>
+          <td style="max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ b.title }}">{{ b.title }}</td>
+          <td>{{ b.total }}</td>
+          <td><span class="tag {{ 'tag-ok' if b.read_count == b.total else 'tag-neutral' }}">{{ b.read_count }}/{{ b.total }}</span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="empty">暂无已发消息</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

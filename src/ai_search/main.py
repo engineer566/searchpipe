@@ -33,6 +33,7 @@ from .dashboard import router as dashboard_router, site_router
 from .db.base import dispose_engine
 from .db.models import UserRole
 from .feedback import router as feedback_router
+from .messages import router as messages_router
 from .moderation.dependencies import moderate_input
 from .moderation.service import ModerationError, check_output
 from .mcp_server import mcp as mcp_server_obj
@@ -111,6 +112,7 @@ app.include_router(billing_router)     # /billing
 app.include_router(payments_router)    # /payments
 app.include_router(usage_router)       # /usage
 app.include_router(feedback_router)    # /feedback
+app.include_router(messages_router)    # /messages
 app.include_router(admin_router)       # /admin
 app.include_router(dashboard_router)   # /dashboard
 
