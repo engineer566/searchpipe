@@ -7,7 +7,8 @@ ARG PYTHON_VERSION=3.13
 FROM ghcr.io/astral-sh/uv:python${PYTHON_VERSION}-bookworm-slim AS builder
 
 ENV UV_LINK_MODE=copy \
-    UV_PYTHON_DOWNLOADS=never
+    UV_PYTHON_DOWNLOADS=never \
+    UV_HTTP_TIMEOUT=120
 
 # 字节码预编译（dockerd 默认 nofile=1024 的宿主上 uv 并行编译可能耗尽 fd，
 # 可用 --build-arg UV_COMPILE_BYTECODE=0 关闭；缺 .pyc 仅影响容器冷启动速度）
@@ -24,7 +25,8 @@ COPY README.md* ./
 COPY src/ ./src/
 
 # 同步依赖到 .venv（--frozen 保证按 lockfile 精确安装，不改写）
-RUN uv sync --frozen --no-dev
+# UV_HTTP_TIMEOUT=120 应对小机器网络慢导致的下载超时
+RUN UV_HTTP_TIMEOUT=120 uv sync --frozen --no-dev
 
 # ---- 运行阶段：精简运行镜像 ----
 FROM python:${PYTHON_VERSION}-slim-bookworm AS runtime
@@ -51,7 +53,8 @@ COPY alembic/ ./alembic/
 COPY wait_for_db.py ./
 # 容器入口：先 alembic upgrade head，再起 uvicorn
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+# 修复 Windows CRLF 换行符（从 Windows 部署时 tar 可能保留 \r）
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
 
 EXPOSE 8000
 
