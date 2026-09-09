@@ -44,6 +44,9 @@
       <a href="/dashboard/feedback" class="{% if active=='feedback' %}active{% endif %}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         反馈</a>
+      <a href="/dashboard/messages" class="{% if active=='messages' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path d="m22 6-10 7L2 6"/></svg>
+        消息<span class="tag tag-warn" id="nav-msg-badge" style="display:none;margin-left:4px"></span></a>
     </nav>
     <div class="side-foot">
       <button class="theme-toggle" type="button"><span class="tt-icon"></span><span class="tt-label"></span></button>
@@ -60,6 +63,7 @@
     <a href="/dashboard/billing" class="{% if active=='billing' %}active{% endif %}">充值</a>
     <a href="/dashboard/docs" class="{% if active=='docs' %}active{% endif %}">文档</a>
     <a href="/dashboard/feedback" class="{% if active=='feedback' %}active{% endif %}">反馈</a>
+    <a href="/dashboard/messages" class="{% if active=='messages' %}active{% endif %}">消息<span class="tag tag-warn" id="nav-msg-badge-top" style="display:none;margin-left:2px"></span></a>
     <span style="flex:1"></span>
     <button class="theme-toggle" type="button" style="width:auto;padding:5px 10px"><span class="tt-icon"></span></button>
     <a href="/dashboard/logout">退出</a>
@@ -72,6 +76,22 @@
   </main>
 </div>
 <script src="/static/app.js"></script>
+<script>
+// 站内信未读角标（轻量拉取，失败静默；页面加载与消息页标记已读后刷新）
+(function(){
+  function setBadges(n){
+    ['nav-msg-badge','nav-msg-badge-top'].forEach(function(id){
+      var el=document.getElementById(id); if(!el) return;
+      if(n>0){ el.style.display=''; el.textContent=n>99?'99+':String(n); } else { el.style.display='none'; }
+    });
+  }
+  window.AISRefreshUnreadBadge=function(){
+    fetch('/messages/unread-count').then(function(r){ return r.ok?r.json():null; })
+      .then(function(d){ if(d) setBadges(d.unread||0); }).catch(function(){});
+  };
+  document.addEventListener('DOMContentLoaded', window.AISRefreshUnreadBadge);
+})();
+</script>
 {% block script %}{% endblock %}
 </body>
 </html>

@@ -23,6 +23,8 @@
 - GET /dashboard/usage             用量统计
 - GET /dashboard/billing           充值/流水
 - GET /dashboard/docs              开发文档
+- GET /dashboard/feedback          反馈工单页
+- GET /dashboard/messages          站内信页（列表 + 未读高亮 + 点开已读）
 """
 
 import logging
@@ -484,4 +486,18 @@ async def dashboard_feedback(
         return RedirectResponse(url="/dashboard/login", status_code=status.HTTP_303_SEE_OTHER)
     return templates.TemplateResponse(
         request, "feedback.html", {"user": user, "active": "feedback"}
+    )
+
+
+@router.get("/messages")
+async def dashboard_messages(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> object:
+    """站内信页：消息列表 + 未读高亮 + 点开标记已读（数据由 JS 调 /messages 拉取）。"""
+    user = await _user_from_session(request, db)
+    if not user:
+        return RedirectResponse(url="/dashboard/login", status_code=status.HTTP_303_SEE_OTHER)
+    return templates.TemplateResponse(
+        request, "messages.html", {"user": user, "active": "messages"}
     )

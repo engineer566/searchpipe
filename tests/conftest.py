@@ -132,5 +132,6 @@ def pytest_collection_modifyitems(config, items):  # noqa: ARG001
         "tests/test_feedback.py": 8,
         "tests/test_admin_monitor.py": 9,
         "tests/test_payments.py": 10,
+        "tests/test_messages.py": 11,
     }
     items.sort(key=lambda it: order.get(_file_key(it), 99))
