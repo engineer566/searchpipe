@@ -37,6 +37,39 @@ def test_healthz(client: TestClient):
     assert resp.json() == {"status": "ok"}
 
 
+def test_search_cache_key_stable_and_param_sensitive():
+    """结果缓存 key：同参数稳定、参数变化即变；include_raw_content 不进 key
+    （缓存统一存带正文的完整结果，命中后按请求裁剪）。"""
+    from ai_search.core.search_service import _cache_key
+    from ai_search.schemas import SearchRequest
+
+    base = SearchRequest(query="q1", max_results=5, include_answer=True)
+    same = SearchRequest(query="q1", max_results=5, include_answer=True)
+    assert _cache_key(base) == _cache_key(same)
+
+    # 影响结果内容的参数都进 key
+    assert _cache_key(base) != _cache_key(
+        SearchRequest(query="q2", max_results=5, include_answer=True)
+    )
+    assert _cache_key(base) != _cache_key(
+        SearchRequest(query="q1", max_results=6, include_answer=True)
+    )
+    assert _cache_key(base) != _cache_key(
+        SearchRequest(query="q1", max_results=5, include_answer=False)
+    )
+    assert _cache_key(base) != _cache_key(
+        SearchRequest(
+            query="q1", max_results=5, include_answer=True, search_depth="advanced"
+        )
+    )
+
+    # include_raw_content 只影响响应裁剪，不进 key
+    with_raw = SearchRequest(
+        query="q1", max_results=5, include_answer=True, include_raw_content=True
+    )
+    assert _cache_key(base) == _cache_key(with_raw)
+
+
 def test_home_no_auth(client: TestClient):
     """首页无需鉴权。"""
     assert client.get("/").status_code == 200

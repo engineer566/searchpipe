@@ -23,6 +23,7 @@
       {% endif %}
 
       <form action="/dashboard/register" method="post">
+        <input type="hidden" name="next" value="{{ next or '' }}">
         <div class="mb"><label>邮箱</label>
           <input type="email" name="email" placeholder="you@example.com" value="{{ email or '' }}" required>
         </div>
@@ -40,7 +41,7 @@
       </form>
 
       <div class="auth-links">
-        <a href="/dashboard/login">已有账号？去登录</a>
+        <a href="/dashboard/login{% if next %}?next={{ next | urlencode }}{% endif %}">已有账号？去登录</a>
       </div>
     </div>
 

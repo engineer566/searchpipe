@@ -22,12 +22,15 @@ class Settings(BaseSettings):
     # --- 搜索行为 ---
     max_results: int = 5
     fetch_top_n: int = 5
-    request_timeout: int = 20
+    request_timeout: int = 20      # SearXNG 检索超时（秒）
+    fetch_timeout: int = 12        # 单页正文抓取超时（秒），收紧以压低抓取阶段长尾
+    fetch_concurrency: int = 8     # 正文抓取并发数
     llm_timeout: int = 30
 
     # --- 缓存 ---
     redis_url: str = "redis://localhost:6379/0"
-    enable_cache: bool = False
+    enable_cache: bool = True      # 相同 query+参数的结果缓存（Redis 不可用时自动降级为不缓存）
+    search_cache_ttl: int = 300    # 结果缓存 TTL（秒）
 
     # --- 商业化后端：数据库 ---
     database_url: str = "postgresql+asyncpg://ai:ai@localhost:5432/ai"

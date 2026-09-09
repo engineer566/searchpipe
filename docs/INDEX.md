@@ -13,7 +13,7 @@
 searchpipe/
 ├── src/ai_search/
 │   ├── main.py               # FastAPI 入口：中间件/路由汇聚 + /search 依赖链 + /healthz + /agent-setup/SKILL.md + 订阅积分过期清理后台任务（207 行）
-│   ├── config.py             # pydantic-settings 全部配置（含 SMTP、OAuth、支付双渠道、审核、限流、充值规则）（99 行）
+│   ├── config.py             # pydantic-settings 全部配置（含 SMTP、OAuth、支付双渠道、审核、限流、充值规则、抓取超时/并发、结果缓存 TTL）（102 行）
 │   ├── schemas.py            # /search 请求/响应模型
 │   ├── mcp_server.py         # FastMCP streamable-http 子应用（/mcp，共用商业管线；鉴权支持 URL ?api_key= / Authorization 头 / 工具参数）（219 行）
 │   ├── agent_setup.py        # /agent-setup/SKILL.md 生成：Tavily 式 URL 内嵌 Key 的 MCP 接入指南（172 行）
@@ -28,14 +28,14 @@ searchpipe/
 │   │   ├── oauth.py          # GitHub/微信 OAuth 客户端（106 行）
 │   │   └── errors.py         # AuthError（17 行）
 │   ├── dashboard/            # 控制台（Jinja2 SSR + session cookie）
-│   │   ├── routes.py         # /dashboard/* 页面 + 登录/注册/忘记密码表单处理 + 服务条款页 + 反馈工单页 + 站内信页
-│   │   ├── templates/        # base/landing/login/register/forgot_password/reset_password/dashboard/api_keys/usage/billing/docs/terms/feedback/messages/admin_monitor/admin_feedback/admin_messages（17 个模板；2026-09-08 改版为 Agent-first 定位：落地页首屏 MCP 接入，弱化 RAG 叙事；base.html 导航含站内信未读角标）
+│   │   ├── routes.py         # /dashboard/* 页面 + 登录/注册/忘记密码表单处理（支持 ?next= 站内回跳）+ 服务条款页 + 反馈工单页 + 站内信页；/dashboard?q= 预填快速搜索
+│   │   ├── templates/        # base/landing/login/register/forgot_password/reset_password/dashboard/api_keys/usage/billing/docs/terms/feedback/messages/admin_monitor/admin_feedback/admin_messages（17 个模板；2026-09-08 改版为 Agent-first 定位：落地页首屏 MCP 接入 + 在线体验入口，弱化 RAG 叙事；base.html 导航含站内信未读角标）
 │   │   └── static/           # app.css（双主题设计系统）+ app.js
 │   ├── db/
 │   │   ├── base.py           # engine/session 工厂 + dispose_engine（44 行）
 │   │   ├── session.py        # get_db 依赖
 │   │   └── models/           # user(含 OAuthAccount)/api_key/billing(Plan/Order 含订阅字段)/credit(含 CreditLot 批次)/subscription/usage/feedback_ticket/site_message(站内信，batch_id 聚合已读统计)
-│   ├── billing/              # 积分计费：批次化扣费/退款/赠送/过期清理（service 396 行；pipeline 88 行；subscription 订阅/续订/升级到账 142 行）
+│   ├── billing/              # 积分计费：批次化扣费/退款/赠送/过期清理（service 396 行；pipeline 89 行；subscription 订阅/续订/升级到账 142 行）
 │   ├── payments/             # 虎皮椒支付（支付宝/微信双渠道）：catalog/四类下单/回调/状态查询（routes 263 行；service 253 行）
 │   ├── api_keys/             # sp- 前缀 API Key CRUD（service 91 行）
 │   ├── usage/                # 用量日志中间件 + 统计/导出（middleware 75 行）
@@ -45,10 +45,10 @@ searchpipe/
 │   ├── feedback/             # 用户反馈工单：提交/列表/管理侧关闭（__init__ 162 行）
 │   ├── messages/             # 站内信用户侧：GET /messages 列表 + 未读数 + 标记已读（__init__ 134 行；管理端发送在 admin/routes.py）
 │   ├── search/               # 检索编排：SearXNG 客户端 + 多引擎聚合（orchestrator 53 行）
-│   ├── extract/              # trafilatura 正文抓取（fetcher 229 行）
+│   ├── extract/              # trafilatura 正文抓取（fetcher 230 行；超时/并发走 config fetch_timeout/fetch_concurrency）
 │   ├── rerank/               # LLM 重排（llm_reranker 136 行）
-│   ├── core/search_service.py# 搜索管线总装 run_search（66 行）
-│   └── utils/                # cache（Redis 懒连接单例 97 行）/ mailer（smtplib+to_thread，SMTP 未配置降级日志，54 行；2026-09-08）/ logger
+│   ├── core/search_service.py# 搜索管线总装 run_search（含 Redis 结果缓存 + 精排前候选裁剪）（143 行）
+│   └── utils/                # cache（Redis 懒连接单例 97 行；限流/重置 token/结果缓存共用）/ mailer（smtplib+to_thread，SMTP 未配置降级日志，54 行；2026-09-08）/ logger
 ├── alembic/                  # DB 迁移（入口 entrypoint.sh 自动 upgrade head）
 ├── tests/                    # pytest；真实 PG/Redis；conftest 有 loop 隔离硬约束（必读）
 ├── searxng/                  # SearXNG 双环境配置：settings.yml=境外默认（bing+google cse+brave+wiki 系）；settings.cn.yml=境内（bing+baidu+sogou+360search），compose 按 SEARXNG_SETTINGS_PATH 选用
@@ -74,7 +74,7 @@ searchpipe/
 | `auth/routes.py` | 307 | 注册/登录/refresh/忘记密码/重置密码/OAuth stub/me |
 | `auth/dependencies.py` | 139 | JWT/API Key/cookie 三通道 DI |
 | `auth/password_reset.py` | 87 | Redis 一次性重置 token（`pwdreset:token:*`）+ 冷却（`pwdreset:cooldown:*`） |
-| `dashboard/routes.py` | 503 | SSR 页面 + /robots.txt + /sitemap.xml + /terms 服务条款页 + 表单登录/注册/密码重置/反馈工单/站内信页（失败重渲染，不裸 4xx） |
+| `dashboard/routes.py` | 545 | SSR 页面 + /robots.txt + /sitemap.xml + /terms 服务条款页 + 表单登录/注册/密码重置/反馈工单/站内信页（失败重渲染，不裸 4xx；登录/注册支持 ?next= 站内回跳）+ 落地页在线体验入口登录态探测 |
 | `feedback/__init__.py` | 162 | 用户反馈工单：POST/GET /feedback + Redis 频率限制 |
 | `messages/__init__.py` | 134 | 站内信用户侧：GET /messages（列表+未读数）、GET /messages/unread-count、POST /messages/{id}/read（越权 404） |
 | `admin/routes.py` | 651 | 管理端：用户/积分/订单/统计/反馈工单（Accept: text/html 渲染管理页）/站内信（GET/POST /admin/messages，定向+广播）/运营监控 SSR 页 |
@@ -90,7 +90,7 @@ searchpipe/
 
 **API（JWT/API Key）**：`/auth/register|login|refresh|forgot-password|reset-password|me`（auth/routes.py:153-305）· `/api-keys` CRUD · `/billing/balance|transactions|plans` · `/payments/catalog|packages|orders|callback` · `/usage|/usage/logs|/usage/export` · `/feedback` 提交/列表 · `/messages` 列表/未读数/标记已读（messages/__init__.py）· `/admin/users|credits|orders|stats|feedback|messages|monitor` · `POST /search`（main.py:131）· `GET /agent-setup/SKILL.md`（main.py:125）
 
-**控制台（session cookie）**：`GET /` 营销页 · `GET /robots.txt` · `GET /sitemap.xml` · `/terms` 服务条款 · `/dashboard/login|register|forgot-password|reset-password|logout` · `/dashboard[|/api-keys|/usage|/billing|/docs|/feedback|/messages]`（dashboard/routes.py）
+**控制台（session cookie）**：`GET /` 营销页（含在线体验入口） · `GET /robots.txt` · `GET /sitemap.xml` · `/terms` 服务条款 · `/dashboard/login|register|forgot-password|reset-password|logout`（login/register 支持 ?next= 回跳） · `/dashboard[|/api-keys|/usage|/billing|/docs|/feedback|/messages]`（/dashboard 支持 ?q= 预填并自动触发快速搜索）
 
 ## 按任务跳转表
 

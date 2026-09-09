@@ -59,6 +59,7 @@ docker logs ai-search-app --tail 200 | grep -i reset
 - [ ] 浏览器打开 `/`（落地页）→ 200，h1 含「让你的 AI Agent 联网」
 - [ ] 落地页首屏 → 含 MCP 接入命令（`claude mcp add` 代码块）和「复制配置提示词」按钮
 - [ ] 落地页定价区 → 含订阅三档（包月·基础/进阶/旗舰）
+- [ ] 落地页首屏「在线体验」搜索框：未登录提交 → 302 到 `/dashboard/login?next=/dashboard?q=...`，登录后自动回跳并预填触发搜索；已登录提交 → 302 进 `/dashboard?q=...` 自动开始搜索
 - [ ] `curl -s 127.0.0.1:8001/terms` → 200，含「概不退款」「不支持自动续订」条款
 - [ ] `curl -s 127.0.0.1:8001/robots.txt` → 200，含 Sitemap 声明
 - [ ] `curl -s 127.0.0.1:8001/sitemap.xml` → 200，合法 XML，含 `/`、`/terms` 等 URL
@@ -91,7 +92,7 @@ docker logs ai-search-app --tail 200 | grep -i reset
 ## 四、控制台页面（session cookie 登录态）
 
 - [ ] `/dashboard` → 200，含余额/统计卡、「接入你的 Agent」快速上手卡（MCP 命令优先）、快速搜索入口
-- [ ] 快速搜索：提交一次搜索 → 有结果返回（隐藏等待提示的体验优化见站内信同迭代需求，有则一并验证）
+- [ ] 快速搜索：提交一次搜索 → 加载态为 spinner +「搜索中…」（**不含任何秒数/时间预期提示**），有结果返回；TTL（默认 300s）内重复相同 query → 秒回（结果缓存命中）
 - [ ] `/dashboard/api-keys` → 200；创建 Key → 弹窗显示完整 MCP 链接（`{APP_BASE_URL}/mcp?api_key=sp-…`），列表行含链接格式；吊销 Key 后该 Key 调 /search 被拒
 - [ ] `/dashboard/usage` → 200，用量统计/日志可见刚产生的搜索记录
 - [ ] `/dashboard/billing` → 200，含充值 4 档（¥10/¥20/¥50/¥100）+ 自定义金额（≤¥100）、订阅 3 档（限时 5 折划线价）、余额与流水
