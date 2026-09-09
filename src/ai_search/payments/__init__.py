@@ -3,7 +3,7 @@
 from .provider import PaymentProvider
 from .routes import router
 from .service import (
-    create_order_from_plan,
+    create_order,
     fulfill_order,
     get_order,
     get_provider,
@@ -14,7 +14,7 @@ from .xunhupay import XunHuPayProvider
 __all__ = [
     "PaymentProvider",
     "XunHuPayProvider",
-    "create_order_from_plan",
+    "create_order",
     "fulfill_order",
     "get_order",
     "get_provider",

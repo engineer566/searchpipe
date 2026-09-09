@@ -6,6 +6,7 @@
 """
 
 import logging
+from decimal import Decimal
 
 from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,7 +18,7 @@ from .service import InsufficientCreditsError, deduct_credits, refund_credits
 logger = logging.getLogger(__name__)
 
 
-def stamp_request(request: Request, ctx: AuthContext, cost: int, balance: int) -> None:
+def stamp_request(request: Request, ctx: AuthContext, cost: int, balance: Decimal) -> None:
     """把计费/鉴权信息挂到 request.state，供 UsageLog 中间件读取。"""
     request.state.user_id = ctx.user_id
     request.state.api_key_id = ctx.api_key_id
@@ -31,7 +32,7 @@ async def charge_search(
     db: AsyncSession,
     ctx: AuthContext,
     search_depth: str,
-) -> int:
+) -> Decimal:
     """扣费并把信息挂 request.state。返回扣费后余额。
 
     委托纯核 billing.pipeline.charge_credits 做 DB 操作，本层只补

@@ -2,16 +2,21 @@
 {% block title %}充值 · SearchPipe{% endblock %}
 {% block content %}
 <div class="page-head">
-  <h1>充值与账单</h1>
-  <p>预付费充值，积分永久有效。内测期支付由虎皮椒过渡，后续接入官方商户。</p>
+  <h1>充值与订阅</h1>
+  <p>¥0.03 = 1 积分，1 积分 = 1 次请求。充值积分永久有效，订阅积分 30 天有效。支持支付宝、微信支付。</p>
 </div>
 
 <div class="grid2 mb" style="align-items:start">
   <div class="stat-card" style="padding:26px 28px">
     <div class="stat-label">当前余额</div>
-    <div class="stat-value text-ok" style="font-size:38px">{{ balance }}</div>
-    <div class="stat-hint">积分 · 每次搜索按深度扣费，失败自动退款</div>
+    <div class="stat-value text-ok" style="font-size:38px">{{ '%.2f'|format(balance) }}</div>
+    <div class="stat-hint">
+      永久积分 {{ '%.2f'|format(permanent) }} · 限时积分 {{ '%.2f'|format(expiring) }}
+      {% if upcoming and upcoming > 0 %}<br>续订待生效 {{ '%.2f'|format(upcoming) }}（下一周期起可用）{% endif %}
+      {% if next_expiry %}<br>最近到期：{{ next_expiry.strftime('%Y-%m-%d %H:%M') }}（到期未用完自动清零）{% endif %}
+    </div>
   </div>
+  <div class="card" id="sub-status" style="display:none;margin:0"></div>
   <div class="card" id="pending-card" style="display:none;margin:0">
     <h2>待支付订单</h2>
     <div id="pending-order"></div>
@@ -19,10 +24,27 @@
 </div>
 
 <div class="card">
-  <h2>充值套餐</h2>
-  <p class="card-sub">选择套餐后将跳转收银台完成支付，积分实时到账。</p>
+  <h2>包月订阅 <span class="tag tag-err">限时 5 折</span></h2>
+  <p class="card-sub">订阅积分自到账起 30 天有效，到期未用完自动清零；支持手动续订与升级，不支持自动续订与降级。</p>
+  <div class="pricing-grid" id="sub-plans" style="max-width:none;grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">
+    <div class="empty" style="grid-column:1/-1">加载中…</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>积分充值</h2>
+  <p class="card-sub">固定档位更优惠；也可自定义金额（单笔不超过 ¥100），严格按 ¥0.03 = 1 积分兑换。充值积分永久有效。</p>
   <div class="pricing-grid" id="plans" style="max-width:none;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">
     <div class="empty" style="grid-column:1/-1">加载中…</div>
+  </div>
+  <div class="row mt" style="align-items:flex-end;flex-wrap:wrap">
+    <div>
+      <label class="stat-label" for="custom-amount">自定义金额（元）</label><br>
+      <input id="custom-amount" type="number" min="0.01" max="100" step="0.01" placeholder="1.00 ~ 100.00"
+             style="padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--txt);width:180px">
+    </div>
+    <div class="muted" id="custom-preview" style="padding-bottom:10px">输入金额后实时显示可兑换积分</div>
+    <button class="btn" id="custom-buy" onclick="buyCustom()" disabled>充值</button>
   </div>
 </div>
 
@@ -41,10 +63,11 @@
             {% elif t.type=='consume' %}<span class="tag tag-warn">消费</span>
             {% elif t.type=='grant' %}<span class="tag tag-ok">赠送</span>
             {% elif t.type=='refund' %}<span class="tag tag-ok">退款</span>
+            {% elif t.type=='expire' %}<span class="tag tag-err">到期</span>
             {% else %}<span class="tag tag-neutral">{{ t.type }}</span>{% endif %}
           </td>
-          <td style="font-weight:600;font-variant-numeric:tabular-nums" class="{% if t.delta>0 %}text-ok{% else %}text-err{% endif %}">{{ '%+d'|format(t.delta) }}</td>
-          <td style="font-variant-numeric:tabular-nums">{{ t.balance_after }}</td>
+          <td style="font-weight:600;font-variant-numeric:tabular-nums" class="{% if t.delta>0 %}text-ok{% else %}text-err{% endif %}">{{ '%+.2f'|format(t.delta) }}</td>
+          <td style="font-variant-numeric:tabular-nums">{{ '%.2f'|format(t.balance_after) }}</td>
           <td class="muted">{{ t.remark or '—' }}</td>
         </tr>
       {% endfor %}
@@ -55,44 +78,153 @@
   <div class="empty">暂无交易记录。</div>
   {% endif %}
 </div>
+
+<!-- 下单前二次确认弹窗 -->
+<div class="modal-mask" id="confirm-modal">
+  <div class="modal">
+    <h3 id="cf-title">确认订单</h3>
+    <div id="cf-summary" style="margin:10px 0;font-size:15px"></div>
+    <div class="msg msg-warn" style="margin:10px 0;font-size:13px;line-height:1.7;text-align:left" id="cf-notice"></div>
+    <div style="margin:14px 0">
+      <div class="stat-label" style="margin-bottom:8px">支付渠道</div>
+      <div class="row">
+        <label class="row" style="gap:6px;cursor:pointer"><input type="radio" name="pay-channel" value="alipay" checked> 支付宝</label>
+        <label class="row" style="gap:6px;cursor:pointer"><input type="radio" name="pay-channel" value="wechat"> 微信支付</label>
+      </div>
+    </div>
+    <div class="row" style="justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="closeConfirm()">取消</button>
+      <button class="btn" id="cf-ok" onclick="confirmOrder()">确认支付</button>
+    </div>
+  </div>
+</div>
 {% endblock %}
 {% block script %}
 <script>
-// 加载套餐
+var CATALOG=null, PENDING=null;
+var RATE=0.03, MAX_YUAN=100;
+
+// 重要信息提示（下单前二次确认）
+var NOTICES={
+  recharge:'<strong>请确认：</strong><br>· 充值积分永久有效，1 积分 = 1 次请求<br>· 积分不可转让、不可提现、不可兑换现金<br>· <strong>一经售出，概不退款</strong>',
+  subscribe:'<strong>请确认：</strong><br>· 订阅积分自到账起 30 天有效，到期未用完自动清零<br>· 不支持自动续订，到期需手动续订<br>· 积分不可转让、不可提现<br>· <strong>一经售出，概不退款</strong>',
+  renew:'<strong>请确认：</strong><br>· 续订积分从下一周期开始生效，不累积到当前周期<br>· 有效期为下一周期起 30 天，到期未用完自动清零<br>· <strong>一经售出，概不退款</strong>',
+  upgrade:'<strong>请确认：</strong><br>· 升级需支付新档位当前售价全额（不抵扣旧档剩余价值）<br>· 新档位积分即刻到账，自升级时刻起 30 天有效<br>· 原档位未用完的积分将延期至与新档位同期到期<br>· 不支持降级<br>· <strong>一经售出，概不退款</strong>'
+};
+
 (async()=>{
-  const el=document.getElementById('plans');
   try{
-    const plans=await AIS.api('/payments/packages');
-    if(!plans.length){ el.innerHTML='<div class="empty" style="grid-column:1/-1">暂无套餐（管理员未配置）</div>'; return; }
-    el.innerHTML=plans.map(p=>
-      '<div class="price-card"><h3>'+AIS.esc(p.name)+'</h3>'
-      +'<div class="price">¥'+p.price_yuan+'</div>'
-      +'<div class="muted" style="font-size:13px">'+p.credits+' 积分</div>'
-      +'<ul><li>积分永久有效</li><li>失败自动退款</li></ul>'
-      +'<button class="btn btn-block" onclick="buy(\''+p.id+'\',this)">购买</button></div>'
-    ).join('');
-  }catch(e){ el.innerHTML='<div class="empty" style="grid-column:1/-1">加载失败：'+AIS.esc(e.message)+'</div>'; }
+    CATALOG=await AIS.api('/payments/catalog');
+    RATE=parseFloat(CATALOG.credit_yuan_rate);
+    MAX_YUAN=CATALOG.max_recharge_yuan;
+    renderSubPlans();
+    renderRechargePlans();
+  }catch(e){
+    document.getElementById('plans').innerHTML='<div class="empty" style="grid-column:1/-1">加载失败：'+AIS.esc(e.message)+'</div>';
+    document.getElementById('sub-plans').innerHTML='';
+  }
 })();
 
-// 购买 → 创建订单 → 跳转支付页
-async function buy(planId,btn){
+function priceHtml(p){
+  var s='<div class="price">¥'+p.price_yuan.toFixed(2)+'</div>';
+  if(p.original_price_yuan&&p.original_price_yuan>p.price_yuan){
+    s='<div class="price">¥'+p.price_yuan.toFixed(2)
+      +' <span style="font-size:14px;color:var(--faint);text-decoration:line-through">¥'+p.original_price_yuan.toFixed(2)+'</span></div>';
+  }
+  return s;
+}
+
+function renderSubPlans(){
+  var el=document.getElementById('sub-plans');
+  var sub=CATALOG.subscription;
+  if(sub){
+    var st=document.getElementById('sub-status');
+    st.style.display='block';
+    st.innerHTML='<h2>当前订阅</h2><div style="font-size:17px;font-weight:600">'+AIS.esc(sub.plan_name)+'</div>'
+      +'<div class="muted" style="font-size:13px;margin-top:4px">周期至 '+new Date(sub.period_end).toLocaleString('zh-CN')+'</div>';
+  }
+  if(!CATALOG.subscription_plans.length){ el.innerHTML='<div class="empty" style="grid-column:1/-1">暂无订阅套餐</div>'; return; }
+  el.innerHTML=CATALOG.subscription_plans.map(function(p){
+    var btn;
+    if(!sub){
+      btn='<button class="btn btn-block" onclick="openConfirm(\'subscribe\',\''+p.id+'\',\''+AIS.esc(p.name)+'\','+p.price_yuan+','+p.credits+')">订阅</button>';
+    }else if(sub.plan_id===p.id){
+      btn='<button class="btn btn-block" onclick="openConfirm(\'renew\',\''+p.id+'\',\''+AIS.esc(p.name)+'\','+p.price_yuan+','+p.credits+')">续订</button>';
+    }else if((p.level||0)>(sub.level||0)){
+      btn='<button class="btn btn-block" onclick="openConfirm(\'upgrade\',\''+p.id+'\',\''+AIS.esc(p.name)+'\','+p.price_yuan+','+p.credits+')">升级</button>';
+    }else{
+      btn='<button class="btn btn-ghost btn-block" disabled>不支持降级</button>';
+    }
+    return '<div class="price-card"><h3>'+AIS.esc(p.name)+'</h3>'+priceHtml(p)
+      +'<div class="muted" style="font-size:13px">'+p.credits+' 积分 / 30 天</div>'
+      +'<ul><li>积分 30 天有效</li><li>可手动续订/升级</li></ul>'+btn+'</div>';
+  }).join('');
+}
+
+function renderRechargePlans(){
+  var el=document.getElementById('plans');
+  if(!CATALOG.recharge_plans.length){ el.innerHTML='<div class="empty" style="grid-column:1/-1">暂无充值档位</div>'; return; }
+  el.innerHTML=CATALOG.recharge_plans.map(function(p){
+    return '<div class="price-card"><h3>'+AIS.esc(p.name)+'</h3>'+priceHtml(p)
+      +'<div class="muted" style="font-size:13px">'+p.credits+' 积分</div>'
+      +'<ul><li>积分永久有效</li><li>失败自动退款</li></ul>'
+      +'<button class="btn btn-block" onclick="openConfirm(\'recharge\',\''+p.id+'\',\''+AIS.esc(p.name)+'\','+p.price_yuan+','+p.credits+')">购买</button></div>';
+  }).join('');
+}
+
+// 自定义金额：实时显示兑换积分（2 位小数）
+var amountInput=document.getElementById('custom-amount');
+amountInput.addEventListener('input',function(){
+  var v=parseFloat(amountInput.value), preview=document.getElementById('custom-preview'), btn=document.getElementById('custom-buy');
+  if(!v||v<=0){ preview.textContent='输入金额后实时显示可兑换积分'; btn.disabled=true; return; }
+  if(v>MAX_YUAN){ preview.textContent='单笔充值金额不能超过 ¥'+MAX_YUAN; btn.disabled=true; return; }
+  preview.innerHTML='可兑换 <strong class="text-ok">'+(v/RATE).toFixed(2)+'</strong> 积分（¥'+v.toFixed(2)+' ÷ ¥'+RATE+'/积分）';
+  btn.disabled=false;
+});
+
+function buyCustom(){
+  var v=parseFloat(amountInput.value);
+  if(!v||v<=0||v>MAX_YUAN) return;
+  var credits=(v/RATE).toFixed(2);
+  openConfirm('recharge',null,'自定义充值',v,credits,Math.round(v*100));
+}
+
+// 打开二次确认弹窗
+function openConfirm(kind,planId,name,priceYuan,credits,amountCents){
+  PENDING={kind:kind,plan_id:planId,amount_cents:amountCents||null};
+  document.getElementById('cf-title').textContent='确认订单 · '+name;
+  document.getElementById('cf-summary').innerHTML='支付金额：<strong>¥'+Number(priceYuan).toFixed(2)+'</strong>　获得积分：<strong class="text-ok">'+credits+'</strong>';
+  document.getElementById('cf-notice').innerHTML=NOTICES[kind]||NOTICES.recharge;
+  document.getElementById('confirm-modal').classList.add('open');
+}
+function closeConfirm(){ document.getElementById('confirm-modal').classList.remove('open'); PENDING=null; }
+
+async function confirmOrder(){
+  if(!PENDING) return;
+  var btn=document.getElementById('cf-ok');
   btn.disabled=true;
+  var channel=document.querySelector('input[name="pay-channel"]:checked').value;
   try{
-    const d=await AIS.api('/payments/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({plan_id:planId})});
+    var body={kind:PENDING.kind,pay_channel:channel};
+    if(PENDING.plan_id) body.plan_id=PENDING.plan_id;
+    if(PENDING.amount_cents) body.amount_cents=PENDING.amount_cents;
+    var d=await AIS.api('/payments/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    closeConfirm();
     document.getElementById('pending-card').style.display='block';
-    document.getElementById('pending-order').innerHTML='<div class="msg msg-ok" style="margin-top:10px">订单已创建（¥'+(d.amount_cents/100).toFixed(2)+' / '+d.credits+' 积分），<a href="'+d.pay_url+'" target="_blank" rel="noopener">点击前往支付 →</a></div>';
+    document.getElementById('pending-order').innerHTML='<div class="msg msg-ok" style="margin-top:10px">订单已创建（¥'+(d.amount_cents/100).toFixed(2)+' / '+d.credits+' 积分，'+(d.pay_channel==='wechat'?'微信支付':'支付宝')+'），<a href="'+d.pay_url+'" target="_blank" rel="noopener">点击前往支付 →</a></div>';
     pollOrder(d.order_id);
   }catch(e){ alert(e.message); }
   finally{ btn.disabled=false; }
 }
+
 async function pollOrder(orderId){
-  for(let i=0;i<60;i++){
-    await new Promise(r=>setTimeout(r,3000));
+  for(var i=0;i<60;i++){
+    await new Promise(function(r){setTimeout(r,3000);});
     try{
-      const d=await AIS.api('/payments/orders/'+orderId);
+      var d=await AIS.api('/payments/orders/'+orderId);
       if(d.status==='paid'){
         document.getElementById('pending-order').innerHTML='<div class="msg msg-ok" style="margin-top:10px">支付成功！积分已到账，正在刷新…</div>';
-        setTimeout(()=>location.reload(),2000);
+        setTimeout(function(){location.reload();},2000);
         return;
       }
     }catch(e){ /* 轮询失败继续 */ }

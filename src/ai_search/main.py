@@ -11,6 +11,7 @@
 """
 
 import logging
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -53,12 +54,29 @@ _STATIC_DIR = Path(__file__).parent / "dashboard" / "static"
 _mcp_app = mcp_server_obj.http_app(transport="streamable-http", path="/")
 
 
+async def _expired_credits_sweep_loop() -> None:
+    """后台任务：每小时清理全库过期订阅积分（读路径另有惰性 sweep，此为兜底）。"""
+    from .billing.service import sweep_all_expired
+    from .db.base import async_session_factory
+
+    while True:
+        try:
+            async with async_session_factory() as db:
+                await sweep_all_expired(db)
+                await db.commit()
+        except Exception:  # noqa: BLE001
+            logger.exception("订阅积分过期清理任务异常")
+        await asyncio.sleep(3600)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # noqa: ARG001
     logger.info("SearchPipe 启动")
+    sweep_task = asyncio.create_task(_expired_credits_sweep_loop())
     # 进入 MCP 子应用的 lifespan（初始化 streamable-http session manager）
     async with _mcp_app.lifespan(_mcp_app):
         yield
+    sweep_task.cancel()
     logger.info("SearchPipe 关闭，释放 DB engine")
     await dispose_engine()
 

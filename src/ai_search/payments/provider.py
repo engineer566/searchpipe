@@ -20,9 +20,9 @@ class PaymentProvider(ABC):
 
     @abstractmethod
     async def create_order(
-        self, order_no: str, amount_cents: int, subject: str
+        self, order_no: str, amount_cents: int, subject: str, pay_channel: str = "alipay"
     ) -> str:
-        """创建支付订单，返回支付页/二维码 URL。"""
+        """创建支付订单，返回支付页/二维码 URL。pay_channel: alipay/wechat。"""
         ...
 
     @abstractmethod

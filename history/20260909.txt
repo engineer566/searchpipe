@@ -1,0 +1,37 @@
+2026-09-09 需求：支付渠道（充值 + 包月订阅，支付宝/微信双渠道）
+
+== 需求要点 ==
+1. 充值：¥0.03=1 积分；固定档 ¥10=350 / ¥20=700 / ¥50=1800 / ¥100=5000；单笔上限 ¥100；
+   自定义金额严格按汇率兑换，实时显示、入账积分精确到 2 位小数；充值积分永久有效。
+2. 订阅：3 档包月（限时 5 折）：¥9.99/1000（标 ¥19.99）、¥24.99/3000（标 ¥49.99）、
+   ¥49.99/10000（标 ¥99.99）。积分 30 天有效（固定 30 天）；手动续订（下周期生效）；
+   升级付新档当前售价全额，新档积分即刻起算 30 天，旧档未用完积分延期至同期；不降级、不自动续订。
+3. 规则写入服务条款；下单前二次弹窗重要信息；落地页展示订阅规则。
+
+== 已确认决策 ==
+- 提供方：继续虎皮椒（个人无商户资质，最简单），支付宝/微信各建一个应用各一套凭证。
+- 积分精度：NUMERIC(20,2)（余额/流水/订单 credits），支持 2 位小数。
+- 「一个月」= 固定 30 天。
+- 升级价 = 新档当前实际售价（折扣期按折扣价），不抵扣旧档剩余价值。
+- 升级后旧档已排队续订批次仍按原时刻生效（规则未覆盖，按保留处理）。
+
+== 实现摘要 ==
+- 迁移 b71f2c3d9e50：plans +kind/level/original_price_cents；orders +kind/pay_channel、
+  credits→Numeric(20,2)；credit 小数化 + lot_usage JSONB；新表 credit_lots/subscriptions
+  （部分唯一索引：同用户至多一条 active）；种子 7 个套餐（固定 UUID 1111…/2222…）。
+- billing/service.py 批次化：deduct 按 expires_at 升序消耗（NULL 最后），可用余额=已生效
+  未过期批次之和；refund 按 lot_usage 还原原批次，溢出进永久批次；sweep_expired 惰性 +
+  lifespan 每小时后台兜底；get_balance_detail 返回 permanent/expiring/upcoming/next_expiry。
+- billing/subscription.py：fulfill_subscribe/renew/upgrade；get_active_subscription 惰性过期。
+- payments：config 双渠道凭证（回退通用配置）；xunhupay 按渠道签名、回调双 secret 验；
+  service 四类下单校验 + 按 kind 发放；GET /payments/catalog（含登录用户订阅状态）。
+- 前端：billing.html 重写（订阅区续订/升级逻辑、自定义金额实时换算、渠道选择、二次确认
+  弹窗含不退款声明）；landing.html 订阅三档+规则；terms.html 第二条重写；admin 订单 +kind/channel。
+- 测试：tests/test_payments.py（HTTP 层 9 条，FakeProvider monkeypatch 模块单例）+
+  tests/test_billing_lots.py（session-loop 服务级 4 条：扣费顺序/过期清理/退款还原/排队批次不可用），
+  conftest 顺序表登记（billing_lots=1 紧随 mcp；payments=10）。全量 75 passed, 5 skipped。
+
+== 部署注意 ==
+- 测试服部署需先配置 XUNHUPAY_APPID_ALIPAY/APPSECRET_ALIPAY/APPID_WECHAT/APPSECRET_WECHAT
+  与 XUNHUPAY_NOTIFY_URL（回调地址指向 https://测试服/payments/callback）。
+- entrypoint 自动 alembic upgrade head，迁移与种子自动生效。

@@ -140,7 +140,7 @@ claude mcp add --transport http searchpipe \
 <section class="section" id="pricing" aria-labelledby="pricing-heading">
   <div class="section-head">
     <h2 id="pricing-heading">简单透明的积分制</h2>
-    <p>预付费充值，积分永久有效。注册即送免费额度，先让 Agent 跑通再付费。</p>
+    <p>¥0.03 = 1 积分，1 积分 = 1 次请求。注册即送免费额度，先让 Agent 跑通再付费。</p>
   </div>
   <div class="pricing-grid">
     <div class="price-card">
@@ -157,13 +157,52 @@ claude mcp add --transport http searchpipe \
       <h3>按需充值</h3>
       <div class="price">积分制</div>
       <ul>
-        <li>按次扣费，失败自动退款</li>
-        <li>余额与流水实时可查</li>
-        <li>用量明细支持 CSV 导出</li>
+        <li>固定档位：¥10=350 / ¥20=700 / ¥50=1800 / ¥100=5000 积分</li>
+        <li>自定义金额（≤¥100）按 ¥0.03=1 积分兑换</li>
+        <li>充值积分永久有效，失败自动退款</li>
       </ul>
       <a href="/dashboard/login" class="btn btn-block">开始充值</a>
     </div>
   </div>
+
+  <div class="section-head" style="margin-top:48px">
+    <h2>包月订阅 <span class="tag tag-err">限时 5 折</span></h2>
+    <p>订阅积分自到账起 30 天有效；支持手动续订与升级，不支持自动续订与降级。</p>
+  </div>
+  <div class="pricing-grid">
+    <div class="price-card">
+      <h3>包月·基础</h3>
+      <div class="price">¥9.99 <span style="font-size:14px;color:var(--faint);text-decoration:line-through">¥19.99</span></div>
+      <ul>
+        <li>1000 积分 / 30 天</li>
+        <li>到期未用完自动清零</li>
+      </ul>
+      <a href="/dashboard/login" class="btn btn-ghost btn-block">订阅</a>
+    </div>
+    <div class="price-card featured">
+      <h3>包月·进阶</h3>
+      <div class="price">¥24.99 <span style="font-size:14px;color:var(--faint);text-decoration:line-through">¥49.99</span></div>
+      <ul>
+        <li>3000 积分 / 30 天</li>
+        <li>到期未用完自动清零</li>
+      </ul>
+      <a href="/dashboard/login" class="btn btn-block">订阅</a>
+    </div>
+    <div class="price-card">
+      <h3>包月·旗舰</h3>
+      <div class="price">¥49.99 <span style="font-size:14px;color:var(--faint);text-decoration:line-through">¥99.99</span></div>
+      <ul>
+        <li>10000 积分 / 30 天</li>
+        <li>到期未用完自动清零</li>
+      </ul>
+      <a href="/dashboard/login" class="btn btn-ghost btn-block">订阅</a>
+    </div>
+  </div>
+  <p class="card-sub" style="text-align:center;margin-top:18px">
+    订阅规则：续订积分从下一周期开始生效（不累积到当前周期）；升级需付新档位当前售价全额，
+    新档积分即刻到账并起算 30 天，原档位未用完积分延期至与新档同期；不支持降级与自动续订；
+    所有付费产品一经售出概不退款。详见 <a href="/terms">服务条款</a>。
+  </p>
 </section>
 </main>
 

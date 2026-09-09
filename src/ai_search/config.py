@@ -53,10 +53,20 @@ class Settings(BaseSettings):
     oauth_redirect_base: str = "http://localhost:8001"  # 回调基址
 
     # --- 商业化后端：支付（虎皮椒过渡）---
+    # 虎皮椒按渠道各建一个应用：支付宝、微信各一套 appid/appsecret。
+    # 渠道专属配置留空时回退到通用 XUNHUPAY_APPID/APPSECRET（单渠道兼容）。
     payment_provider: str = "xunhupay"
     xunhupay_appid: str = ""
     xunhupay_appsecret: str = ""
+    xunhupay_appid_alipay: str = ""
+    xunhupay_appsecret_alipay: str = ""
+    xunhupay_appid_wechat: str = ""
+    xunhupay_appsecret_wechat: str = ""
     xunhupay_notify_url: str = ""
+
+    # --- 商业化后端：充值/订阅规则 ---
+    credit_yuan_rate: str = "0.03"   # ¥0.03 = 1 积分（自定义充值汇率）
+    max_recharge_yuan: int = 100     # 单笔充值上限
 
     # --- 商业化后端：内容审核（合规）---
     moderation_provider: str = "aliyun"

@@ -9,6 +9,7 @@ HTTP 依赖层在调用后自行 stamp_request 把信息挂 request.state 供中
 
 import uuid
 from dataclasses import dataclass
+from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,7 +32,7 @@ class ChargeResult:
     """单次扣费结果。供 HTTP（stamp request.state）和 MCP（直接用）共用。"""
 
     cost: int
-    balance_after: int
+    balance_after: Decimal
     req_ref: str  # 退款用同一 ref
     user_id: uuid.UUID
     api_key_id: uuid.UUID | None
@@ -53,7 +54,7 @@ async def charge_credits(
     if UserRole.is_admin(ctx.user.role):
         return ChargeResult(
             cost=0,
-            balance_after=0,
+            balance_after=Decimal("0"),
             req_ref=req_ref,
             user_id=ctx.user_id,
             api_key_id=ctx.api_key_id,
@@ -73,7 +74,7 @@ async def charge_credits(
 async def refund_credits_for(
     db: AsyncSession,
     charge: ChargeResult,
-) -> int:
+) -> Decimal:
     """按 ChargeResult 退还（纯 DB）。返回退款后余额。
 
     搜索失败 / 输出审核违规时调用。remark 复用 charge.req_ref 便于对账。

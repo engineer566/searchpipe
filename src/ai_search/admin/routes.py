@@ -68,13 +68,15 @@ class GrantCreditsRequest(BaseModel):
 
 class GrantCreditsResponse(BaseModel):
     user_id: str
-    balance: int
+    balance: float
 
 
 class AdminOrderItem(BaseModel):
     id: str
     user_id: str
-    credits: int
+    kind: str
+    pay_channel: str | None
+    credits: float
     amount_cents: int
     status: str
     provider: str
@@ -225,7 +227,9 @@ async def list_orders(
         AdminOrderItem(
             id=str(o.id),
             user_id=str(o.user_id),
-            credits=o.credits,
+            kind=o.kind,
+            pay_channel=o.pay_channel,
+            credits=float(o.credits),
             amount_cents=o.amount_cents,
             status=o.status,
             provider=o.provider,

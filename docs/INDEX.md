@@ -5,15 +5,15 @@
 
 ## 项目一句话定位
 
-自建 AI 搜索 API（Tavily 风格）：`POST /search` 一个端点跑完「SearXNG 多引擎检索 → trafilatura 正文抓取 → DeepSeek 重排/摘要」，外覆完整商业化后端（用户鉴权 / 积分计费 / API Key / 虎皮椒支付 / 内容审核 / 限流 / 用量日志），另提供 Jinja2 服务端渲染控制台（/dashboard）与 MCP Server 入口（/mcp）。
+自建 AI 搜索 API（Tavily 风格）：`POST /search` 一个端点跑完「SearXNG 多引擎检索 → trafilatura 正文抓取 → DeepSeek 重排/摘要」，外覆完整商业化后端（用户鉴权 / 积分计费（批次化、2 位小数）/ API Key / 虎皮椒支付（支付宝+微信双渠道：充值 + 包月订阅）/ 内容审核 / 限流 / 用量日志），另提供 Jinja2 服务端渲染控制台（/dashboard）与 MCP Server 入口（/mcp）。
 
 ## 目录树（仅项目代码）
 
 ```
 searchpipe/
 ├── src/ai_search/
-│   ├── main.py               # FastAPI 入口：中间件/路由汇聚 + /search 依赖链 + /healthz + /agent-setup/SKILL.md（186 行）
-│   ├── config.py             # pydantic-settings 全部配置（含 SMTP、OAuth、支付、审核、限流）（89 行）
+│   ├── main.py               # FastAPI 入口：中间件/路由汇聚 + /search 依赖链 + /healthz + /agent-setup/SKILL.md + 订阅积分过期清理后台任务（205 行）
+│   ├── config.py             # pydantic-settings 全部配置（含 SMTP、OAuth、支付双渠道、审核、限流、充值规则）（99 行）
 │   ├── schemas.py            # /search 请求/响应模型
 │   ├── mcp_server.py         # FastMCP streamable-http 子应用（/mcp，共用商业管线；鉴权支持 URL ?api_key= / Authorization 头 / 工具参数）（219 行）
 │   ├── agent_setup.py        # /agent-setup/SKILL.md 生成：Tavily 式 URL 内嵌 Key 的 MCP 接入指南（172 行）
@@ -34,9 +34,9 @@ searchpipe/
 │   ├── db/
 │   │   ├── base.py           # engine/session 工厂 + dispose_engine（44 行）
 │   │   ├── session.py        # get_db 依赖
-│   │   └── models/           # user(含 OAuthAccount)/api_key/billing/credit/usage/feedback_ticket
-│   ├── billing/              # 积分计费：扣费/退款/赠送/流水（service 175 行；pipeline 88 行）
-│   ├── payments/             # 虎皮椒支付：下单/回调/状态查询（routes 136 行）
+│   │   └── models/           # user(含 OAuthAccount)/api_key/billing(Plan/Order 含订阅字段)/credit(含 CreditLot 批次)/subscription/usage/feedback_ticket
+│   ├── billing/              # 积分计费：批次化扣费/退款/赠送/过期清理（service 396 行；pipeline 88 行；subscription 订阅/续订/升级到账 142 行）
+│   ├── payments/             # 虎皮椒支付（支付宝/微信双渠道）：catalog/四类下单/回调/状态查询（routes 263 行；service 253 行）
 │   ├── api_keys/             # sp- 前缀 API Key CRUD（service 91 行）
 │   ├── usage/                # 用量日志中间件 + 统计/导出（middleware 75 行）
 │   ├── rate_limit/           # Redis ZSET 滑动窗口限流（service 42 行）
@@ -73,11 +73,12 @@ searchpipe/
 | `auth/routes.py` | 307 | 注册/登录/refresh/忘记密码/重置密码/OAuth stub/me |
 | `auth/dependencies.py` | 139 | JWT/API Key/cookie 三通道 DI |
 | `auth/password_reset.py` | 87 | Redis 一次性重置 token（`pwdreset:token:*`）+ 冷却（`pwdreset:cooldown:*`） |
-| `dashboard/routes.py` | 472 | SSR 页面 + /robots.txt + /sitemap.xml + /terms 服务条款页 + 表单登录/注册/密码重置/反馈工单（失败重渲染，不裸 4xx） |
+| `dashboard/routes.py` | 487 | SSR 页面 + /robots.txt + /sitemap.xml + /terms 服务条款页 + 表单登录/注册/密码重置/反馈工单（失败重渲染，不裸 4xx） |
 | `feedback/__init__.py` | 162 | 用户反馈工单：POST/GET /feedback + Redis 频率限制 |
-| `admin/routes.py` | 451 | 管理端：用户/积分/订单/统计/反馈工单/运营监控 SSR 页 |
-| `billing/service.py` | 175 | 积分账户：grant/deduct/refund/流水（幂等靠 ref 唯一） |
-| `payments/xunhupay.py` | 86 | 虎皮椒签名/下单/回调验签 |
+| `admin/routes.py` | 453 | 管理端：用户/积分/订单/统计/反馈工单/运营监控 SSR 页 |
+| `billing/service.py` | 396 | 积分账户：批次化 grant/deduct/refund/sweep_expired（行锁；限时批次优先消耗；退款按 lot_usage 还原原批次） |
+| `billing/subscription.py` | 142 | 包月订阅：订阅/续订/升级到账（30 天有效期、续订下周期生效、升级延期累积） |
+| `payments/xunhupay.py` | 102 | 虎皮椒签名/下单/回调验签（支付宝/微信双渠道凭证，回调两套 secret 各验一次） |
 | `usage/middleware.py` | 75 | BaseHTTPMiddleware 用量日志（注意 task group 约束） |
 | `rate_limit/service.py` | 42 | Redis ZSET 滑动窗口 |
 | `utils/cache.py` | 97 | RedisCache 懒连接单例（测试 rebind 见 conftest） |
@@ -85,7 +86,7 @@ searchpipe/
 
 ## 路由速查
 
-**API（JWT/API Key）**：`/auth/register|login|refresh|forgot-password|reset-password|me`（auth/routes.py:153-305）· `/api-keys` CRUD · `/billing/balance|transactions|plans` · `/payments/packages|orders|callback` · `/usage|/usage/logs|/usage/export` · `/feedback` 提交/列表 · `/admin/users|credits|orders|stats|feedback|monitor` · `POST /search`（main.py:110）· `GET /agent-setup/SKILL.md`（main.py:104）
+**API（JWT/API Key）**：`/auth/register|login|refresh|forgot-password|reset-password|me`（auth/routes.py:153-305）· `/api-keys` CRUD · `/billing/balance|transactions|plans` · `/payments/catalog|packages|orders|callback` · `/usage|/usage/logs|/usage/export` · `/feedback` 提交/列表 · `/admin/users|credits|orders|stats|feedback|monitor` · `POST /search`（main.py:110）· `GET /agent-setup/SKILL.md`（main.py:104）
 
 **控制台（session cookie）**：`GET /` 营销页 · `GET /robots.txt` · `GET /sitemap.xml` · `/terms` 服务条款 · `/dashboard/login|register|forgot-password|reset-password|logout` · `/dashboard[|/api-keys|/usage|/billing|/docs|/feedback]`（dashboard/routes.py）
 
@@ -97,7 +98,7 @@ searchpipe/
 | 改注册/忘记密码邮件 | `docs/memory/searchpipe-auth-design.md` | `auth/password_reset.py` + `utils/mailer.py` |
 | 改控制台页面/SEO | `dashboard/routes.py` 头部 docstring 路由表 | 对应 `dashboard/templates/*.html` |
 | 改搜索管线 | `core/search_service.py` | `search/orchestrator.py` → `extract/fetcher.py` → `rerank/llm_reranker.py` |
-| 改计费/退款 | `billing/service.py` 头部 docstring | `billing/pipeline.py` + `main.py` /search 依赖链 |
+| 改计费/退款/订阅 | `billing/service.py` 头部 docstring | `billing/subscription.py` + `billing/pipeline.py` + `payments/service.py` |
 | 加测试 | `tests/conftest.py` 头部 docstring（loop 隔离硬约束） | 现有 `tests/test_auth.py` / `tests/test_feedback.py` 作范式 |
 | 部署到测试服 | `docs/memory/searchpipe-test-server.md` | `Dockerfile` / `docker-compose.test.yml` |
 | 改配置/环境变量 | `config.py` | `.env.example`（同步更新） |

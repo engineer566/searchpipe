@@ -433,14 +433,29 @@ async def dashboard_billing(
     user = await _user_from_session(request, db)
     if not user:
         return RedirectResponse(url="/dashboard/login", status_code=status.HTTP_303_SEE_OTHER)
-    from ..billing.service import get_balance, list_transactions
+    from ..billing.service import get_balance_detail, list_transactions
+    from ..billing.subscription import get_active_subscription
+    from ..db.models import Plan
 
-    balance = await get_balance(db, user.id)
+    detail = await get_balance_detail(db, user.id)
+    sub = await get_active_subscription(db, user.id)
+    sub_plan = await db.get(Plan, sub.plan_id) if sub else None
     txs, total = await list_transactions(db, user.id, page=1, size=50)
     return templates.TemplateResponse(
         request,
         "billing.html",
-        {"user": user, "balance": balance, "transactions": txs, "active": "billing"},
+        {
+            "user": user,
+            "balance": detail["balance"],
+            "permanent": detail["permanent"],
+            "expiring": detail["expiring"],
+            "upcoming": detail["upcoming"],
+            "next_expiry": detail["next_expiry"],
+            "subscription": sub,
+            "subscription_plan": sub_plan,
+            "transactions": txs,
+            "active": "billing",
+        },
     )
 
 
