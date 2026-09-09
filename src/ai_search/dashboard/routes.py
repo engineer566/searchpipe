@@ -229,11 +229,35 @@ async def auth_landing(
 
 @router.get("/login")
 async def login_page(
-    request: Request, reset: int = 0, next_url: str = Query("", alias="next")
+    request: Request,
+    reset: int = 0,
+    registered: int = 0,
+    verify_success: int = 0,
+    verify_error: int = 0,
+    verify_already: int = 0,
+    next_url: str = Query("", alias="next"),
 ) -> object:
-    """登录页（仅邮箱密码）。?reset=1 时显示「密码已重置」提示；?next= 登录后回跳。"""
-    info = "密码已重置，请使用新密码登录" if reset else None
-    return _render_login(request, info=info, next_url=_safe_next(next_url) or "")
+    """登录页（仅邮箱密码）。支持多种提示：
+    - ?reset=1 密码已重置
+    - ?registered=1 注册成功，请查收验证邮件
+    - ?verify_success=1 邮箱验证成功
+    - ?verify_error=1 验证链接无效或已过期
+    - ?verify_already=1 邮箱已验证
+    - ?next= 登录后回跳
+    """
+    info = None
+    error = None
+    if reset:
+        info = "密码已重置，请使用新密码登录"
+    elif registered:
+        info = "注册成功！验证邮件已发送，请查收邮箱并点击链接完成验证。"
+    elif verify_success:
+        info = "邮箱验证成功！现在可以登录了。"
+    elif verify_already:
+        info = "邮箱已验证，无需重复操作。"
+    elif verify_error:
+        error = "验证链接无效或已过期，请重新注册或联系管理员。"
+    return _render_login(request, info=info, error=error, next_url=_safe_next(next_url) or "")
 
 
 @router.post("/login")
@@ -311,6 +335,7 @@ async def register_submit(
         password_hash=hash_password(password),
         role=UserRole.USER.value,
         status=UserStatus.ACTIVE.value,
+        email_verified=False,  # 新注册用户需要验证邮箱
     )
     db.add(user)
     try:
@@ -334,8 +359,14 @@ async def register_submit(
         await db.rollback()
         return _render_register(request, error="该邮箱已注册，请直接登录", email=email, next_url=next_url)
 
+    # 发送验证邮件（异步，不阻塞响应；失败不影响注册）
+    from ..auth.email_verification import send_verification_email
+
+    await send_verification_email(db, email)
+
+    # 注册成功后跳转到登录页，提示用户查收验证邮件
     resp = RedirectResponse(
-        url=next_url or "/dashboard", status_code=status.HTTP_303_SEE_OTHER
+        url="/dashboard/login?registered=1", status_code=status.HTTP_303_SEE_OTHER
     )
     set_session_cookie(resp, str(user.id))
     return resp
@@ -402,6 +433,29 @@ async def reset_password_submit(
     )
 
 
+@router.post("/resend-verification")
+async def resend_verification(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> object:
+    """重发验证邮件（需登录）。"""
+    user = await _user_from_session(request, db)
+    if not user:
+        return RedirectResponse(url="/dashboard/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    if user.email_verified:
+        return RedirectResponse(url="/dashboard?verify_already=1", status_code=status.HTTP_303_SEE_OTHER)
+
+    from ..auth.email_verification import resend_verification_email
+
+    sent = await resend_verification_email(db, str(user.id))
+    if not sent:
+        # 冷却期内，仍然跳转 dashboard 但带提示
+        return RedirectResponse(url="/dashboard?resend_cooldown=1", status_code=status.HTTP_303_SEE_OTHER)
+
+    return RedirectResponse(url="/dashboard?resend_success=1", status_code=status.HTTP_303_SEE_OTHER)
+
+
 @router.get("/logout")
 async def logout() -> RedirectResponse:
     resp = RedirectResponse(url="/dashboard/login", status_code=status.HTTP_303_SEE_OTHER)
@@ -417,12 +471,16 @@ async def logout() -> RedirectResponse:
 async def dashboard_home(
     request: Request,
     q: str = "",
+    resend_success: int = 0,
+    resend_cooldown: int = 0,
     db: AsyncSession = Depends(get_db),
 ) -> object:
     """主面板：余额 + 用量曲线 + 快速搜索。
 
     ?q=xxx：预填快速搜索框并自动触发（落地页「在线体验」入口）。
     未登录时把 /dashboard?q=xxx 整体作为 next 带去登录页，登录后回跳不丢 query。
+    ?resend_success=1：重发验证邮件成功提示。
+    ?resend_cooldown=1：重发验证邮件冷却期提示。
     """
     user = await _user_from_session(request, db)
     if not user:
@@ -435,7 +493,14 @@ async def dashboard_home(
     return templates.TemplateResponse(
         request,
         "dashboard.html",
-        {"user": user, "balance": balance, "active": "home", "initial_q": q},
+        {
+            "user": user,
+            "balance": balance,
+            "active": "home",
+            "initial_q": q,
+            "resend_success": resend_success,
+            "resend_cooldown": resend_cooldown,
+        },
     )
 
 

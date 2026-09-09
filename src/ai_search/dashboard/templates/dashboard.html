@@ -6,6 +6,43 @@
   <p>欢迎回来，{{ user.email or user.phone }}</p>
 </div>
 
+{% if resend_success %}
+<div class="card" style="border-left:3px solid var(--ok);margin-bottom:24px">
+  <div class="row" style="align-items:center;gap:12px">
+    <span style="font-size:20px">✅</span>
+    <div class="grow">
+      <strong>验证邮件已重新发送</strong>
+      <p class="muted" style="margin:4px 0 0;font-size:13px">请查收邮箱并点击链接完成验证。</p>
+    </div>
+  </div>
+</div>
+{% elif resend_cooldown %}
+<div class="card" style="border-left:3px solid var(--warn);margin-bottom:24px">
+  <div class="row" style="align-items:center;gap:12px">
+    <span style="font-size:20px">⏳</span>
+    <div class="grow">
+      <strong>发送过于频繁</strong>
+      <p class="muted" style="margin:4px 0 0;font-size:13px">请等待 60 秒后再试。</p>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if not user.email_verified %}
+<div class="card" style="border-left:3px solid var(--warn);margin-bottom:24px">
+  <div class="row" style="align-items:center;gap:12px">
+    <span style="font-size:20px">⚠️</span>
+    <div class="grow">
+      <strong>邮箱未验证</strong>
+      <p class="muted" style="margin:4px 0 0;font-size:13px">请查收验证邮件并点击链接完成验证，以确保账号安全和正常使用所有功能。</p>
+    </div>
+    <form action="/dashboard/resend-verification" method="post" style="margin:0">
+      <button type="submit" class="btn btn-sm">重发验证邮件</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
 <div class="stat-grid mb">
   <div class="stat-card">
     <div class="stat-label">积分余额</div>

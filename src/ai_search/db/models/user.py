@@ -13,7 +13,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, String, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..base import Base
@@ -50,6 +50,9 @@ class User(Base, PkMixin, TimestampMixin):
         nullable=False,
         default=UserStatus.ACTIVE.value,
         server_default="active",
+    )
+    email_verified: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
     )
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

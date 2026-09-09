@@ -18,13 +18,14 @@ searchpipe/
 │   ├── mcp_server.py         # FastMCP streamable-http 子应用（/mcp，共用商业管线；鉴权支持 URL ?api_key= / Authorization 头 / 工具参数）（219 行）
 │   ├── agent_setup.py        # /agent-setup/SKILL.md 生成：Tavily 式 URL 内嵌 Key 的 MCP 接入指南（172 行）
 │   ├── auth/                 # 鉴权：JWT + session cookie + API Key 三通道
-│   │   ├── routes.py         # /auth/*：注册/登录/refresh/忘记密码/重置/OAuth stub/me（307 行）
+│   │   ├── routes.py         # /auth/*：注册/登录/refresh/忘记密码/重置/邮箱验证/OAuth stub/me（~360 行）
 │   │   ├── dependencies.py   # get_current_user 等 DI 依赖（cookie 兜底）（139 行）
 │   │   ├── core.py           # 协议无关鉴权核（resolve_jwt/resolve_api_key）（88 行）
 │   │   ├── jwt_handler.py    # python-jose HS256 签发/解码（39 行）
 │   │   ├── session.py        # itsdangerous 签名 session cookie（7 天 httponly）（56 行）
 │   │   ├── password.py       # argon2 哈希（passlib）（19 行）
 │   │   ├── password_reset.py # Redis 一次性重置 token + 60s 发信冷却（87 行；2026-09-08）
+│   │   ├── email_verification.py # 邮箱验证 token + 发信冷却（~110 行；2026-09-11）
 │   │   ├── oauth.py          # GitHub/微信 OAuth 客户端（106 行）
 │   │   └── errors.py         # AuthError（17 行）
 │   ├── dashboard/            # 控制台（Jinja2 SSR + session cookie）
@@ -71,9 +72,10 @@ searchpipe/
 | 文件 | 行数 | 职责 |
 |------|------|------|
 | `main.py` | 207 | 入口汇聚 + /search 依赖链编排 + /agent-setup/SKILL.md |
-| `auth/routes.py` | 307 | 注册/登录/refresh/忘记密码/重置密码/OAuth stub/me |
+| `auth/routes.py` | ~360 | 注册/登录/refresh/忘记密码/重置密码/邮箱验证/OAuth stub/me |
 | `auth/dependencies.py` | 139 | JWT/API Key/cookie 三通道 DI |
 | `auth/password_reset.py` | 87 | Redis 一次性重置 token（`pwdreset:token:*`）+ 冷却（`pwdreset:cooldown:*`） |
+| `auth/email_verification.py` | ~110 | Redis 一次性验证 token（`verify:token:*`）+ 冷却（`verify:cooldown:*`） |
 | `dashboard/routes.py` | 545 | SSR 页面 + /robots.txt + /sitemap.xml + /terms 服务条款页 + 表单登录/注册/密码重置/反馈工单/站内信页（失败重渲染，不裸 4xx；登录/注册支持 ?next= 站内回跳）+ 落地页在线体验入口登录态探测 |
 | `feedback/__init__.py` | 162 | 用户反馈工单：POST/GET /feedback + Redis 频率限制 |
 | `messages/__init__.py` | 134 | 站内信用户侧：GET /messages（列表+未读数）、GET /messages/unread-count、POST /messages/{id}/read（越权 404） |
@@ -88,7 +90,7 @@ searchpipe/
 
 ## 路由速查
 
-**API（JWT/API Key）**：`/auth/register|login|refresh|forgot-password|reset-password|me`（auth/routes.py:153-305）· `/api-keys` CRUD · `/billing/balance|transactions|plans` · `/payments/catalog|packages|orders|callback` · `/usage|/usage/logs|/usage/export` · `/feedback` 提交/列表 · `/messages` 列表/未读数/标记已读（messages/__init__.py）· `/admin/users|credits|orders|stats|feedback|messages|monitor` · `POST /search`（main.py:131）· `GET /agent-setup/SKILL.md`（main.py:125）
+**API（JWT/API Key）**：`/auth/register|login|refresh|forgot-password|reset-password|verify-email|resend-verification|me`（auth/routes.py）· `/api-keys` CRUD · `/billing/balance|transactions|plans` · `/payments/catalog|packages|orders|callback` · `/usage|/usage/logs|/usage/export` · `/feedback` 提交/列表 · `/messages` 列表/未读数/标记已读（messages/__init__.py）· `/admin/users|credits|orders|stats|feedback|messages|monitor` · `POST /search`（main.py:131）· `GET /agent-setup/SKILL.md`（main.py:125）
 
 **控制台（session cookie）**：`GET /` 营销页（含在线体验入口） · `GET /robots.txt` · `GET /sitemap.xml` · `/terms` 服务条款 · `/dashboard/login|register|forgot-password|reset-password|logout`（login/register 支持 ?next= 回跳） · `/dashboard[|/api-keys|/usage|/billing|/docs|/feedback|/messages]`（/dashboard 支持 ?q= 预填并自动触发快速搜索）
 
@@ -98,6 +100,7 @@ searchpipe/
 |----------|------|----------|
 | 改鉴权/登录态 | 本表 + `docs/memory/searchpipe-auth-design.md` | `auth/routes.py` / `auth/dependencies.py` |
 | 改注册/忘记密码邮件 | `docs/memory/searchpipe-auth-design.md` | `auth/password_reset.py` + `utils/mailer.py` |
+| 改邮箱验证 | `docs/memory/searchpipe-auth-design.md` | `auth/email_verification.py` + `auth/routes.py`（verify-email/resend-verification） |
 | 改控制台页面/SEO | `dashboard/routes.py` 头部 docstring 路由表 | 对应 `dashboard/templates/*.html` |
 | 改站内信 | `messages/__init__.py`（用户侧）+ `admin/routes.py` 站内信段（管理端） | `db/models/site_message.py` + 模板 `messages.html`/`admin_messages.html`/`admin_feedback.html` |
 | 改搜索管线 | `core/search_service.py` | `search/orchestrator.py` → `extract/fetcher.py` → `rerank/llm_reranker.py` |

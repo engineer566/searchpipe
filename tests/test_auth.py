@@ -377,3 +377,152 @@ def test_landing_try_entry_logged_in(client):
     assert resp.status_code == 200
     assert "在线体验" in resp.text
     assert "已登录，提交后进入控制台" in resp.text
+
+
+# ---------- 邮箱验证 ----------
+
+
+def _extract_verify_token(mail: dict) -> str:
+    m = re.search(r"token=([A-Za-z0-9_\-]+)", mail["text"])
+    assert m, f"验证邮件中未找到 token: {mail}"
+    return m.group(1)
+
+
+def test_register_sends_verification_email(client, sent_mails):
+    """注册成功后应发送验证邮件。"""
+    email = _unique_email()
+    tokens = _register(client, email)
+    assert len(sent_mails) == 1
+    assert sent_mails[0]["to"] == email
+    assert "验证" in sent_mails[0]["subject"] or "verify" in sent_mails[0]["subject"].lower()
+    # 提取 token 并验证链接格式
+    token = _extract_verify_token(sent_mails[0])
+    assert token
+    assert "/auth/verify-email?token=" in sent_mails[0]["text"]
+
+
+def test_verify_email_success(client, sent_mails):
+    """验证邮箱成功 → 跳转登录页带成功提示。"""
+    email = _unique_email()
+    _register(client, email)
+    assert len(sent_mails) == 1
+    token = _extract_verify_token(sent_mails[0])
+
+    # 访问验证链接
+    resp = client.get(f"/auth/verify-email?token={token}", follow_redirects=False)
+    assert resp.status_code == 302
+    assert "verify_success=1" in resp.headers["location"]
+
+    # 验证后 /me 应返回 email_verified=true
+    tokens = client.post("/auth/login", json={"email": email, "password": _PW}).json()
+    resp = client.get("/auth/me", headers={"Authorization": f"Bearer {tokens['access_token']}"})
+    assert resp.status_code == 200
+    assert resp.json()["email_verified"] is True
+
+
+def test_verify_email_invalid_token(client):
+    """无效 token → 跳转登录页带错误提示。"""
+    resp = client.get("/auth/verify-email?token=forged-token", follow_redirects=False)
+    assert resp.status_code == 302
+    assert "verify_error=1" in resp.headers["location"]
+
+
+def test_verify_email_already_verified(client, sent_mails):
+    """已验证的邮箱再次验证 → 跳转登录页带已验证提示。"""
+    email = _unique_email()
+    _register(client, email)
+    token = _extract_verify_token(sent_mails[0])
+
+    # 第一次验证
+    resp = client.get(f"/auth/verify-email?token={token}", follow_redirects=False)
+    assert resp.status_code == 302
+    assert "verify_success=1" in resp.headers["location"]
+
+    # 再次使用同一 token（已消费，应失败）
+    resp = client.get(f"/auth/verify-email?token={token}", follow_redirects=False)
+    assert resp.status_code == 302
+    assert "verify_error=1" in resp.headers["location"]
+
+
+def test_dashboard_register_shows_verification_hint(client):
+    """Dashboard 注册成功后跳转到登录页带 registered=1 提示。"""
+    email = _unique_email()
+    resp = client.post(
+        "/dashboard/register",
+        data={"email": email, "password": _PW, "password_confirm": _PW, "agree_terms": "on"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    assert "registered=1" in resp.headers["location"]
+
+    # 跟随重定向到登录页，应显示验证邮件提示
+    resp = client.get(resp.headers["location"])
+    assert resp.status_code == 200
+    assert "验证邮件" in resp.text or "查收" in resp.text
+
+
+def test_dashboard_unverified_user_sees_warning(client, sent_mails):
+    """未验证邮箱的用户访问 dashboard 应显示警告提示。"""
+    email = _unique_email()
+    resp = client.post(
+        "/dashboard/register",
+        data={"email": email, "password": _PW, "password_confirm": _PW, "agree_terms": "on"},
+        follow_redirects=True,  # 跟随重定向到 dashboard
+    )
+    assert resp.status_code == 200
+    assert "邮箱未验证" in resp.text
+    assert "重发验证邮件" in resp.text
+
+
+def test_resend_verification_email(client, sent_mails):
+    """重发验证邮件功能。"""
+    email = _unique_email()
+    resp = client.post(
+        "/dashboard/register",
+        data={"email": email, "password": _PW, "password_confirm": _PW, "agree_terms": "on"},
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+    initial_count = len(sent_mails)
+
+    # 重发验证邮件
+    resp = client.post("/dashboard/resend-verification", follow_redirects=False)
+    assert resp.status_code == 303
+    assert "resend_success=1" in resp.headers["location"]
+
+    # 应多了一封邮件
+    assert len(sent_mails) == initial_count + 1
+    assert sent_mails[-1]["to"] == email
+
+
+def test_api_resend_verification(client, sent_mails):
+    """API 端点重发验证邮件。"""
+    email = _unique_email()
+    tokens = _register(client, email)
+    initial_count = len(sent_mails)
+
+    resp = client.post(
+        "/auth/resend-verification",
+        headers={"Authorization": f"Bearer {tokens['access_token']}"},
+    )
+    assert resp.status_code == 200
+    assert "已重新发送" in resp.json()["detail"]
+    assert len(sent_mails) == initial_count + 1
+
+
+def test_api_resend_verification_already_verified(client, sent_mails):
+    """已验证邮箱重发验证邮件应返回 400。"""
+    email = _unique_email()
+    tokens = _register(client, email)
+    token = _extract_verify_token(sent_mails[0])
+
+    # 先验证邮箱
+    client.get(f"/auth/verify-email?token={token}")
+
+    # 再尝试重发
+    resp = client.post(
+        "/auth/resend-verification",
+        headers={"Authorization": f"Bearer {tokens['access_token']}"},
+    )
+    assert resp.status_code == 400
+    assert "已验证" in resp.json()["detail"]

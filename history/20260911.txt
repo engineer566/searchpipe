@@ -1,0 +1,53 @@
+# 2026-09-11 邮箱验证功能开发
+
+## 需求
+防止虚假注册骗积分，添加邮箱验证功能。
+
+## 实现内容
+
+### 1. User 模型变更
+- 新增 `email_verified` 布尔字段（默认 false）
+- 迁移脚本：`alembic/versions/d4b8e2f1a3c5_add_email_verified_to_users.py`
+
+### 2. 邮箱验证服务
+- 新文件：`src/ai_search/auth/email_verification.py`
+- Redis token 存储：`verify:token:<token>` → user_id（TTL 24h）
+- 发信冷却：`verify:cooldown:<email>`（TTL 60s）
+- 函数：`create_verification_token`、`consume_verification_token`、`send_verification_email`、`resend_verification_email`
+
+### 3. API 端点
+- `GET /auth/verify-email?token=xxx`：验证邮箱，成功跳转登录页带 `verify_success=1`
+- `POST /auth/resend-verification`：重发验证邮件（需登录）
+- `/auth/register`：注册后自动发送验证邮件
+- `/auth/me`：返回 `email_verified` 字段
+
+### 4. Dashboard 变更
+- 注册成功后跳转到 `/dashboard/login?registered=1`，显示"请查收验证邮件"提示
+- 登录页支持多种提示参数：`registered`、`verify_success`、`verify_error`、`verify_already`
+- 未验证用户访问 dashboard 显示警告卡片 + 重发按钮
+- 新增 `POST /dashboard/resend-verification` 端点
+
+### 5. 模板更新
+- `login.html`：已有 info/error 变量支持，无需修改
+- `dashboard.html`：添加邮箱未验证警告卡片 + 重发成功/冷却提示
+
+### 6. 测试用例
+- `tests/test_auth.py` 新增 9 个测试：
+  - `test_register_sends_verification_email`
+  - `test_verify_email_success`
+  - `test_verify_email_invalid_token`
+  - `test_verify_email_already_verified`
+  - `test_dashboard_register_shows_verification_hint`
+  - `test_dashboard_unverified_user_sees_warning`
+  - `test_resend_verification_email`
+  - `test_api_resend_verification`
+  - `test_api_resend_verification_already_verified`
+
+### 7. 文档更新
+- `docs/INDEX.md`：更新模块速查表、路由速查、按任务跳转表
+- `docs/memory/searchpipe-auth-design.md`：更新设计决策和实现要点
+
+## 待办
+- [ ] 在测试环境运行全量 pytest
+- [ ] 部署到测试服验证
+- [ ] 提交到 dev 并 push origin

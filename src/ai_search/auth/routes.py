@@ -29,6 +29,10 @@ from ..db.session import get_db
 from .dependencies import get_current_user
 from .jwt_handler import create_access_token, create_refresh_token, decode_token
 from .oauth import GitHubOAuth, WeChatOAuth
+from .email_verification import (
+    consume_verification_token,
+    send_verification_email,
+)
 from .password import hash_password, verify_password
 from .password_reset import consume_reset_token, request_password_reset
 
@@ -73,6 +77,7 @@ class UserInfo(BaseModel):
     email: str | None = None
     phone: str | None = None
     role: str
+    email_verified: bool = False
 
 
 # ---------- 辅助 ----------
@@ -152,7 +157,7 @@ def _normalize_email(email: str) -> str:
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)) -> TokenResponse:
-    """邮箱+密码注册。注册即签发 token 并赠送免费额度。"""
+    """邮箱+密码注册。注册即签发 token 并赠送免费额度，同时发送邮箱验证邮件。"""
     email = _normalize_email(req.email)
     existing = (
         await db.execute(select(User).where(User.email == email))
@@ -165,6 +170,7 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)) -> 
         password_hash=hash_password(req.password),
         role=UserRole.USER.value,
         status=UserStatus.ACTIVE.value,
+        email_verified=False,  # 新注册用户需要验证邮箱
     )
     db.add(user)
     try:
@@ -176,6 +182,10 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)) -> 
         # 并发重复注册竞态：唯一索引兜底
         await db.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, "该邮箱已注册") from e
+
+    # 发送验证邮件（异步，不阻塞响应；失败不影响注册）
+    await send_verification_email(db, email)
+
     return _issue_tokens(user)
 
 
@@ -298,10 +308,73 @@ async def oauth_wechat_callback() -> dict:
     raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "微信登录待个体工商户后接入微信开放平台")
 
 
+# ---------- 邮箱验证 ----------
+
+
+@router.get("/verify-email")
+async def verify_email(
+    token: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+) -> RedirectResponse:
+    """验证邮箱链接。成功 → 302 到登录页带提示；失败 → 302 到登录页带错误提示。"""
+    user_id = await consume_verification_token(token)
+    if not user_id:
+        return RedirectResponse(
+            url="/dashboard/login?verify_error=1",
+            status_code=status.HTTP_302_FOUND,
+        )
+
+    user = await db.get(User, user_id)
+    if not user:
+        return RedirectResponse(
+            url="/dashboard/login?verify_error=1",
+            status_code=status.HTTP_302_FOUND,
+        )
+
+    if user.email_verified:
+        # 已验证，直接跳转
+        return RedirectResponse(
+            url="/dashboard/login?verify_already=1",
+            status_code=status.HTTP_302_FOUND,
+        )
+
+    user.email_verified = True
+    await db.commit()
+
+    return RedirectResponse(
+        url="/dashboard/login?verify_success=1",
+        status_code=status.HTTP_302_FOUND,
+    )
+
+
+@router.post("/resend-verification")
+async def resend_verification(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """重新发送验证邮件（需登录）。"""
+    from .email_verification import resend_verification_email
+
+    if user.email_verified:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "邮箱已验证")
+
+    sent = await resend_verification_email(db, str(user.id))
+    if not sent:
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "发送过于频繁，请稍后再试")
+
+    return {"detail": "验证邮件已重新发送，请查收"}
+
+
 # ---------- 当前用户 ----------
 
 
 @router.get("/me", response_model=UserInfo)
 async def me(user: User = Depends(get_current_user)) -> UserInfo:
     """返回当前登录用户信息。"""
-    return UserInfo(id=str(user.id), email=user.email, phone=user.phone, role=user.role)
+    return UserInfo(
+        id=str(user.id),
+        email=user.email,
+        phone=user.phone,
+        role=user.role,
+        email_verified=user.email_verified,
+    )
