@@ -330,6 +330,20 @@ p.card-sub { color: var(--muted); font-size: 13px; }
 .text-ok { color: var(--ok); }
 .text-err { color: var(--err); }
 
+/* ---------- 加载态 ---------- */
+.spinner {
+  display: inline-block; width: 14px; height: 14px; vertical-align: -2px;
+  border: 2px solid var(--border); border-top-color: var(--accent);
+  border-radius: 50%; animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---------- 落地页在线体验 ---------- */
+.hero-demo { display: flex; gap: 10px; max-width: 640px; margin: 28px auto 0; }
+.hero-demo input { flex: 1; }
+.hero-demo .btn { flex-shrink: 0; }
+.hero-demo-hint { color: var(--faint); font-size: 13px; margin: 10px 0 0; }
+
 /* ---------- 响应式 ---------- */
 @media (max-width: 900px) {
   .shell { flex-direction: column; }

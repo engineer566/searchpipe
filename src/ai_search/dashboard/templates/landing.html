@@ -28,6 +28,7 @@
     <a href="#features">产品</a>
     <a href="#api">API</a>
     <a href="#pricing">定价</a>
+    <a href="#try">在线体验</a>
     <a href="/dashboard/docs">文档</a>
   </div>
   <div class="nav-actions">
@@ -45,6 +46,15 @@
     <a href="/dashboard/register" class="btn btn-lg">获取 API Key</a>
     <button type="button" class="btn btn-ghost btn-lg" onclick="AIS.copy('{{ base_url }}/agent-setup/SKILL.md', this)">复制配置提示词</button>
   </div>
+  <form class="hero-demo" id="try" action="/dashboard" method="get" aria-label="在线体验">
+    <input type="text" name="q" placeholder="输入问题，体验完整搜索管线（检索→抓取→重排→摘要）" required>
+    <button type="submit" class="btn btn-lg">在线体验</button>
+  </form>
+  {% if logged_in %}
+  <p class="hero-demo-hint">已登录，提交后进入控制台并自动开始搜索</p>
+  {% else %}
+  <p class="hero-demo-hint">需登录后体验——未登录会先引导注册/登录，完成后自动回到你的搜索</p>
+  {% endif %}
   <div class="code-block hero-code" data-copy><pre><code># 一条命令，把实时网络搜索装进你的 Agent
 claude mcp add --transport http searchpipe \
   "{{ base_url }}/mcp?api_key=sp-你的API密钥"</code></pre></div>

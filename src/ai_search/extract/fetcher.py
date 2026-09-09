@@ -210,13 +210,14 @@ class Fetcher:
     """并发抓取多个 URL 的正文。"""
 
     def __init__(self, settings: Settings) -> None:
-        self._timeout = settings.request_timeout
+        self._timeout = settings.fetch_timeout
+        self._concurrency = settings.fetch_concurrency
 
     async def fetch_batch(
-        self, urls: list[str], *, concurrency: int = 5
+        self, urls: list[str], *, concurrency: int | None = None
     ) -> dict[str, str | None]:
         """并发抓取，返回 {url: 正文或None}。"""
-        sem = asyncio.Semaphore(concurrency)
+        sem = asyncio.Semaphore(concurrency or self._concurrency)
 
         async def _one(u: str) -> tuple[str, str | None]:
             async with sem:

@@ -73,7 +73,7 @@ document.getElementById('quick-search').onsubmit=async e=>{
   const q=document.getElementById('q').value.trim();
   if(!q) return;
   const btn=document.getElementById('qs-btn'),st=document.getElementById('qs-status'),out=document.getElementById('qs-out');
-  btn.disabled=true; st.textContent='搜索中…通常需要 10–30 秒'; out.innerHTML='';
+  btn.disabled=true; st.innerHTML='<span class="spinner" aria-hidden="true"></span> 搜索中…'; out.innerHTML='';
   try{
     const d=await AIS.api('/search',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({query:q,max_results:5,include_answer:document.getElementById('ans').checked})});
@@ -97,5 +97,14 @@ document.getElementById('quick-search').onsubmit=async e=>{
     out.innerHTML='<div class="msg msg-err">'+AIS.esc(e.message)+'</div>';
   }finally{ btn.disabled=false; }
 };
+
+// 落地页「在线体验」入口带参进入：预填并自动触发快速搜索
+(function(){
+  const initialQ={{ initial_q | tojson }};
+  if(initialQ){
+    document.getElementById('q').value=initialQ;
+    document.getElementById('quick-search').requestSubmit();
+  }
+})();
 </script>
 {% endblock %}

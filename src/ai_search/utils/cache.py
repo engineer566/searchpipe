@@ -1,7 +1,7 @@
 """缓存层 —— Redis 实现（懒连接单例）。
 
-供限流（滑动窗口）、会话等共用。
-结果缓存（同 query+params）后续按 enable_cache 开关接入。
+供限流（滑动窗口）、密码重置 token、结果缓存（core/search_service.py，
+enable_cache 开关 + search_cache_ttl）等共用。
 """
 
 import logging

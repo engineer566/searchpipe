@@ -276,3 +276,104 @@ def test_dashboard_forgot_and_reset_pages(client, sent_mails):
     assert "reset=1" in resp.headers["location"]
     resp = client.post("/auth/login", json={"email": email, "password": _PW_NEW})
     assert resp.status_code == 200
+
+
+# ---------- 快速搜索体验入口（落地页 → 登录回跳 → /dashboard?q= 预填） ----------
+
+
+def test_dashboard_q_redirects_anonymous_to_login_with_next(client):
+    """未登录访问 /dashboard?q=xxx → 303 到登录页，next 携带完整 /dashboard?q=xxx。"""
+    resp = client.get(
+        "/dashboard",
+        params={"q": "fastapi 部署"},
+        follow_redirects=False,
+        # 共享 TestClient 的 cookie jar 可能被先跑的用例写入有效 session，
+        # 覆盖无效 cookie 模拟匿名访客（签名校验失败即未登录）
+        cookies={"ai_search_session": "invalid"},
+    )
+    assert resp.status_code == 303
+    loc = resp.headers["location"]
+    assert loc.startswith("/dashboard/login?next=")
+    # next 里是 URL 编码后的 /dashboard?q=...
+    assert "%2Fdashboard%3Fq%3D" in loc
+
+
+def test_dashboard_login_next_redirect_and_open_redirect_blocked(client):
+    """登录成功按 next（站内路径）回跳；站外 next 被忽略，回退 /dashboard。"""
+    email = _unique_email()
+    _register(client, email)
+
+    resp = client.post(
+        "/dashboard/login",
+        data={
+            "email": email,
+            "password": _PW,
+            "agree_terms": "on",
+            "next": "/dashboard?q=fastapi",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    assert resp.headers["location"] == "/dashboard?q=fastapi"
+
+    # open redirect 防护：站外/协议相对地址一律回退 /dashboard
+    for evil in ("https://evil.example.com", "//evil.example.com"):
+        resp = client.post(
+            "/dashboard/login",
+            data={"email": email, "password": _PW, "agree_terms": "on", "next": evil},
+            follow_redirects=False,
+        )
+        assert resp.status_code == 303
+        assert resp.headers["location"] == "/dashboard"
+
+
+def test_dashboard_register_next_redirect(client):
+    """注册成功同样支持 next 回跳（落地页体验入口 → 注册 → 回到体验页）。"""
+    email = _unique_email()
+    resp = client.post(
+        "/dashboard/register",
+        data={
+            "email": email,
+            "password": _PW,
+            "password_confirm": _PW,
+            "agree_terms": "on",
+            "next": "/dashboard?q=hello",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303, resp.text
+    assert resp.headers["location"] == "/dashboard?q=hello"
+
+
+def test_dashboard_q_prefill_logged_in(client):
+    """已登录访问 /dashboard?q=xxx → 200，页面内嵌 initial_q 供 JS 预填并自动搜索。"""
+    email = _unique_email()
+    resp = client.post(
+        "/dashboard/register",
+        data={"email": email, "password": _PW, "password_confirm": _PW, "agree_terms": "on"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303  # cookie 已写入 jar
+    resp = client.get("/dashboard", params={"q": "fastapi deploy"})
+    assert resp.status_code == 200, resp.text
+    assert 'initialQ="fastapi deploy"' in resp.text  # initial_q 渲染进页面脚本
+    assert "requestSubmit" in resp.text
+
+
+def test_landing_try_entry_logged_in(client):
+    """已登录用户访问落地页：体验入口提示直接进入控制台。"""
+    resp = client.post(
+        "/dashboard/register",
+        data={
+            "email": _unique_email(),
+            "password": _PW,
+            "password_confirm": _PW,
+            "agree_terms": "on",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303  # 注册即登录，cookie 写入 jar
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert "在线体验" in resp.text
+    assert "已登录，提交后进入控制台" in resp.text

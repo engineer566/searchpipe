@@ -76,3 +76,19 @@ def test_landing_agent_first_positioning(client):
     assert "/mcp?api_key=" in text
     # 弱化 RAG：不再作为卖点出现
     assert "RAG" not in text
+
+
+def test_landing_try_entry_anonymous(client):
+    """落地页含「在线体验」入口：匿名态提示需登录，表单 GET 到 /dashboard?q=。
+
+    共享 TestClient 的 cookie jar 可能被先跑的用例写入有效 session，
+    这里显式覆盖一个无效 cookie 来模拟匿名访客（签名校验失败即视为未登录）。
+    """
+    resp = client.get("/", cookies={"ai_search_session": "invalid"})
+    assert resp.status_code == 200
+    text = resp.text
+    assert "在线体验" in text
+    assert 'action="/dashboard"' in text
+    assert 'name="q"' in text
+    assert "需登录后体验" in text
+    assert "已登录，提交后进入控制台" not in text

@@ -9,16 +9,16 @@
 - GET /sitemap.xml               站点地图
 - GET /terms                     服务条款页（site_router，公开）
 - GET /dashboard/auth?token=xxx    OAuth/JWT 登录后落地：把 token 换成 session cookie → 302 到 /dashboard
-- GET /dashboard/login             登录页（仅邮箱密码；第三方登录前端不开放）
-- POST /dashboard/login            邮箱密码登录 → 设 cookie → 302 /dashboard
-- GET /dashboard/register          注册页
-- POST /dashboard/register         邮箱注册 → 送免费额度 → 设 cookie → 302 /dashboard
+- GET /dashboard/login             登录页（仅邮箱密码；第三方登录前端不开放；支持 ?next= 回跳）
+- POST /dashboard/login            邮箱密码登录 → 设 cookie → 302 next 或 /dashboard
+- GET /dashboard/register          注册页（支持 ?next= 回跳）
+- POST /dashboard/register         邮箱注册 → 送免费额度 → 设 cookie → 302 next 或 /dashboard
 - GET /dashboard/forgot-password   忘记密码页
 - POST /dashboard/forgot-password  发重置邮件（统一话术防枚举）
 - GET /dashboard/reset-password    重置密码页（预检 token）
 - POST /dashboard/reset-password   校验 token 改密 → 302 登录页
 - GET /dashboard/logout            清 cookie → 302 /dashboard/login
-- GET /dashboard                   主面板（余额/用量/快速搜索）
+- GET /dashboard                   主面板（余额/用量/快速搜索；?q=xxx 预填并自动触发快速搜索）
 - GET /dashboard/api-keys          API Key 管理
 - GET /dashboard/usage             用量统计
 - GET /dashboard/billing           充值/流水
@@ -27,6 +27,7 @@
 
 import logging
 from datetime import datetime, timezone
+from urllib.parse import quote
 
 from email_validator import EmailNotValidError, validate_email
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, status
@@ -90,10 +91,22 @@ async def _user_from_session(request: Request, db: AsyncSession) -> User | None:
 # ---------- 营销首页（公开） ----------
 
 
+def _safe_next(next_url: str) -> str | None:
+    """登录/注册回跳目标白名单：仅允许站内相对路径（防 open redirect）。"""
+    if next_url and next_url.startswith("/") and not next_url.startswith("//"):
+        return next_url
+    return None
+
+
 @site_router.get("/")
 async def landing(request: Request) -> object:
-    """营销首页：产品定位 + 特性 + API 示例 + 定价锚点。"""
-    return _render_with_base(request, "landing.html", {})
+    """营销首页：产品定位 + 在线体验入口 + 特性 + API 示例 + 定价锚点。
+
+    登录态探测：仅校验 session cookie 签名（不查库）——最坏情况是失效 cookie
+    用户看到「已登录」文案，点击后 /dashboard 守卫仍会引导登录，无害。
+    """
+    logged_in = read_session_cookie(request) is not None
+    return _render_with_base(request, "landing.html", {"logged_in": logged_in})
 
 
 # ---------- SEO ----------
@@ -151,18 +164,26 @@ async def terms_page(request: Request) -> object:
 
 
 def _render_login(
-    request: Request, error: str | None = None, email: str = "", info: str | None = None
+    request: Request,
+    error: str | None = None,
+    email: str = "",
+    info: str | None = None,
+    next_url: str = "",
 ) -> object:
-    """渲染登录页（可带错误/提示与邮箱回填）。"""
+    """渲染登录页（可带错误/提示与邮箱回填，next_url 用于登录后回跳）。"""
     return templates.TemplateResponse(
-        request, "login.html", {"error": error, "email": email, "info": info}
+        request,
+        "login.html",
+        {"error": error, "email": email, "info": info, "next": next_url},
     )
 
 
-def _render_register(request: Request, error: str | None = None, email: str = "") -> object:
-    """渲染注册页（可带错误与邮箱回填）。"""
+def _render_register(
+    request: Request, error: str | None = None, email: str = "", next_url: str = ""
+) -> object:
+    """渲染注册页（可带错误与邮箱回填，next_url 用于注册后回跳）。"""
     return templates.TemplateResponse(
-        request, "register.html", {"error": error, "email": email}
+        request, "register.html", {"error": error, "email": email, "next": next_url}
     )
 
 
@@ -205,10 +226,12 @@ async def auth_landing(
 
 
 @router.get("/login")
-async def login_page(request: Request, reset: int = 0) -> object:
-    """登录页（仅邮箱密码）。?reset=1 时显示「密码已重置」提示。"""
+async def login_page(
+    request: Request, reset: int = 0, next_url: str = Query("", alias="next")
+) -> object:
+    """登录页（仅邮箱密码）。?reset=1 时显示「密码已重置」提示；?next= 登录后回跳。"""
     info = "密码已重置，请使用新密码登录" if reset else None
-    return _render_login(request, info=info)
+    return _render_login(request, info=info, next_url=_safe_next(next_url) or "")
 
 
 @router.post("/login")
@@ -217,36 +240,42 @@ async def login_submit(
     email: str = Form(...),
     password: str = Form(...),
     agree_terms: str = Form(""),
+    next_url: str = Form("", alias="next"),
     db: AsyncSession = Depends(get_db),
 ) -> object:
-    """邮箱密码登录 → 设 cookie → /dashboard。失败重渲染登录页并提示。
+    """邮箱密码登录 → 设 cookie → next（站内）或 /dashboard。失败重渲染登录页并提示。
 
     控制台面向真实用户，显式区分「邮箱未注册」与「密码错误」；
     API 层（/auth/login）仍返回统一 401 防脚本枚举。
     """
     email = email.strip().lower()
+    next_url = _safe_next(next_url) or ""
     if agree_terms != "on":
-        return _render_login(request, error="请先阅读并同意《服务条款》", email=email)
+        return _render_login(request, error="请先阅读并同意《服务条款》", email=email, next_url=next_url)
     user = (
         await db.execute(select(User).where(User.email == email))
     ).scalar_one_or_none()
     if not user:
-        return _render_login(request, error="该邮箱未注册，请先注册", email=email)
+        return _render_login(request, error="该邮箱未注册，请先注册", email=email, next_url=next_url)
     if not verify_password(password, user.password_hash):
-        return _render_login(request, error="密码错误，请重新输入", email=email)
+        return _render_login(request, error="密码错误，请重新输入", email=email, next_url=next_url)
     if user.status != UserStatus.ACTIVE.value:
-        return _render_login(request, error="账号已被停用，请联系客服", email=email)
+        return _render_login(request, error="账号已被停用，请联系客服", email=email, next_url=next_url)
     user.last_login_at = datetime.now(timezone.utc)
     await db.commit()
-    resp = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+    resp = RedirectResponse(
+        url=next_url or "/dashboard", status_code=status.HTTP_303_SEE_OTHER
+    )
     set_session_cookie(resp, str(user.id))
     return resp
 
 
 @router.get("/register")
-async def register_page(request: Request) -> object:
-    """注册页（仅邮箱密码）。"""
-    return _render_register(request)
+async def register_page(
+    request: Request, next_url: str = Query("", alias="next")
+) -> object:
+    """注册页（仅邮箱密码）。?next= 注册后回跳。"""
+    return _render_register(request, next_url=_safe_next(next_url) or "")
 
 
 @router.post("/register")
@@ -256,22 +285,24 @@ async def register_submit(
     password: str = Form(...),
     password_confirm: str = Form(...),
     agree_terms: str = Form(""),
+    next_url: str = Form("", alias="next"),
     db: AsyncSession = Depends(get_db),
 ) -> object:
-    """邮箱注册 → 送免费额度 → 设 cookie → /dashboard。失败重渲染注册页并提示。"""
+    """邮箱注册 → 送免费额度 → 设 cookie → next（站内）或 /dashboard。失败重渲染注册页并提示。"""
     email = email.strip().lower()
+    next_url = _safe_next(next_url) or ""
     if agree_terms != "on":
-        return _render_register(request, error="请先阅读并同意《服务条款》", email=email)
+        return _render_register(request, error="请先阅读并同意《服务条款》", email=email, next_url=next_url)
     if err := _validate_email(email):
-        return _render_register(request, error=err, email=email)
+        return _render_register(request, error=err, email=email, next_url=next_url)
     if err := _validate_password(password, password_confirm):
-        return _render_register(request, error=err, email=email)
+        return _render_register(request, error=err, email=email, next_url=next_url)
 
     existing = (
         await db.execute(select(User).where(User.email == email))
     ).scalar_one_or_none()
     if existing:
-        return _render_register(request, error="该邮箱已注册，请直接登录", email=email)
+        return _render_register(request, error="该邮箱已注册，请直接登录", email=email, next_url=next_url)
 
     user = User(
         email=email,
@@ -299,9 +330,11 @@ async def register_submit(
     except IntegrityError:
         # 并发重复注册竞态：唯一索引兜底
         await db.rollback()
-        return _render_register(request, error="该邮箱已注册，请直接登录", email=email)
+        return _render_register(request, error="该邮箱已注册，请直接登录", email=email, next_url=next_url)
 
-    resp = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+    resp = RedirectResponse(
+        url=next_url or "/dashboard", status_code=status.HTTP_303_SEE_OTHER
+    )
     set_session_cookie(resp, str(user.id))
     return resp
 
@@ -381,17 +414,26 @@ async def logout() -> RedirectResponse:
 @router.get("/")
 async def dashboard_home(
     request: Request,
+    q: str = "",
     db: AsyncSession = Depends(get_db),
 ) -> object:
-    """主面板：余额 + 用量曲线 + 快速搜索。"""
+    """主面板：余额 + 用量曲线 + 快速搜索。
+
+    ?q=xxx：预填快速搜索框并自动触发（落地页「在线体验」入口）。
+    未登录时把 /dashboard?q=xxx 整体作为 next 带去登录页，登录后回跳不丢 query。
+    """
     user = await _user_from_session(request, db)
     if not user:
-        return RedirectResponse(url="/dashboard/login", status_code=status.HTTP_303_SEE_OTHER)
+        target = "/dashboard" + (f"?q={quote(q)}" if q else "")
+        login_url = f"/dashboard/login?next={quote(target, safe='')}"
+        return RedirectResponse(url=login_url, status_code=status.HTTP_303_SEE_OTHER)
     from ..billing.service import get_balance
 
     balance = await get_balance(db, user.id)
     return templates.TemplateResponse(
-        request, "dashboard.html", {"user": user, "balance": balance, "active": "home"}
+        request,
+        "dashboard.html",
+        {"user": user, "balance": balance, "active": "home", "initial_q": q},
     )
 
 
