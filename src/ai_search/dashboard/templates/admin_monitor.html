@@ -115,6 +115,45 @@
     </div>
   </div>
 </div>
+
+<!-- 注册用户列表 -->
+<div class="card mb">
+  <h2>注册用户列表</h2>
+  <p class="card-sub">最近 50 名注册用户 · 共 {{ metrics.user_count }} 人</p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>邮箱</th>
+          <th>角色</th>
+          <th>状态</th>
+          <th>注册时间</th>
+          <th>最后登录</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in registered_users %}
+        <tr>
+          <td style="font-size:13px">{{ u.email or u.phone or '—' }}</td>
+          <td>
+            {% if u.role == 'owner' %}<span class="tag" style="background:var(--accent);color:#fff">owner</span>
+            {% elif u.role == 'admin' %}<span class="tag" style="background:var(--warn);color:#fff">admin</span>
+            {% else %}<span class="tag">{{ u.role }}</span>{% endif %}
+          </td>
+          <td>
+            {% if u.status == 'active' %}<span class="tag tag-ok">活跃</span>
+            {% else %}<span class="tag tag-err">封禁</span>{% endif %}
+          </td>
+          <td class="muted" style="white-space:nowrap;font-size:12px">{{ u.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td class="muted" style="white-space:nowrap;font-size:12px">{{ u.last_login_at.strftime('%Y-%m-%d %H:%M') if u.last_login_at else '—' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="empty">暂无注册用户</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
 {% endblock %}
 
 {% block script %}

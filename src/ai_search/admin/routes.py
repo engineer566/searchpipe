@@ -11,7 +11,7 @@
 - POST  /admin/feedback/{id}/close 关闭工单
 - GET   /admin/messages         站内信 SSR 页（发送表单 + 已发批次已读统计；支持 ?to= 邮箱 / ?ticket= 工单预填）
 - POST  /admin/messages         发送站内信（定向按邮箱 / 全局广播，一行一收件人）
-- GET   /admin/monitor          运营监控（SSR 页面）
+- GET   /admin/monitor          运营监控（SSR 页面，含注册用户列表）
 """
 
 import logging
@@ -626,6 +626,14 @@ async def monitor_page(
     )
     recent_errors = (await db.execute(recent_errors_stmt)).scalars().all()
 
+    # 注册用户列表（最近 50 名，按注册时间倒序）
+    registered_users_stmt = (
+        select(User)
+        .order_by(User.created_at.desc())
+        .limit(50)
+    )
+    registered_users = (await db.execute(registered_users_stmt)).scalars().all()
+
     return templates.TemplateResponse(
         request,
         "admin_monitor.html",
@@ -646,6 +654,7 @@ async def monitor_page(
             },
             "recent_logs": recent_logs,
             "recent_errors": recent_errors,
+            "registered_users": registered_users,
             "now": now,
         },
     )
