@@ -157,6 +157,151 @@ def test_search_with_api_key_charges_credits(
     assert before - after >= 1
 
 
+def test_search_failure_refunds_credits(
+    client: TestClient,
+    api_key_headers: dict,
+    auth_headers: dict,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """检索失败 → 502 → 扣费被自动退还（余额不变 + 有 refund 流水）。
+
+    monkeypatch 替换 ai_search.main 模块命名空间里的 run_search（端点经
+    `from .core.search_service import run_search` 绑定到 main 模块，patch
+    目标必须是 ai_search.main.run_search 而非 core.search_service.run_search）。
+    """
+    import ai_search.main as main_mod
+
+    async def _boom(req):  # noqa: ARG001
+        raise RuntimeError("searxng unreachable")
+
+    monkeypatch.setattr(main_mod, "run_search", _boom)
+
+    before = _balance_val(client.get("/billing/balance", headers=auth_headers).json())
+
+    resp = client.post(
+        "/search",
+        json={"query": "anything", "max_results": 3, "include_answer": False},
+        headers=api_key_headers,
+    )
+    assert resp.status_code == 502, resp.text
+
+    # 扣费已退还：余额与调用前一致
+    after = _balance_val(client.get("/billing/balance", headers=auth_headers).json())
+    assert after == before
+
+    # 流水：consume（remark=search:<ref>）+ refund（remark=refund:search:<ref>）成对出现
+    txs = client.get("/billing/transactions", headers=auth_headers).json()["items"]
+    consume = [t for t in txs if t["type"] == "consume" and t["delta"] < 0]
+    refunds = [t for t in txs if t["type"] == "refund" and t["delta"] > 0]
+    assert consume, "应有 consume 流水"
+    assert refunds, "应有 refund 流水"
+    refund_remarks = {t["remark"] for t in refunds}
+    matched = [
+        t for t in consume if t["remark"] and f"refund:{t['remark']}" in refund_remarks
+    ]
+    assert matched, "consume 流水应与 refund 流水按 remark 对应"
+
+
+def test_search_failure_refund_is_idempotent(
+    client: TestClient,
+    api_key_headers: dict,
+    auth_headers: dict,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """同一请求内 refund_search 重复调用只退一次（credits_refunded 标志）。
+
+    用 spy 包裹真实 refund_search，在端点调用后再额外调一次——第二次应因
+    幂等标志短路，余额只恢复一次（仍等于调用前）。
+    """
+    import ai_search.main as main_mod
+    from ai_search.billing import dependencies as billing_deps
+
+    async def _boom(req):  # noqa: ARG001
+        raise RuntimeError("searxng unreachable")
+
+    monkeypatch.setattr(main_mod, "run_search", _boom)
+
+    real_refund_search = billing_deps.refund_search
+    spy_calls: list[int] = []
+
+    async def _spy_refund_search(request, db):
+        await real_refund_search(request, db)
+        # 模拟重复调用（如同一请求内两条失败路径都触发退款）
+        await real_refund_search(request, db)
+        spy_calls.append(1)
+
+    monkeypatch.setattr(main_mod, "refund_search", _spy_refund_search)
+
+    before = _balance_val(client.get("/billing/balance", headers=auth_headers).json())
+
+    resp = client.post(
+        "/search",
+        json={"query": "anything", "max_results": 3, "include_answer": False},
+        headers=api_key_headers,
+    )
+    assert resp.status_code == 502, resp.text
+    assert spy_calls, "spy 应被端点调用"
+
+    after = _balance_val(client.get("/billing/balance", headers=auth_headers).json())
+    assert after == before, "重复退款应被幂等标志拦截，余额只恢复一次"
+
+    txs = client.get("/billing/transactions", headers=auth_headers).json()["items"]
+    consume = [t for t in txs if t["type"] == "consume" and t["delta"] < 0]
+    refunds = [t for t in txs if t["type"] == "refund" and t["delta"] > 0]
+    refund_remarks = [t["remark"] for t in refunds]
+    # 幂等：最新一笔 consume（本次请求）恰有一笔对应 refund，且无重复 refund 流水
+    latest = consume[0]
+    assert f"refund:{latest['remark']}" in refund_remarks
+    assert refund_remarks.count(f"refund:{latest['remark']}") == 1
+    assert len(set(refund_remarks)) == len(refund_remarks), "不应有重复 refund 流水"
+
+
+def test_search_output_moderation_failure_refunds(
+    client: TestClient,
+    api_key_headers: dict,
+    auth_headers: dict,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """输出审核违规 → 400 → 扣费被退还。
+
+    moderation_enabled 内测默认 false，但端点是在 ai_search.main 命名空间
+    直接调 check_output——patch 该引用即可测退款路径，无需开启真实审核服务。
+    """
+    import ai_search.main as main_mod
+    from ai_search.moderation.service import ModerationError
+    from ai_search.schemas import SearchResponse, SearchResult
+
+    async def _fake_search(req):  # noqa: ARG001
+        return SearchResponse(
+            query="anything",
+            answer="违规答案",
+            results=[SearchResult(url="https://x.example", title="t", content="c")],
+        )
+
+    async def _reject(answer):  # noqa: ARG001
+        raise ModerationError(labels=["violence"], stage="output")
+
+    monkeypatch.setattr(main_mod, "run_search", _fake_search)
+    monkeypatch.setattr(main_mod, "check_output", _reject)
+
+    before = _balance_val(client.get("/billing/balance", headers=auth_headers).json())
+
+    resp = client.post(
+        "/search",
+        json={"query": "anything", "max_results": 3, "include_answer": True},
+        headers=api_key_headers,
+    )
+    assert resp.status_code == 400, resp.text
+
+    after = _balance_val(client.get("/billing/balance", headers=auth_headers).json())
+    assert after == before
+
+    txs = client.get("/billing/transactions", headers=auth_headers).json()["items"]
+    refunds = [t for t in txs if t["type"] == "refund" and t["delta"] > 0]
+    assert refunds, "输出违规应有 refund 流水"
+    assert all(t["remark"].startswith("refund:") for t in refunds)
+
+
 @pytest.mark.skipif(not LIVE_SEARCH, reason="跳过实时搜索（需 SearXNG 运行）")
 def test_search_insufficient_credits_402(client: TestClient):
     """余额耗尽后搜索应 402。
