@@ -110,3 +110,26 @@ def test_landing_footer_has_terms_link(client):
     resp = client.get("/")
     assert resp.status_code == 200
     assert "/terms" in resp.text
+
+
+# ---------- 前端自定义校验（app.js setCustomValidity） ----------
+
+
+def test_app_js_has_terms_custom_validity(client):
+    """app.js 对 #agree_terms 做 setCustomValidity，提示文案须体现"同意《服务条款》"。
+
+    TestClient 不执行 JS，故直接检查 /static/app.js 静态资源内容。
+    """
+    resp = client.get("/static/app.js")
+    assert resp.status_code == 200
+    assert "agree_terms" in resp.text
+    assert "setCustomValidity" in resp.text
+    assert "同意《服务条款》" in resp.text
+
+
+def test_login_register_pages_load_app_js(client):
+    """登录页/注册页均加载 app.js，#agree_terms 自定义校验会自动生效。"""
+    for path in ("/dashboard/login", "/dashboard/register"):
+        resp = client.get(path)
+        assert resp.status_code == 200
+        assert '<script src="/static/app.js"></script>' in resp.text
