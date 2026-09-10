@@ -55,7 +55,7 @@ searchpipe/
 ├── searxng/                  # SearXNG 双环境配置：settings.yml=境外默认（bing+google cse+brave+wiki 系）；settings.cn.yml=境内（bing+baidu+sogou+360search），compose 按 SEARXNG_SETTINGS_PATH 选用
 ├── history/                  # 需求/任务备忘（按日期）
 ├── docs/                     # 本索引 + 项目记忆 + REGRESSION_CHECKLIST.md（MVP 全量回归测试清单，版本迭代上线前必跑）
-├── Dockerfile / entrypoint.sh / docker-compose.yml / docker-compose.test.yml
+├── Dockerfile / entrypoint.sh / docker-compose.yml / docker-compose.test.yml / docker-compose.prod.yml
 └── AGENTS.md                 # Agent 入口规则（DSH 自动加载）
 ```
 

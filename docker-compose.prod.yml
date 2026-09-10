@@ -1,0 +1,79 @@
+# 生产编排（境外正式服 searchpipe.tech）。
+# 与测试编排的差异（生产加固）：
+#   1. app 只绑 127.0.0.1:8001 —— 公网流量一律经 nginx(443) 反代，应用端口不对
+#      外暴露（测试服 compose 绑 0.0.0.0 靠安全组白名单兜底，生产不用这套）；
+#   2. searxng/redis/postgres 不发布宿主端口 —— 只在 ai-search-net 内网互通，
+#      外部（含宿主机其它进程）够不到数据库与检索源。
+# 境外主机：SearXNG 走默认 settings.yml（bing+google cse+brave+wiki 系），
+# .env 里不要设 SEARXNG_SETTINGS_PATH（设了 settings.cn.yml 就变成境内引擎）。
+services:
+  searxng:
+    image: searxng/searxng:latest
+    container_name: ai-search-searxng
+    volumes:
+      - ./searxng:/etc/searxng:rw
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8080/
+      - SEARXNG_SECRET=${SEARXNG_SECRET:-please-change-this-secret}
+      # 双环境配置：境外默认 settings.yml；境内主机在 .env 设
+      # SEARXNG_SETTINGS_PATH=/etc/searxng/settings.cn.yml
+      - SEARXNG_SETTINGS_PATH=${SEARXNG_SETTINGS_PATH:-/etc/searxng/settings.yml}
+    restart: unless-stopped
+    networks:
+      - ai-search-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: ai-search-redis
+    restart: unless-stopped
+    networks:
+      - ai-search-net
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: ai-search-postgres
+    environment:
+      - POSTGRES_DB=ai
+      - POSTGRES_USER=ai
+      - POSTGRES_PASSWORD=ai
+    volumes:
+      - ai-search-pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ai -d ai"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - ai-search-net
+
+  app:
+    image: searchpipe:latest
+    container_name: ai-search-app
+    ports:
+      # 只绑回环：nginx 反代 127.0.0.1:8001 → 容器 8000（宿主机 8000 留给 docparse）
+      - "127.0.0.1:8001:8000"
+    env_file:
+      - .env
+    environment:
+      # 容器内通过服务名访问同网络的 searxng / redis / postgres，覆盖 .env 里的 localhost
+      - SEARXNG_URL=http://searxng:8080
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql+asyncpg://ai:ai@postgres:5432/ai
+    depends_on:
+      searxng:
+        condition: service_started
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - ai-search-net
+
+volumes:
+  ai-search-pgdata:
+
+networks:
+  ai-search-net:
+    driver: bridge
