@@ -5,20 +5,31 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{% block title %}SearchPipe 控制台{% endblock %}</title>
 <meta name="description" content="{% block description %}SearchPipe — 为 AI Agent 而生的联网搜索 API 与远程 MCP Server，一次调用完成检索、抓取、重排与摘要。{% endblock %}">
-<meta name="keywords" content="{% block keywords %}AI搜索,搜索API,MCP,Agent,Claude,Cursor,LLM,联网搜索,AI Agent,API{% endblock %}">
-<link rel="canonical" href="{% block canonical %}{{ base_url }}{% endblock %}">
+<!-- 控制台页面全部属于「需登录」区域：不进索引（X-Robots-Tag 由服务端中间件兜底） -->
+<meta name="robots" content="{% block robots %}noindex, nofollow{% endblock %}">
+<link rel="canonical" href="{% block canonical %}{{ base_url }}{{ request.url.path }}{% endblock %}">
+<meta property="og:site_name" content="SearchPipe">
+<meta property="og:locale" content="zh_CN">
 <meta property="og:title" content="{% block og_title %}{{ self.title() }}{% endblock %}">
 <meta property="og:description" content="{% block og_description %}{{ self.description() }}{% endblock %}">
 <meta property="og:type" content="{% block og_type %}website{% endblock %}">
-<meta property="og:url" content="{% block og_url %}{{ base_url }}{% endblock %}">
+<meta property="og:url" content="{% block og_url %}{{ base_url }}{{ request.url.path }}{% endblock %}">
+<meta property="og:image" content="{{ base_url }}/static/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="{% block twitter_title %}{{ self.title() }}{% endblock %}">
 <meta name="twitter:description" content="{% block twitter_description %}{{ self.description() }}{% endblock %}">
+<meta name="twitter:image" content="{{ base_url }}/static/og-image.png">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#4f46e5">
 <script>
 // 防主题闪烁：渲染前决定主题
 (function(){try{var t=localStorage.getItem('searchpipe-theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
 </script>
-<link rel="stylesheet" href="/static/app.css?v=20260912">
+<link rel="stylesheet" href="/static/app.css?v=20260913">
 {% block head_extra %}{% endblock %}
 </head>
 <body>
@@ -38,7 +49,7 @@
       <a href="/dashboard/billing" class="{% if active=='billing' %}active{% endif %}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
         充值</a>
-      <a href="/dashboard/docs" class="{% if active=='docs' %}active{% endif %}">
+      <a href="/docs" class="{% if active=='docs' %}active{% endif %}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
         文档</a>
       <a href="/dashboard/feedback" class="{% if active=='feedback' %}active{% endif %}">
@@ -61,7 +72,7 @@
     <a href="/dashboard/api-keys" class="{% if active=='keys' %}active{% endif %}">Keys</a>
     <a href="/dashboard/usage" class="{% if active=='usage' %}active{% endif %}">用量</a>
     <a href="/dashboard/billing" class="{% if active=='billing' %}active{% endif %}">充值</a>
-    <a href="/dashboard/docs" class="{% if active=='docs' %}active{% endif %}">文档</a>
+    <a href="/docs" class="{% if active=='docs' %}active{% endif %}">文档</a>
     <a href="/dashboard/feedback" class="{% if active=='feedback' %}active{% endif %}">反馈</a>
     <a href="/dashboard/messages" class="{% if active=='messages' %}active{% endif %}">消息<span class="tag tag-warn" id="nav-msg-badge-top" style="display:none;margin-left:2px"></span></a>
     <span style="flex:1"></span>
@@ -75,7 +86,7 @@
     </div>
   </main>
 </div>
-<script src="/static/app.js?v=20260912"></script>
+<script src="/static/app.js?v=20260913" defer></script>
 <script>
 // 站内信未读角标（轻量拉取，失败静默；页面加载与消息页标记已读后刷新）
 (function(){

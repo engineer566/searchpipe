@@ -91,6 +91,11 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = True        # 465 走 SSL；587 需 STARTTLS 时置 false 另配
     app_base_url: str = "http://localhost:8001"  # 对外基址，用于拼密码重置链接
 
+    # --- SEO：站长平台验证（留空则不渲染对应 meta 标签）---
+    google_site_verification: str = ""   # Google Search Console 的 HTML 标记值（content 内容）
+    bing_site_verification: str = ""     # Bing Webmaster Tools 的 msvalidate.01
+    baidu_site_verification: str = ""    # 百度搜索资源平台的 code 值
+
     # --- MCP server（第二协议入口）---
     # True：MCP tool 必须带 sp- API Key、走计费扣积分（对齐 Tavily，方案 A）。
     # False：本地 dev 旁路，裸调 run_search 不扣费（便于无 key 测试）。

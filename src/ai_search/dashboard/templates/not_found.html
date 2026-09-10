@@ -1,0 +1,32 @@
+{% extends "base_public.html" %}
+{% block title %}页面不存在（404） · {{ site_name }}{% endblock %}
+{% block description %}你访问的页面不存在或已被移动。可以从首页、开发文档、MCP 接入指南或定价页继续浏览 SearchPipe。{% endblock %}
+{% block robots %}noindex, follow{% endblock %}
+{% block content %}
+<div class="page-wrap narrow">
+  <div class="page-head" style="text-align:center;padding:40px 0 8px">
+    <p class="eyebrow" style="display:inline-block;padding:4px 14px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-size:13px;font-weight:600">HTTP 404</p>
+    <h1 style="font-size:30px;margin:16px 0 8px">页面不存在</h1>
+    <p>你访问的地址可能拼写有误、已过期，或者只对登录用户开放。</p>
+  </div>
+
+  <div class="feature-grid" style="margin-top:26px">
+    <div class="feature">
+      <h3><a href="/">返回首页</a></h3>
+      <p>产品介绍、能力说明与免费额度入口。</p>
+    </div>
+    <div class="feature">
+      <h3><a href="/mcp-server">MCP 接入指南</a></h3>
+      <p>四步把远程 MCP Server 接进 Claude Code / Cursor。</p>
+    </div>
+    <div class="feature">
+      <h3><a href="/docs">开发文档</a></h3>
+      <p>REST API 参数、响应结构与调用示例。</p>
+    </div>
+    <div class="feature">
+      <h3><a href="/dashboard">控制台</a></h3>
+      <p>余额、API Key、用量与充值（需登录）。</p>
+    </div>
+  </div>
+</div>
+{% endblock %}

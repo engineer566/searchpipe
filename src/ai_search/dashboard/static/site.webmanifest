@@ -1,0 +1,16 @@
+{
+  "name": "SearchPipe — 让 AI Agent 接入实时网络",
+  "short_name": "SearchPipe",
+  "description": "面向 AI Agent 的联网搜索 API 与远程 MCP Server：多引擎检索、正文抓取、LLM 重排与摘要，一次调用返回结构化结果。",
+  "lang": "zh-CN",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b0d12",
+  "theme_color": "#4f46e5",
+  "icons": [
+    { "src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/static/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/static/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

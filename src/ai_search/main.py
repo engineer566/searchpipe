@@ -17,7 +17,8 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.staticfiles import StaticFiles
 
 from .admin import router as admin_router
@@ -29,7 +30,11 @@ from .billing.dependencies import charge_search, refund_search
 from .billing.routes import router as billing_router
 from .billing.service import InsufficientCreditsError
 from .core.search_service import run_search
-from .dashboard import router as dashboard_router, site_router
+from .dashboard import (
+    router as dashboard_router,
+    seo_router,
+    site_router,
+)
 from .db.base import dispose_engine
 from .db.models import UserRole
 from .feedback import router as feedback_router
@@ -81,6 +86,21 @@ async def _expired_credits_sweep_loop() -> None:
         await asyncio.sleep(3600)
 
 
+async def _noindex_private_paths(request: Request, call_next):  # type: ignore[no-untyped-def]
+    """给需登录/内部/接口路径补 `X-Robots-Tag: noindex, nofollow`。
+
+    robots.txt 只对「守规矩」的爬虫生效，且无法约束分享出去的单条链接；
+    响应头是第二道保险，确保控制台、管理端与 API 页面永远不进索引
+    （私有路径清单与 robots.txt 共用 seo.PRIVATE_PATH_PREFIXES，见 dashboard/seo.py）。
+    """
+    from .dashboard.seo import is_private_path
+
+    resp = await call_next(request)
+    if is_private_path(request.url.path):
+        resp.headers["X-Robots-Tag"] = "noindex, nofollow"
+    return resp
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # noqa: ARG001
     logger.info("SearchPipe 启动")
@@ -93,7 +113,15 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
     await dispose_engine()
 
 
-app = FastAPI(title="SearchPipe", version="0.2.0", lifespan=lifespan)
+# /docs 留给公开开发文档页（dashboard/public_pages.py，可被搜索引擎收录），
+# Swagger UI 挪到 /api-docs；redoc 关闭（与 /docs 抢路径且无人使用）。
+app = FastAPI(
+    title="SearchPipe",
+    version="0.2.0",
+    lifespan=lifespan,
+    docs_url="/api-docs",
+    redoc_url=None,
+)
 
 # 中间件（外→内）：CORS → 用量日志
 # 限流已下沉到 /search 端点内（需 ctx.user.role 判 admin 豁免），故不再注册中间件。
@@ -105,6 +133,31 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(UsageLogMiddleware)
+# X-Robots-Tag 兜底（最外层：包住全部路由，含 /dashboard 与 API）
+app.middleware("http")(_noindex_private_paths)
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """浏览器访问不存在的页面时渲染带内链的 404 页；接口请求仍返回 JSON。
+
+    改造前所有 404 都是 FastAPI 默认 JSON（`{"detail":"Not Found"}`），
+    对访客是死路一条（没有出口链接，爬虫也无从继续抓取）。
+    """
+    if exc.status_code == 404 and "text/html" in request.headers.get("accept", ""):
+        from .dashboard.routes import render_with_base
+        from .dashboard.seo import not_found_ld
+
+        return render_with_base(
+            request,
+            "not_found.html",
+            {"jsonld": not_found_ld()},
+            status_code=404,
+        )
+    return JSONResponse(
+        {"detail": exc.detail}, status_code=exc.status_code, headers=exc.headers
+    )
+
 
 # 静态资源（控制台 CSS/JS；no-cache 防浏览器缓存旧版本）
 app.mount("/static", _NoCacheStaticFiles(directory=str(_STATIC_DIR)), name="static")
@@ -116,7 +169,8 @@ app.mount("/static", _NoCacheStaticFiles(directory=str(_STATIC_DIR)), name="stat
 app.mount("/mcp", _mcp_app)
 
 # 路由器
-app.include_router(site_router)        # / 营销首页
+app.include_router(seo_router)         # /robots.txt /sitemap.xml /favicon.ico /og-image.png
+app.include_router(site_router)        # 公开内容页：/ /terms /docs /mcp-server /pricing /faq
 app.include_router(auth_router)        # /auth
 app.include_router(api_keys_router)    # /api-keys
 app.include_router(billing_router)     # /billing

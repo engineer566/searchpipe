@@ -4,10 +4,6 @@
 程序调用走 JWT/API Key（不经此层）。
 
 路由：
-- GET /                          营销首页（site_router，公开）
-- GET /robots.txt                搜索引擎爬虫规则
-- GET /sitemap.xml               站点地图
-- GET /terms                     服务条款页（site_router，公开）
 - GET /dashboard/auth?token=xxx    OAuth/JWT 登录后落地：把 token 换成 session cookie → 302 到 /dashboard
 - GET /dashboard/login             登录页（仅邮箱密码；第三方登录前端不开放；支持 ?next= 回跳）
 - POST /dashboard/login            邮箱密码登录 → 设 cookie → 302 next 或 /dashboard
@@ -22,7 +18,7 @@
 - GET /dashboard/api-keys          API Key 管理
 - GET /dashboard/usage             用量统计
 - GET /dashboard/billing           充值/流水
-- GET /dashboard/docs              开发文档
+- GET /dashboard/docs              → 301 跳转公开文档页 /docs（控制台不再单独渲染文档）
 - GET /dashboard/feedback          反馈工单页
 - GET /dashboard/messages          站内信页（列表 + 未读高亮 + 点开已读）
 """
@@ -33,7 +29,7 @@ from urllib.parse import quote
 
 from email_validator import EmailNotValidError, validate_email
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, status
-from fastapi.responses import PlainTextResponse, RedirectResponse
+from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -57,26 +53,31 @@ from ..db.session import get_db
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
-site_router = APIRouter(tags=["site"])
 
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 
+# 站长平台验证 meta 走 Jinja 全局函数（.env 配置即生效，两个站点壳模板共用）
+from .seo import verification_metas as _verification_metas  # noqa: E402
 
-def _get_base_url() -> str:
-    """从配置读取对外基址。"""
-    from ..config import get_settings
-
-    return get_settings().app_base_url.rstrip("/")
+templates.env.globals["verification_metas"] = _verification_metas
 
 
-def _render_with_base(
-    request: Request, template: str, context: dict | None = None
+def render_with_base(
+    request: Request,
+    template: str,
+    context: dict | None = None,
+    **kwargs: object,
 ) -> object:
-    """渲染模板并注入 base_url（供 SEO canonical/og:url 使用）。"""
+    """渲染模板并注入 base_url（模板拼绝对地址 / canonical / og:url 都要用）。
+
+    额外 kwargs 透传给 TemplateResponse（如 status_code=404 用于自定义 404 页）。
+    """
+    from .seo import get_base_url
+
     ctx = dict(context or {})
-    ctx.setdefault("base_url", _get_base_url())
-    return templates.TemplateResponse(request, template, ctx)
+    ctx.setdefault("base_url", get_base_url())
+    return templates.TemplateResponse(request, template, ctx, **kwargs)
 
 
 async def _user_from_session(request: Request, db: AsyncSession) -> User | None:
@@ -90,7 +91,7 @@ async def _user_from_session(request: Request, db: AsyncSession) -> User | None:
     return user
 
 
-# ---------- 营销首页（公开） ----------
+# ---------- 登录/注册入口 ----------
 
 
 def _safe_next(next_url: str) -> str | None:
@@ -98,71 +99,6 @@ def _safe_next(next_url: str) -> str | None:
     if next_url and next_url.startswith("/") and not next_url.startswith("//"):
         return next_url
     return None
-
-
-@site_router.get("/")
-async def landing(request: Request) -> object:
-    """营销首页：产品定位 + 在线体验入口 + 特性 + API 示例 + 定价锚点。
-
-    登录态探测：仅校验 session cookie 签名（不查库）——最坏情况是失效 cookie
-    用户看到「已登录」文案，点击后 /dashboard 守卫仍会引导登录，无害。
-    """
-    logged_in = read_session_cookie(request) is not None
-    return _render_with_base(request, "landing.html", {"logged_in": logged_in})
-
-
-# ---------- SEO ----------
-
-
-@site_router.get("/robots.txt", response_class=PlainTextResponse)
-async def robots_txt() -> str:
-    """搜索引擎爬虫规则：允许收录公开页，禁止后台与 API。"""
-    base = _get_base_url()
-    return (
-        f"User-agent: *\n"
-        f"Allow: /\n"
-        f"Disallow: /dashboard\n"
-        f"Disallow: /admin\n"
-        f"Disallow: /api\n"
-        f"Disallow: /auth\n"
-        f"Disallow: /mcp\n"
-        f"Sitemap: {base}/sitemap.xml\n"
-    )
-
-
-@site_router.get("/sitemap.xml", response_class=PlainTextResponse)
-async def sitemap_xml() -> str:
-    """站点地图：列出公开可索引的页面。"""
-    base = _get_base_url()
-    urls = [
-        f"{base}/",
-        f"{base}/dashboard/login",
-        f"{base}/dashboard/register",
-        f"{base}/dashboard/docs",
-    ]
-    url_entries = "\n".join(
-        f"  <url>\n"
-        f"    <loc>{url}</loc>\n"
-        f"    <changefreq>weekly</changefreq>\n"
-        f"    <priority>{'1.0' if url == base + '/' else '0.6'}</priority>\n"
-        f"  </url>"
-        for url in urls
-    )
-    return (
-        '<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
-        f"{url_entries}\n"
-        "</urlset>"
-    )
-
-
-@site_router.get("/terms")
-async def terms_page(request: Request) -> object:
-    """服务条款页（公开可访问）。"""
-    return templates.TemplateResponse(request, "terms.html", {})
-
-
-# ---------- 登录/注册入口 ----------
 
 
 def _render_login(
@@ -173,7 +109,7 @@ def _render_login(
     next_url: str = "",
 ) -> object:
     """渲染登录页（可带错误/提示与邮箱回填，next_url 用于登录后回跳）。"""
-    return templates.TemplateResponse(
+    return render_with_base(
         request,
         "login.html",
         {"error": error, "email": email, "info": info, "next": next_url},
@@ -184,7 +120,7 @@ def _render_register(
     request: Request, error: str | None = None, email: str = "", next_url: str = ""
 ) -> object:
     """渲染注册页（可带错误与邮箱回填，next_url 用于注册后回跳）。"""
-    return templates.TemplateResponse(
+    return render_with_base(
         request, "register.html", {"error": error, "email": email, "next": next_url}
     )
 
@@ -379,7 +315,7 @@ async def register_submit(
 @router.get("/forgot-password")
 async def forgot_password_page(request: Request) -> object:
     """忘记密码页。"""
-    return templates.TemplateResponse(request, "forgot_password.html", {"sent": False})
+    return render_with_base(request, "forgot_password.html", {"sent": False})
 
 
 @router.post("/forgot-password")
@@ -390,7 +326,7 @@ async def forgot_password_submit(
 ) -> object:
     """发重置邮件。无论邮箱是否注册都展示同一话术（防枚举）。"""
     await request_password_reset(db, email)
-    return templates.TemplateResponse(
+    return render_with_base(
         request, "forgot_password.html", {"sent": True, "email": email.strip().lower()}
     )
 
@@ -401,7 +337,7 @@ async def reset_password_page(
 ) -> object:
     """重置密码页：预检 token 有效性，无效直接提示链接失效。"""
     valid = (await peek_reset_token(token)) is not None
-    return templates.TemplateResponse(
+    return render_with_base(
         request, "reset_password.html", {"token": token, "invalid": not valid}
     )
 
@@ -416,13 +352,13 @@ async def reset_password_submit(
 ) -> object:
     """校验 token 改密 → 302 登录页（带重置成功提示）。"""
     if err := _validate_password(password, password_confirm):
-        return templates.TemplateResponse(
+        return render_with_base(
             request, "reset_password.html", {"token": token, "error": err}
         )
     user_id = await consume_reset_token(token)
     user = await db.get(User, user_id) if user_id else None
     if not user:
-        return templates.TemplateResponse(
+        return render_with_base(
             request,
             "reset_password.html",
             {"token": token, "invalid": True},
@@ -491,7 +427,7 @@ async def dashboard_home(
     from ..billing.service import get_balance
 
     balance = await get_balance(db, user.id)
-    return templates.TemplateResponse(
+    return render_with_base(
         request,
         "dashboard.html",
         {
@@ -516,7 +452,7 @@ async def dashboard_api_keys(
     from ..api_keys.service import list_keys
 
     keys = await list_keys(db, user.id)
-    return _render_with_base(
+    return render_with_base(
         request, "api_keys.html", {"user": user, "keys": keys, "active": "keys"}
     )
 
@@ -530,7 +466,7 @@ async def dashboard_usage(
     user = await _user_from_session(request, db)
     if not user:
         return RedirectResponse(url="/dashboard/login", status_code=status.HTTP_303_SEE_OTHER)
-    return templates.TemplateResponse(
+    return render_with_base(
         request, "usage.html", {"user": user, "active": "usage"}
     )
 
@@ -551,7 +487,7 @@ async def dashboard_billing(
     sub = await get_active_subscription(db, user.id)
     sub_plan = await db.get(Plan, sub.plan_id) if sub else None
     txs, total = await list_transactions(db, user.id, page=1, size=50)
-    return templates.TemplateResponse(
+    return render_with_base(
         request,
         "billing.html",
         {
@@ -570,17 +506,13 @@ async def dashboard_billing(
 
 
 @router.get("/docs")
-async def dashboard_docs(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-) -> object:
-    """开发文档页：认证、端点、示例、错误码。"""
-    user = await _user_from_session(request, db)
-    if not user:
-        return RedirectResponse(url="/dashboard/login", status_code=status.HTTP_303_SEE_OTHER)
-    return templates.TemplateResponse(
-        request, "docs.html", {"user": user, "active": "docs"}
-    )
+async def dashboard_docs() -> RedirectResponse:
+    """开发文档已改为公开页面（可被搜索引擎收录）。
+
+    这里做 301 永久跳转：老的站内链接、用户书签与已收录 URL 都能落到 /docs，
+    同时避免同一份文档出现两个 URL 造成重复内容。
+    """
+    return RedirectResponse(url="/docs", status_code=status.HTTP_301_MOVED_PERMANENTLY)
 
 
 @router.get("/feedback")
@@ -592,7 +524,7 @@ async def dashboard_feedback(
     user = await _user_from_session(request, db)
     if not user:
         return RedirectResponse(url="/dashboard/login", status_code=status.HTTP_303_SEE_OTHER)
-    return templates.TemplateResponse(
+    return render_with_base(
         request, "feedback.html", {"user": user, "active": "feedback"}
     )
 
@@ -606,6 +538,6 @@ async def dashboard_messages(
     user = await _user_from_session(request, db)
     if not user:
         return RedirectResponse(url="/dashboard/login", status_code=status.HTTP_303_SEE_OTHER)
-    return templates.TemplateResponse(
+    return render_with_base(
         request, "messages.html", {"user": user, "active": "messages"}
     )
