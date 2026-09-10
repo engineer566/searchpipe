@@ -25,6 +25,7 @@ from .admin import router as admin_router
 from .agent_setup import render_skill_md
 from .api_keys import router as api_keys_router
 from .auth import router as auth_router
+from .auth.core import EmailNotVerifiedError, require_email_verified
 from .auth.dependencies import AuthContext, get_current_user_or_api_key
 from .billing.dependencies import charge_search, refund_search
 from .billing.routes import router as billing_router
@@ -208,6 +209,12 @@ async def search(
     request.state.search_query = req.query
     request.state.search_max_results = req.max_results
     request.state.search_depth = req.search_depth
+
+    # 0. 邮箱验证检查（未验证用户不能使用搜索；admin/owner 豁免）
+    try:
+        require_email_verified(ctx.user)
+    except EmailNotVerifiedError as e:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(e)) from e
 
     # 1. 输入审核（命中违禁不扣费）
     await moderate_input(req.query)

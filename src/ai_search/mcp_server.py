@@ -23,7 +23,7 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.dependencies import get_http_request
 
-from .auth.core import resolve_api_key
+from .auth.core import EmailNotVerifiedError, require_email_verified, resolve_api_key
 from .auth.errors import AuthError
 from .billing.pipeline import ChargeResult, charge_credits, refund_credits_for
 from .billing.service import InsufficientCreditsError
@@ -129,6 +129,12 @@ async def ai_search_search(
                 ctx = await resolve_api_key(raw, db)
             except AuthError as e:
                 raise ToolError(f"API Key 无效或已吊销: {e}") from e
+
+            # 邮箱验证检查（未验证用户不能使用 MCP；admin/owner 豁免）
+            try:
+                require_email_verified(ctx.user)
+            except EmailNotVerifiedError as e:
+                raise ToolError(str(e)) from e
 
             # 限流（admin/owner 豁免）
             if not UserRole.is_admin(ctx.user.role):

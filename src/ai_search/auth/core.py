@@ -25,6 +25,13 @@ logger = logging.getLogger(__name__)
 API_KEY_PREFIX = "sp-"
 
 
+class EmailNotVerifiedError(AuthError):
+    """邮箱未验证异常：用于限制未验证用户使用搜索/MCP 等功能。"""
+
+    def __init__(self) -> None:
+        super().__init__("请先验证邮箱才能使用此功能")
+
+
 class AuthContext:
     """统一鉴权上下文：user 必有，api_key 可空（JWT 登录时为 None）。"""
 
@@ -79,10 +86,26 @@ async def resolve_jwt(token: str, db: AsyncSession) -> AuthContext:
     return AuthContext(user=user)
 
 
+def require_email_verified(user: User) -> None:
+    """检查用户邮箱是否已验证，未验证则抛 EmailNotVerifiedError。
+
+    用于 /search、MCP 等需要邮箱验证才能使用的功能。
+    admin/owner 豁免此检查。
+    """
+    from ..db.models import UserRole
+
+    if UserRole.is_admin(user.role):
+        return
+    if not user.email_verified:
+        raise EmailNotVerifiedError()
+
+
 __all__ = [
     "API_KEY_PREFIX",
     "AuthContext",
     "AuthError",
+    "EmailNotVerifiedError",
+    "require_email_verified",
     "resolve_api_key",
     "resolve_jwt",
 ]
