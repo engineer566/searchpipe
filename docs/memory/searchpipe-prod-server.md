@@ -7,6 +7,7 @@
 **`https://searchpipe.tech`** —— 远端阿里云境外主机（Ubuntu 22.04，x86_64，1.6G 内存小机器，与测试服同规格）。
 
 - **SSH**：`ssh -i /home/wuyuming/Projects/work.pem root@47.89.243.229`（root 可登录；work.pem 是生产机钥匙，test_host.pem 是测试机的，别混）
+- **Windows 环境密钥路径**：`D:\Projects\work.pem`（与 Linux 路径对应同一文件，DSH Windows 会话用此路径）
 - 部署目录 `/opt/searchpipe`（rsync 代码副本，非 git 仓库）；compose 项目名 `searchpipe`
 - 同机还跑着 aitrendwatch（127.0.0.1:5050）与 docparse（nginx upstream 127.0.0.1:8000，容器常停）
 - **nginx(80/443) 已配好 searchpipe.tech 反代**：`proxy_pass http://127.0.0.1:8001`，含 `/mcp` SSE 专属块（关缓冲/300s 超时/upgrade 头）；Let's Encrypt 证书已签（www 二级域同证书）。改反代配置别动 8001 回源端口
@@ -60,6 +61,16 @@ ssh -i ...work.pem root@47.89.243.229 "cd /opt/searchpipe && docker compose -f d
 - **nginx（同日，先于应用部署已完成）**：①`www.searchpipe.tech` 独立 server 块 → 301 主域（此前 www 直接 200，属重复内容）；②`listen 443 ssl http2`（此前仅 HTTP/1.1）；③80 端口一律 301 到 `https://searchpipe.tech`（一步到位）；④新增 `/etc/nginx/conf.d/gzip.conf`（`gzip_types` 覆盖 css/js/json/xml/svg + `gzip_vary`，此前静态资源明文传输）；⑤安全头 HSTS/X-Content-Type-Options/Referrer-Policy/X-Frame-Options。实测 `http_version=2`、css/js/sitemap 均 `content-encoding: gzip`、www 与 http 均 301 归一。
 - **坑（重要）**：`/etc/nginx/sites-enabled/` 里长期堆着历史 `.bak` 文件，而该目录被 `nginx.conf` 全量 include——**备份文件与线上配置抢同名 server_name**（本次 reload 实测报 `conflicting server name "www.searchpipe.tech" on [::]:80`）。已把全部备份挪到 `/root/nginx-backups/`，**以后备份不要放 sites-enabled**。
 - **待办**：Google Search Console / Bing Webmaster / 百度搜索资源平台尚未提交 sitemap（需账号操作）；验证码填 `.env` 的 `*_SITE_VERIFICATION` 后重启 app 即渲染 meta。
+
+## 邮箱验证限制与统计修复部署（2026-09-13）
+
+- **应用部署（main e6b722e）**：Windows 环境通过 tar+scp 同步代码（无 rsync），`docker build` → `docker compose -f docker-compose.prod.yml up -d` 重启 app。
+- **验证结果**：
+  - 未验证邮箱用户调用 `/search`（JWT/API Key）返回 403「请先验证邮箱才能使用此功能」✓
+  - 已验证邮箱用户正常调用 `/search` 返回搜索结果 ✓
+  - `/usage` API 正常返回近 30 天统计数据 ✓
+  - dashboard.html 统计 JS 改为 DOMContentLoaded 事件触发，确保 AIS 对象就绪后执行
+- **MCP 接入限制**：mcp_server.py 中 ai_search_search tool 增加 require_email_verified 检查，未验证用户调用 MCP tool 将返回 ToolError。
 
 ## 坑/注意
 
