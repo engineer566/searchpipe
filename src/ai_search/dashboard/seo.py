@@ -41,7 +41,7 @@ OG_IMAGE_WIDTH = 1200
 OG_IMAGE_HEIGHT = 630
 
 # 内容最后更新日（改公开页文案时同步 bump，用于 sitemap lastmod）
-SITE_LAST_MODIFIED = "2026-09-10"
+SITE_LAST_MODIFIED = "2026-09-13"
 
 # 可索引公开页：(路径, sitemap 权重, 更新频率)
 PUBLIC_PAGES: tuple[tuple[str, str, str], ...] = (

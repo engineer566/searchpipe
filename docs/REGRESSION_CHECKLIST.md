@@ -26,7 +26,7 @@ docker start ai-search-postgres ai-search-redis ai-search-searxng
 
 ⚠️ 必须用 `.venv/bin/python -m pytest`，不要直接调 `.venv/bin/pytest`——venv 从旧路径 `~/Projects/ai-search` 迁来，入口脚本 shebang 已失效，`python -m` 才可靠。
 
-自动化测试已覆盖：auth/注册登录、搜索扣费与退款、MCP、支付 catalog/下单/回调、积分批次、反馈工单、SEO、服务条款、admin 限流豁免、admin 监控页（见 `tests/`）。**本清单的手工项是自动化之外的补充，不能互相替代。**
+自动化测试已覆盖：auth/注册登录、搜索扣费与退款、MCP、支付 catalog/下单/回调、积分批次、反馈工单、SEO（`tests/test_seo.py` 44 项一致性校验）、服务条款、admin 限流豁免、admin 监控页（见 `tests/`）。**本清单的手工项是自动化之外的补充，不能互相替代。**
 
 ### 测试服（上线验证）
 
@@ -61,9 +61,27 @@ docker logs ai-search-app --tail 200 | grep -i reset
 - [ ] 落地页定价区 → 含订阅三档（包月·基础/进阶/旗舰）
 - [ ] 落地页首屏「在线体验」搜索框：未登录提交 → 302 到 `/dashboard/login?next=/dashboard?q=...`，登录后自动回跳并预填触发搜索；已登录提交 → 302 进 `/dashboard?q=...` 自动开始搜索
 - [ ] `curl -s 127.0.0.1:8001/terms` → 200，含「概不退款」「不支持自动续订」条款
-- [ ] `curl -s 127.0.0.1:8001/robots.txt` → 200，含 Sitemap 声明
-- [ ] `curl -s 127.0.0.1:8001/sitemap.xml` → 200，合法 XML，含 `/`、`/terms` 等 URL
 - [ ] `curl -s 127.0.0.1:8001/agent-setup/SKILL.md` → 200，text 内容含 MCP 配置（`{APP_BASE_URL}/mcp?api_key=sp-…`）
+
+### 1.1 SEO / 收录面（2026-09-13 整改，随迭代必跑）
+
+> 详细约定与不变量见 `docs/memory/searchpipe-seo.md`；自动化覆盖在 `tests/test_seo.py`（44 项）。
+
+- [ ] 6 个公开页全部 200：`/`、`/docs`、`/mcp-server`、`/pricing`、`/faq`、`/terms`
+- [ ] `curl -s 127.0.0.1:8001/robots.txt` → 200 `text/plain`，含 `Disallow: /mcp/`（带尾斜杠，不能是裸 `/mcp`）与 `Sitemap:` 声明
+- [ ] `curl -si 127.0.0.1:8001/sitemap.xml | grep -i content-type` → `application/xml`（不是 `text/plain`）
+- [ ] sitemap 里每个 URL 都能 200，且**不被 robots 任何 Disallow 前缀命中**（自洽性）
+- [ ] 每个公开页 `<link rel="canonical">` 指向自身（形如 `{APP_BASE_URL}/docs`），且 `<meta name="robots">` 不含 noindex
+- [ ] 每个公开页只有一个 `<h1>`；`<title>` 与 `<meta name="description">` 非空且各页不重复
+- [ ] 每个公开页含 `og:image`（`{APP_BASE_URL}/static/og-image.png`）与 `twitter:image`；且该图 URL 200 image/png
+- [ ] 公开页含合法 JSON-LD（`<script type="application/ld+json">`，解析无报错）：首页含 Organization/WebSite/SoftwareApplication/FAQPage；`/docs` 含 TechArticle；`/mcp-server` 含 HowTo；`/faq` 含 FAQPage；`/pricing` 含 Product+Offer
+- [ ] `/pricing` 的 Offer 价格都能在页面上看到（结构化数据与展示一致）
+- [ ] `/favicon.ico`、`/favicon.svg`、`/apple-touch-icon.png`、`/llms.txt` 均 200 且 Content-Type 正确（favicon 不能是 404 JSON）
+- [ ] `curl -si 127.0.0.1:8001/dashboard/login | grep -i x-robots-tag` → `noindex, nofollow`；`/admin/users`、`/api-docs`、`/openapi.json`、`/search` 同样带该头
+- [ ] `/dashboard/docs` → 301 到 `/docs`；`/docs` 200（公开文档页，控制台导航「文档」指向它）
+- [ ] 404 双形态：`curl -H "Accept: text/html" .../no-such-page` → 404 HTML（含「页面不存在」与站内链接）；`curl -H "Accept: application/json" .../no-such-page` → 404 JSON `{"detail":"Not Found"}`
+- [ ] 生产域名侧（仅生产）：`https://www.searchpipe.tech/xxx` 与 `http://searchpipe.tech/xxx` 均 301 到 `https://searchpipe.tech/xxx`；`curl -w '%{http_version}'` 为 `2`；`app.css`/`app.js`/`sitemap.xml` 响应带 `content-encoding: gzip`
+- [ ] 站长平台（Google/Bing/百度）验证码填进 `.env` 的 `*_SITE_VERIFICATION` 后，首页 `<head>` 出现对应 meta；未配置时**不出现**空标签
 
 ## 二、鉴权
 
@@ -97,7 +115,7 @@ docker logs ai-search-app --tail 200 | grep -i reset
 - [ ] `/dashboard/usage` → 200，用量统计/日志可见刚产生的搜索记录
 - [ ] `/dashboard/billing` → 200，含充值 4 档（¥10/¥20/¥50/¥100）+ 自定义金额（≤¥100）、订阅 3 档（限时 5 折划线价）、余额与流水
 - [ ] 计费页点击充值/订阅 → 弹出**二次确认弹窗**，确认后才下单
-- [ ] `/dashboard/docs` → 200，MCP 接入/一句话配置章节在前，REST API 在后
+- [ ] `/dashboard/docs` → 301 跳公开文档页 `/docs`；`/docs` 200，MCP 接入/一句话配置章节在前，REST API 在后
 - [ ] `/dashboard/feedback` → 200；提交反馈工单 → 成功，列表出现该工单；短时间重复提交 → 频率限制提示
 
 ## 五、支付

@@ -1,0 +1,59 @@
+# 2026-09-13 SEO 全面优化
+
+## 需求
+
+用户原话：「帮我整体做一次全面的 SEO 优化」。范围经确认为**技术 SEO + 内容层**，并且**一起改生产 nginx 并部署**（代码 → 测试服 → 生产服）。
+
+## 线上实测发现的问题（整改前）
+
+| # | 问题 | 影响 |
+|---|------|------|
+| 1 | sitemap.xml 里的 `/dashboard/docs` 同时被 robots.txt `Disallow: /dashboard` 屏蔽、且需登录（爬虫拿到 303） | robots 与 sitemap 自相矛盾，等于告诉爬虫抓一个必然失败的 URL |
+| 2 | sitemap.xml 以 `text/plain` 返回 | 按协议爬虫会把 sitemap 当纯文本忽略 |
+| 3 | 全站只有 1 个可索引页面（落地页），`/terms` 连 description/canonical 都没有 | 无内容落点，长尾词无从承载 |
+| 4 | `base.html` 的 canonical 一律指向首页 | 子页 canonical 全错（互相抢权重） |
+| 5 | `/favicon.ico` 404（返回 JSON） | 搜索结果显示无图标，日志噪音 |
+| 6 | 无 og:image / twitter:image / 结构化数据 | 社交与富媒体结果无展示 |
+| 7 | 404 一律裸 JSON `{"detail":"Not Found"}` | 访客死胡同，爬虫无出口链接 |
+| 8 | 私有路径只靠 robots.txt | 缺 `X-Robots-Tag` 响应头兜底 |
+| 9 | 生产 nginx：443 未开 HTTP/2；`gzip_types` 默认只压 html（CSS/JS/XML 明文传输）；`www.searchpipe.tech` 直接 200（与主域重复内容）；无安全头 | 速度/重复内容/可信度 |
+| 10 | nginx `sites-enabled/` 里堆着历史 `.bak` 文件（会被全量 include） | 与线上配置抢同名 server_name（本次已实测触发 warning），已挪到 `/root/nginx-backups/` |
+
+## 交付内容
+
+### 代码（dev `93003aa`）
+
+- **`src/ai_search/dashboard/seo.py`（新增）**：`PUBLIC_PAGES` 是「可索引公开页」的单一事实来源，robots.txt / sitemap.xml / 测试全从它派生；JSON-LD 构造器（Organization / WebSite / SoftwareApplication / FAQPage / HowTo / TechArticle / BreadcrumbList / Product+Offer）；站点图标与 og-image 路由；`/llms.txt`；`is_private_path()` 私有路径判定（robots 与 X-Robots-Tag 同源）。
+- **`src/ai_search/dashboard/public_pages.py`（新增）**：公开内容页 —— `/docs`（开发文档）、`/mcp-server`（MCP 接入指南）、`/pricing`（定价）、`/faq`（12 组问答），以及 `/`、`/terms`。
+- **模板**：新增 `base_public.html`（公开站点壳：完整 head 元信息 + 导航 + 页脚内链）、`public_docs.html`、`mcp_server.html`、`pricing.html`、`faq.html`、`not_found.html`；`landing.html` 改为 extends 公开壳并新增「典型使用场景」「常见问题」两节与内链；`terms.html` 补齐元信息与结构化数据；`base.html` 修正 canonical、加 noindex、图标、og:image；删除已被公开页取代的 `docs.html`。
+- **`main.py`**：私有路径 `X-Robots-Tag: noindex, nofollow` 中间件；浏览器 404 → HTML 404 页（`Accept` 不含 `text/html` 时仍是 JSON，接口契约不变）；Swagger 从 `/docs` 挪到 `/api-docs`（`/docs` 让给公开文档页）。
+- **`routes.py`**：`/dashboard/docs` → 301 `/docs`；`/dashboard/*` 全部渲染路径统一走 `render_with_base`（canonical/og 用绝对地址）；公开页迁出本文件。
+- **静态资源**：`favicon.ico`（多尺寸 ICO）、`favicon.svg`、`apple-touch-icon.png`、`icon-512.png`、`og-image.png`（1200×630）、`site.webmanifest`；`app.css` 补公开内容页样式。
+- **`config.py` / `.env.example`**：`GOOGLE_SITE_VERIFICATION` / `BING_SITE_VERIFICATION` / `BAIDU_SITE_VERIFICATION`，配置后才渲染 meta。
+
+### 基础设施（生产 nginx，已生效）
+
+- `www.searchpipe.tech` → `https://searchpipe.tech` 301 归一（消除重复内容）
+- 443 开启 HTTP/2；80 一步跳到主域 HTTPS
+- 新增 `/etc/nginx/conf.d/gzip.conf`：`gzip_types` 覆盖 css/js/json/xml/svg + `gzip_vary`
+- 安全头：HSTS、`X-Content-Type-Options`、`Referrer-Policy`、`X-Frame-Options`
+- 清出 `sites-enabled/` 里的历史备份文件
+
+### 测试
+
+`tests/test_seo.py` 重写为 44 项**一致性防回归**（不再只是断言标签存在）：robots↔sitemap 自洽、sitemap 每个 URL 必须 200 且 canonical 自指、结构化数据与页面可见文案/价格交叉校验、私有路径 noindex 头、404 双形态、图标可用、title/description 唯一且长度合理。全量 `pytest` **147 passed / 5 skipped**（skipped 为未配支付凭证的用例）。
+
+## 线上验证（生产 https://searchpipe.tech）
+
+- 6 个公开页全部 200，canonical/og:image 全为 `https://searchpipe.tech/...`，单一 h1，JSON-LD 全部可解析
+- `/sitemap.xml` → `application/xml`，6 条 URL 逐条 200；robots 全部规则与 sitemap 无冲突
+- `/favicon.ico` 200 image/x-icon；`/og-image.png` 200 image/png (152KB)；`/llms.txt` 200
+- `/dashboard/docs` → 301 `/docs`；`/dashboard/*`、`/admin/*`、`/api-docs`、`/openapi.json` 均带 `X-Robots-Tag: noindex, nofollow`
+- `http_version=2`、CSS/JS/sitemap 均 `content-encoding: gzip`、www 与 http 均为 301 归一
+- 6 个公开页 HTML 标签闭合校验通过（html.parser 栈式校验）
+
+## 待人工跟进（无法代做）
+
+1. 在 **Google Search Console** / **Bing Webmaster** / **百度搜索资源平台** 添加站点并提交 `https://searchpipe.tech/sitemap.xml`，拿到验证码后填进 `.env` 的 `*_SITE_VERIFICATION` 再重启应用。
+2. 内容层持续投入：目前 6 个页面是「能收录」的地基，后续按真实搜索词（如「Claude Code MCP 配置」「AI 搜索 API 对比」）补长尾内容页，才有排名增长。
+3. 外链：GitHub 仓库 README、MCP 生态目录（如 MCP 服务器聚合站）、技术社区文章带上 `https://searchpipe.tech`。

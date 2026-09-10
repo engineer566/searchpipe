@@ -12,7 +12,7 @@
 ```
 searchpipe/
 ├── src/ai_search/
-│   ├── main.py               # FastAPI 入口：中间件/路由汇聚 + /search 依赖链 + /healthz + /agent-setup/SKILL.md + 订阅积分过期清理后台任务（218 行；/static 静态资源 no-cache 防旧缓存）
+│   ├── main.py               # FastAPI 入口：中间件/路由汇聚 + /search 依赖链 + /healthz + /agent-setup/SKILL.md + 订阅积分过期清理后台任务（272 行；/static no-cache 防旧缓存；私有路径 X-Robots-Tag noindex 中间件 + 浏览器 404 HTML 页；Swagger 在 /api-docs）
 │   ├── config.py             # pydantic-settings 全部配置（含 SMTP、OAuth、支付双渠道、审核、限流、充值规则、抓取超时/并发、结果缓存 TTL）（102 行）
 │   ├── schemas.py            # /search 请求/响应模型
 │   ├── mcp_server.py         # FastMCP streamable-http 子应用（/mcp，共用商业管线；鉴权支持 URL ?api_key= / Authorization 头 / 工具参数）（219 行）
@@ -28,10 +28,12 @@ searchpipe/
 │   │   ├── email_verification.py # 邮箱验证 token + 发信冷却（~110 行；2026-09-11）
 │   │   ├── oauth.py          # GitHub/微信 OAuth 客户端（106 行）
 │   │   └── errors.py         # AuthError（17 行）
-│   ├── dashboard/            # 控制台（Jinja2 SSR + session cookie）
-│   │   ├── routes.py         # /dashboard/* 页面 + 登录/注册/忘记密码表单处理（支持 ?next= 站内回跳）+ 服务条款页 + 反馈工单页 + 站内信页；/dashboard?q= 预填快速搜索
-│   │   ├── templates/        # base/landing/login/register/forgot_password/reset_password/dashboard/api_keys/usage/billing/docs/terms/feedback/messages/admin_monitor/admin_feedback/admin_messages（17 个模板；2026-09-08 改版为 Agent-first 定位：落地页首屏 MCP 接入 + 在线体验入口，弱化 RAG 叙事；base.html 导航含站内信未读角标）
-│   │   └── static/           # app.css（双主题设计系统）+ app.js
+│   ├── dashboard/            # 控制台 + 公开站点（Jinja2 SSR + session cookie）
+│   │   ├── routes.py         # 控制台 /dashboard/* 页面（543 行） + 登录/注册/忘记密码表单处理（支持 ?next= 站内回跳）+ 反馈工单页 + 站内信页；/dashboard?q= 预填快速搜索；/dashboard/docs → 301 /docs
+│   │   ├── public_pages.py   # 公开可索引页（173 行；2026-09-13 SEO 整改从 routes.py 拆出 + 新增内容页）：/ 落地页 /terms 条款 /docs 开发文档 /mcp-server MCP 接入指南 /pricing 定价 /faq 常见问题
+│   │   ├── seo.py            # SEO 基建（597 行；2026-09-13 新增）：PUBLIC_PAGES 单一事实来源 + robots.txt/sitemap.xml/llms.txt/favicon/og-image 路由 + JSON-LD 构造 + 私有路径判定 + 站长验证 meta
+│   │   ├── templates/        # base(控制台壳)/base_public(公开站点壳，含完整 SEO head)/landing/public_docs/mcp_server/pricing/faq/terms/not_found/login/register/forgot_password/reset_password/dashboard/api_keys/usage/billing/feedback/messages/admin_*（22 个模板；公开页全部 extends base_public.html）
+│   │   └── static/           # app.css（双主题设计系统）+ app.js + favicon.ico/svg、apple-touch-icon.png、icon-512.png、og-image.png、site.webmanifest
 │   ├── db/
 │   │   ├── base.py           # engine/session 工厂 + dispose_engine（44 行）
 │   │   ├── session.py        # get_db 依赖
@@ -71,12 +73,14 @@ searchpipe/
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
-| `main.py` | 218 | 入口汇聚 + /search 依赖链编排 + /agent-setup/SKILL.md（/static 挂 _NoCacheStaticFiles） |
+| `main.py` | 272 | 入口汇聚 + /search 依赖链编排 + /agent-setup/SKILL.md + X-Robots-Tag 中间件 + 404 页（/static 挂 _NoCacheStaticFiles；Swagger 挪到 /api-docs） |
 | `auth/routes.py` | ~380 | 注册/登录/refresh/忘记密码/重置密码/邮箱验证/OAuth stub/me |
 | `auth/dependencies.py` | 139 | JWT/API Key/cookie 三通道 DI |
 | `auth/password_reset.py` | 87 | Redis 一次性重置 token（`pwdreset:token:*`）+ 冷却（`pwdreset:cooldown:*`） |
 | `auth/email_verification.py` | ~110 | Redis 一次性验证 token（`verify:token:*`）+ 冷却（`verify:cooldown:*`） |
-| `dashboard/routes.py` | 611 | SSR 页面 + /robots.txt + /sitemap.xml + /terms 服务条款页 + 表单登录/注册/密码重置/反馈工单/站内信页（失败重渲染，不裸 4xx；登录/注册支持 ?next= 站内回跳，注册经登录页透传 next）+ 落地页在线体验入口登录态探测 |
+| `dashboard/routes.py` | 543 | 控制台 SSR 页面 + 表单登录/注册/密码重置/反馈工单/站内信页（失败重渲染，不裸 4xx；登录/注册支持 ?next= 站内回跳）+ `/dashboard/docs` 301 → `/docs` |
+| `dashboard/public_pages.py` | 173 | 公开可索引页：`/` `/terms` `/docs` `/mcp-server` `/pricing` `/faq`（统一走 `base_public.html` 壳 + 注入 canonical/og/JSON-LD） |
+| `dashboard/seo.py` | 597 | SEO 基建：`PUBLIC_PAGES` 单一事实来源、JSON-LD 构造、robots.txt/sitemap.xml/llms.txt/favicon/og-image 路由、`is_private_path()`、站长验证 meta |
 | `feedback/__init__.py` | 162 | 用户反馈工单：POST/GET /feedback + Redis 频率限制 |
 | `messages/__init__.py` | 134 | 站内信用户侧：GET /messages（列表+未读数）、GET /messages/unread-count、POST /messages/{id}/read（越权 404） |
 | `admin/routes.py` | 660 | 管理端：用户/积分/订单/统计/反馈工单（Accept: text/html 渲染管理页）/站内信（GET/POST /admin/messages，定向+广播）/运营监控 SSR 页（含注册用户列表） |
@@ -92,7 +96,9 @@ searchpipe/
 
 **API（JWT/API Key）**：`/auth/register|login|refresh|forgot-password|reset-password|verify-email|resend-verification|me`（auth/routes.py）· `/api-keys` CRUD · `/billing/balance|transactions|plans` · `/payments/catalog|packages|orders|callback` · `/usage|/usage/logs|/usage/export` · `/feedback` 提交/列表 · `/messages` 列表/未读数/标记已读（messages/__init__.py）· `/admin/users|credits|orders|stats|feedback|messages|monitor` · `POST /search`（main.py:143）· `GET /agent-setup/SKILL.md`（main.py:137）
 
-**控制台（session cookie）**：`GET /` 营销页（含在线体验入口） · `GET /robots.txt` · `GET /sitemap.xml` · `/terms` 服务条款 · `/dashboard/login|register|forgot-password|reset-password|logout`（login/register 支持 ?next= 回跳） · `/dashboard[|/api-keys|/usage|/billing|/docs|/feedback|/messages]`（/dashboard 支持 ?q= 预填并自动触发快速搜索）
+**公开页（可索引，seo.py + public_pages.py）**：`GET /` 落地页 · `GET /docs` 开发文档 · `GET /mcp-server` MCP 接入指南 · `GET /pricing` 定价 · `GET /faq` 常见问题 · `GET /terms` 服务条款 · `GET /robots.txt` · `GET /sitemap.xml`（application/xml） · `GET /llms.txt` · `GET /favicon.ico|/favicon.svg|/apple-touch-icon.png|/og-image.png`
+
+**控制台（session cookie，noindex）**：`/dashboard/login|register|forgot-password|reset-password|logout`（login/register 支持 ?next= 回跳） · `/dashboard[|/api-keys|/usage|/billing|/feedback|/messages]`（/dashboard 支持 ?q= 预填并自动触发快速搜索） · `/dashboard/docs` → 301 `/docs` · Swagger UI 在 `/api-docs`（`/docs` 已被公开文档页占用）
 
 ## 按任务跳转表
 
@@ -101,7 +107,8 @@ searchpipe/
 | 改鉴权/登录态 | 本表 + `docs/memory/searchpipe-auth-design.md` | `auth/routes.py` / `auth/dependencies.py` |
 | 改注册/忘记密码邮件 | `docs/memory/searchpipe-auth-design.md` | `auth/password_reset.py` + `utils/mailer.py` |
 | 改邮箱验证 | `docs/memory/searchpipe-auth-design.md` | `auth/email_verification.py` + `auth/routes.py`（verify-email/resend-verification） |
-| 改控制台页面/SEO | `dashboard/routes.py` 头部 docstring 路由表 | 对应 `dashboard/templates/*.html` |
+| 改控制台页面 | `dashboard/routes.py` 头部 docstring 路由表 | 对应 `dashboard/templates/*.html` |
+| 改公开页/元信息/robots/sitemap | `docs/memory/searchpipe-seo.md`（SEO 不变量） | `dashboard/seo.py` + `dashboard/public_pages.py` + `base_public.html` |
 | 改站内信 | `messages/__init__.py`（用户侧）+ `admin/routes.py` 站内信段（管理端） | `db/models/site_message.py` + 模板 `messages.html`/`admin_messages.html`/`admin_feedback.html` |
 | 改搜索管线 | `core/search_service.py` | `search/orchestrator.py` → `extract/fetcher.py` → `rerank/llm_reranker.py` |
 | 改计费/退款/订阅 | `billing/service.py` 头部 docstring | `billing/subscription.py` + `billing/pipeline.py` + `payments/service.py` |

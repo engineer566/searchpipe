@@ -53,10 +53,18 @@ ssh -i ...work.pem root@47.89.243.229 "cd /opt/searchpipe && docker compose -f d
 - 中英文多 query 召回正常（7-11s/次）
 - 已清理冒烟用户（users 归零）
 
+
+## SEO 整改与 nginx 调整（2026-09-13）
+
+- **应用部署（main 93003aa）**：rsync → `docker build` → `docker compose -f docker-compose.prod.yml up -d app`；线上复验 6 个公开页 200、canonical/og 均为 `https://searchpipe.tech/...`、JSON-LD 可解析、sitemap 6 条 URL 逐条 200、robots 与 sitemap 自洽、`/dashboard/docs` 301 `/docs`、私有路径带 `X-Robots-Tag: noindex, nofollow`、404 双形态、6 页 HTML 标签闭合校验通过。
+- **nginx（同日，先于应用部署已完成）**：①`www.searchpipe.tech` 独立 server 块 → 301 主域（此前 www 直接 200，属重复内容）；②`listen 443 ssl http2`（此前仅 HTTP/1.1）；③80 端口一律 301 到 `https://searchpipe.tech`（一步到位）；④新增 `/etc/nginx/conf.d/gzip.conf`（`gzip_types` 覆盖 css/js/json/xml/svg + `gzip_vary`，此前静态资源明文传输）；⑤安全头 HSTS/X-Content-Type-Options/Referrer-Policy/X-Frame-Options。实测 `http_version=2`、css/js/sitemap 均 `content-encoding: gzip`、www 与 http 均 301 归一。
+- **坑（重要）**：`/etc/nginx/sites-enabled/` 里长期堆着历史 `.bak` 文件，而该目录被 `nginx.conf` 全量 include——**备份文件与线上配置抢同名 server_name**（本次 reload 实测报 `conflicting server name "www.searchpipe.tech" on [::]:80`）。已把全部备份挪到 `/root/nginx-backups/`，**以后备份不要放 sites-enabled**。
+- **待办**：Google Search Console / Bing Webmaster / 百度搜索资源平台尚未提交 sitemap（需账号操作）；验证码填 `.env` 的 `*_SITE_VERIFICATION` 后重启 app 即渲染 meta。
+
 ## 坑/注意
 
 1. **境外引擎现实**：机房 IP 下 brave 爬搜常 429（自动 Suspended 180s 降级）、wikidata init 403、google cse 未配 key 天然失败——兜底靠 bing+wikipedia，实测召回仍够（30 候选）。要提质有两条路：配 Brave Search API key（free tier）或 Google CSE key 填进 searxng/settings.yml 对应引擎。
 2. 1.6G 内存跑全栈 + aitrendwatch：available 常年 ~450Mi，和测试服同等吃紧；OOM 先加 swapfile。
 3. app 绑 127.0.0.1:8001 后，**外部无法直连 8001 排障**，一律 SSH 上去 curl 127.0.0.1:8001。
-4. www.searchpipe.tech 证书已含但 nginx 只做 https 跳转不做归一，对外统一宣传 searchpipe.tech。
+4. ~~www.searchpipe.tech 证书已含但 nginx 只做 https 跳转不做归一~~ **2026-09-13 已修**：www 独立 server 块 301 归一到主域（证书是同一张，含 www SAN）。
 5. 支付回调/邮件链接全部依赖 APP_BASE_URL，换域名只改 .env 三处（APP_BASE_URL/OAUTH_REDIRECT_BASE/XUNHUPAY_NOTIFY_URL）。
