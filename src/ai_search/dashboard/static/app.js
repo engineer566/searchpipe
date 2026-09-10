@@ -79,7 +79,7 @@
   /* ---------- 服务条款勾选框 ----------
      未勾选时用 setCustomValidity 给出明确提示（覆盖浏览器原生"请勾选此框"），
      勾选后清空自定义校验。login.html / register.html 的 #agree_terms 自动生效。 */
-  var TERMS_REQUIRED_MSG = '请先阅读并勾选，表示同意《服务条款》';
+  var TERMS_REQUIRED_MSG = '请同意《服务条款》';
   function initTermsCheckbox() {
     var box = document.getElementById('agree_terms');
     if (!box) return;

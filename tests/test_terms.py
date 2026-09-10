@@ -128,8 +128,15 @@ def test_app_js_has_terms_custom_validity(client):
 
 
 def test_login_register_pages_load_app_js(client):
-    """登录页/注册页均加载 app.js，#agree_terms 自定义校验会自动生效。"""
+    """登录页/注册页均加载 app.js（带版本号防缓存），#agree_terms 自定义校验会自动生效。"""
     for path in ("/dashboard/login", "/dashboard/register"):
         resp = client.get(path)
         assert resp.status_code == 200
-        assert '<script src="/static/app.js"></script>' in resp.text
+        assert '<script src="/static/app.js?v=' in resp.text
+
+
+def test_static_assets_no_cache(client):
+    """静态资源带 Cache-Control: no-cache，防发版后浏览器用旧 JS/CSS。"""
+    resp = client.get("/static/app.js")
+    assert resp.status_code == 200
+    assert resp.headers.get("cache-control") == "no-cache"

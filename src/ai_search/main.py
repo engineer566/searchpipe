@@ -49,6 +49,17 @@ logger = logging.getLogger(__name__)
 
 _STATIC_DIR = Path(__file__).parent / "dashboard" / "static"
 
+
+class _NoCacheStaticFiles(StaticFiles):
+    """静态资源禁用强缓存：Cache-Control: no-cache 强制浏览器每次回源校验
+    （Starlette 支持 ETag/If-Modified-Since，304 仍省流量），避免发版后
+    浏览器继续使用旧 JS/CSS（2026-09-12 勾选条款文案曾因缓存未生效）。"""
+
+    async def get_response(self, path: str, scope):  # type: ignore[override]
+        resp = await super().get_response(path, scope)
+        resp.headers["Cache-Control"] = "no-cache"
+        return resp
+
 # MCP streamable-http ASGI 子应用 —— 必须在构造 lifespan 前创建，
 # 以便把它的 lifespan 合并进 FastAPI 的 lifespan（FastMCP 的 SessionManager
 # 需在启动时初始化 task group，否则 /mcp 请求报 "Task group is not initialized"）。
@@ -95,8 +106,8 @@ app.add_middleware(
 )
 app.add_middleware(UsageLogMiddleware)
 
-# 静态资源（控制台 CSS/JS）
-app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
+# 静态资源（控制台 CSS/JS；no-cache 防浏览器缓存旧版本）
+app.mount("/static", _NoCacheStaticFiles(directory=str(_STATIC_DIR)), name="static")
 
 # MCP 远程端点（streamable-http）——与 /search 共用同一进程/容器，
 # 复用 mcp_server.py 的 ai_search_search tool（含完整商业管线：鉴权→扣费→…）。

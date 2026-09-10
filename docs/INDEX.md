@@ -12,7 +12,7 @@
 ```
 searchpipe/
 ├── src/ai_search/
-│   ├── main.py               # FastAPI 入口：中间件/路由汇聚 + /search 依赖链 + /healthz + /agent-setup/SKILL.md + 订阅积分过期清理后台任务（207 行）
+│   ├── main.py               # FastAPI 入口：中间件/路由汇聚 + /search 依赖链 + /healthz + /agent-setup/SKILL.md + 订阅积分过期清理后台任务（218 行；/static 静态资源 no-cache 防旧缓存）
 │   ├── config.py             # pydantic-settings 全部配置（含 SMTP、OAuth、支付双渠道、审核、限流、充值规则、抓取超时/并发、结果缓存 TTL）（102 行）
 │   ├── schemas.py            # /search 请求/响应模型
 │   ├── mcp_server.py         # FastMCP streamable-http 子应用（/mcp，共用商业管线；鉴权支持 URL ?api_key= / Authorization 头 / 工具参数）（219 行）
@@ -71,7 +71,7 @@ searchpipe/
 
 | 文件 | 行数 | 职责 |
 |------|------|------|
-| `main.py` | 207 | 入口汇聚 + /search 依赖链编排 + /agent-setup/SKILL.md |
+| `main.py` | 218 | 入口汇聚 + /search 依赖链编排 + /agent-setup/SKILL.md（/static 挂 _NoCacheStaticFiles） |
 | `auth/routes.py` | ~380 | 注册/登录/refresh/忘记密码/重置密码/邮箱验证/OAuth stub/me |
 | `auth/dependencies.py` | 139 | JWT/API Key/cookie 三通道 DI |
 | `auth/password_reset.py` | 87 | Redis 一次性重置 token（`pwdreset:token:*`）+ 冷却（`pwdreset:cooldown:*`） |
@@ -90,7 +90,7 @@ searchpipe/
 
 ## 路由速查
 
-**API（JWT/API Key）**：`/auth/register|login|refresh|forgot-password|reset-password|verify-email|resend-verification|me`（auth/routes.py）· `/api-keys` CRUD · `/billing/balance|transactions|plans` · `/payments/catalog|packages|orders|callback` · `/usage|/usage/logs|/usage/export` · `/feedback` 提交/列表 · `/messages` 列表/未读数/标记已读（messages/__init__.py）· `/admin/users|credits|orders|stats|feedback|messages|monitor` · `POST /search`（main.py:131）· `GET /agent-setup/SKILL.md`（main.py:125）
+**API（JWT/API Key）**：`/auth/register|login|refresh|forgot-password|reset-password|verify-email|resend-verification|me`（auth/routes.py）· `/api-keys` CRUD · `/billing/balance|transactions|plans` · `/payments/catalog|packages|orders|callback` · `/usage|/usage/logs|/usage/export` · `/feedback` 提交/列表 · `/messages` 列表/未读数/标记已读（messages/__init__.py）· `/admin/users|credits|orders|stats|feedback|messages|monitor` · `POST /search`（main.py:143）· `GET /agent-setup/SKILL.md`（main.py:137）
 
 **控制台（session cookie）**：`GET /` 营销页（含在线体验入口） · `GET /robots.txt` · `GET /sitemap.xml` · `/terms` 服务条款 · `/dashboard/login|register|forgot-password|reset-password|logout`（login/register 支持 ?next= 回跳） · `/dashboard[|/api-keys|/usage|/billing|/docs|/feedback|/messages]`（/dashboard 支持 ?q= 预填并自动触发快速搜索）
 

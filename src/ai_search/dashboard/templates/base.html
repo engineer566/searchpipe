@@ -18,7 +18,7 @@
 // 防主题闪烁：渲染前决定主题
 (function(){try{var t=localStorage.getItem('searchpipe-theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
 </script>
-<link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/app.css?v=20260912">
 {% block head_extra %}{% endblock %}
 </head>
 <body>
@@ -75,7 +75,7 @@
     </div>
   </main>
 </div>
-<script src="/static/app.js"></script>
+<script src="/static/app.js?v=20260912"></script>
 <script>
 // 站内信未读角标（轻量拉取，失败静默；页面加载与消息页标记已读后刷新）
 (function(){
