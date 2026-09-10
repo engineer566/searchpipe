@@ -113,19 +113,20 @@ def test_forgot_password_neutral_response(client, sent_mails):
 
 def test_reset_password_full_flow(client, sent_mails):
     email = _unique_email()
-    _register(client, email)
+    _register(client, email)  # 注册会发一封验证邮件
+    initial = len(sent_mails)
 
     # 发起重置 → 收到含链接的邮件
     resp = client.post("/auth/forgot-password", json={"email": email})
     assert resp.status_code == 200
-    assert len(sent_mails) == 1
-    assert sent_mails[0]["to"] == email
-    token = _extract_reset_token(sent_mails[0])
+    assert len(sent_mails) == initial + 1
+    assert sent_mails[-1]["to"] == email
+    token = _extract_reset_token(sent_mails[-1])
 
     # 冷却期内再次请求 → 不再发信
     resp = client.post("/auth/forgot-password", json={"email": email})
     assert resp.status_code == 200
-    assert len(sent_mails) == 1
+    assert len(sent_mails) == initial + 1
 
     # 改密 → 旧密码 401、新密码 200
     resp = client.post(
@@ -241,12 +242,12 @@ def test_dashboard_forgot_and_reset_pages(client, sent_mails):
     resp = client.get("/dashboard/forgot-password")
     assert resp.status_code == 200
 
-    # 提交 → 统一话术 + 发信
+    # 提交 → 统一话术 + 发信（注册时已发一封验证邮件）
     resp = client.post("/dashboard/forgot-password", data={"email": email})
     assert resp.status_code == 200
     assert "已发送" in resp.text
-    assert len(sent_mails) == 1
-    token = _extract_reset_token(sent_mails[0])
+    assert len(sent_mails) == 2
+    token = _extract_reset_token(sent_mails[-1])
 
     # 重置页：有效 token 显示表单，伪造 token 显示失效
     resp = client.get(f"/dashboard/reset-password?token={token}")
@@ -328,7 +329,7 @@ def test_dashboard_login_next_redirect_and_open_redirect_blocked(client):
 
 
 def test_dashboard_register_next_redirect(client):
-    """注册成功同样支持 next 回跳（落地页体验入口 → 注册 → 回到体验页）。"""
+    """注册成功保留 next：跳登录页（registered=1&next=...），登录后回跳体验页。"""
     email = _unique_email()
     resp = client.post(
         "/dashboard/register",
@@ -342,6 +343,22 @@ def test_dashboard_register_next_redirect(client):
         follow_redirects=False,
     )
     assert resp.status_code == 303, resp.text
+    loc = resp.headers["location"]
+    assert loc.startswith("/dashboard/login?registered=1")
+    assert "next=%2Fdashboard%3Fq%3Dhello" in loc
+
+    # 登录后按 next 回跳
+    resp = client.post(
+        "/dashboard/login",
+        data={
+            "email": email,
+            "password": _PW,
+            "agree_terms": "on",
+            "next": "/dashboard?q=hello",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
     assert resp.headers["location"] == "/dashboard?q=hello"
 
 
@@ -467,23 +484,35 @@ def test_dashboard_unverified_user_sees_warning(client, sent_mails):
     resp = client.post(
         "/dashboard/register",
         data={"email": email, "password": _PW, "password_confirm": _PW, "agree_terms": "on"},
-        follow_redirects=True,  # 跟随重定向到 dashboard
+        follow_redirects=False,
     )
+    # 注册成功 → 303 登录页（registered=1），但 session cookie 已写入
+    assert resp.status_code == 303
+    assert "registered=1" in resp.headers["location"]
+
+    # 带 cookie 访问 dashboard → 未验证警告卡片
+    resp = client.get("/dashboard")
     assert resp.status_code == 200
     assert "邮箱未验证" in resp.text
     assert "重发验证邮件" in resp.text
 
 
-def test_resend_verification_email(client, sent_mails):
+def test_resend_verification_email(client, sent_mails, monkeypatch):
     """重发验证邮件功能。"""
+    from ai_search.auth import email_verification
+
     email = _unique_email()
     resp = client.post(
         "/dashboard/register",
         data={"email": email, "password": _PW, "password_confirm": _PW, "agree_terms": "on"},
-        follow_redirects=True,
+        follow_redirects=False,
     )
-    assert resp.status_code == 200
+    # 注册 → 303 登录页，session cookie 已写入（已登录）
+    assert resp.status_code == 303
     initial_count = len(sent_mails)
+
+    # 注册时的发信已占 60s 冷却；换掉冷却键前缀以直接测重发成功路径
+    monkeypatch.setattr(email_verification, "_COOLDOWN_PREFIX", "verify:test-cooldown:")
 
     # 重发验证邮件
     resp = client.post("/dashboard/resend-verification", follow_redirects=False)
@@ -495,11 +524,16 @@ def test_resend_verification_email(client, sent_mails):
     assert sent_mails[-1]["to"] == email
 
 
-def test_api_resend_verification(client, sent_mails):
+def test_api_resend_verification(client, sent_mails, monkeypatch):
     """API 端点重发验证邮件。"""
+    from ai_search.auth import email_verification
+
     email = _unique_email()
-    tokens = _register(client, email)
+    tokens = _register(client, email)  # 注册即发验证邮件并占 60s 冷却
     initial_count = len(sent_mails)
+
+    # 换掉冷却键前缀以直接测重发成功路径
+    monkeypatch.setattr(email_verification, "_COOLDOWN_PREFIX", "verify:test-cooldown:")
 
     resp = client.post(
         "/auth/resend-verification",

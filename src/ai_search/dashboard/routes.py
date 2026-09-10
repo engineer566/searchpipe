@@ -364,10 +364,11 @@ async def register_submit(
 
     await send_verification_email(db, email)
 
-    # 注册成功后跳转到登录页，提示用户查收验证邮件
-    resp = RedirectResponse(
-        url="/dashboard/login?registered=1", status_code=status.HTTP_303_SEE_OTHER
-    )
+    # 注册成功后跳转到登录页，提示用户查收验证邮件（保留 next 回跳参数）
+    login_url = "/dashboard/login?registered=1"
+    if next_url:
+        login_url += f"&next={quote(next_url, safe='')}"
+    resp = RedirectResponse(url=login_url, status_code=status.HTTP_303_SEE_OTHER)
     set_session_cookie(resp, str(user.id))
     return resp
 

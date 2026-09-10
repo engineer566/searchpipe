@@ -18,7 +18,7 @@ searchpipe/
 │   ├── mcp_server.py         # FastMCP streamable-http 子应用（/mcp，共用商业管线；鉴权支持 URL ?api_key= / Authorization 头 / 工具参数）（219 行）
 │   ├── agent_setup.py        # /agent-setup/SKILL.md 生成：Tavily 式 URL 内嵌 Key 的 MCP 接入指南（172 行）
 │   ├── auth/                 # 鉴权：JWT + session cookie + API Key 三通道
-│   │   ├── routes.py         # /auth/*：注册/登录/refresh/忘记密码/重置/邮箱验证/OAuth stub/me（~360 行）
+│   │   ├── routes.py         # /auth/*：注册/登录/refresh/忘记密码/重置/邮箱验证/OAuth stub/me（~380 行）
 │   │   ├── dependencies.py   # get_current_user 等 DI 依赖（cookie 兜底）（139 行）
 │   │   ├── core.py           # 协议无关鉴权核（resolve_jwt/resolve_api_key）（88 行）
 │   │   ├── jwt_handler.py    # python-jose HS256 签发/解码（39 行）
@@ -72,14 +72,14 @@ searchpipe/
 | 文件 | 行数 | 职责 |
 |------|------|------|
 | `main.py` | 207 | 入口汇聚 + /search 依赖链编排 + /agent-setup/SKILL.md |
-| `auth/routes.py` | ~360 | 注册/登录/refresh/忘记密码/重置密码/邮箱验证/OAuth stub/me |
+| `auth/routes.py` | ~380 | 注册/登录/refresh/忘记密码/重置密码/邮箱验证/OAuth stub/me |
 | `auth/dependencies.py` | 139 | JWT/API Key/cookie 三通道 DI |
 | `auth/password_reset.py` | 87 | Redis 一次性重置 token（`pwdreset:token:*`）+ 冷却（`pwdreset:cooldown:*`） |
 | `auth/email_verification.py` | ~110 | Redis 一次性验证 token（`verify:token:*`）+ 冷却（`verify:cooldown:*`） |
-| `dashboard/routes.py` | 545 | SSR 页面 + /robots.txt + /sitemap.xml + /terms 服务条款页 + 表单登录/注册/密码重置/反馈工单/站内信页（失败重渲染，不裸 4xx；登录/注册支持 ?next= 站内回跳）+ 落地页在线体验入口登录态探测 |
+| `dashboard/routes.py` | 611 | SSR 页面 + /robots.txt + /sitemap.xml + /terms 服务条款页 + 表单登录/注册/密码重置/反馈工单/站内信页（失败重渲染，不裸 4xx；登录/注册支持 ?next= 站内回跳，注册经登录页透传 next）+ 落地页在线体验入口登录态探测 |
 | `feedback/__init__.py` | 162 | 用户反馈工单：POST/GET /feedback + Redis 频率限制 |
 | `messages/__init__.py` | 134 | 站内信用户侧：GET /messages（列表+未读数）、GET /messages/unread-count、POST /messages/{id}/read（越权 404） |
-| `admin/routes.py` | 657 | 管理端：用户/积分/订单/统计/反馈工单（Accept: text/html 渲染管理页）/站内信（GET/POST /admin/messages，定向+广播）/运营监控 SSR 页（含注册用户列表） |
+| `admin/routes.py` | 660 | 管理端：用户/积分/订单/统计/反馈工单（Accept: text/html 渲染管理页）/站内信（GET/POST /admin/messages，定向+广播）/运营监控 SSR 页（含注册用户列表） |
 | `billing/service.py` | 396 | 积分账户：批次化 grant/deduct/refund/sweep_expired（行锁；限时批次优先消耗；退款按 lot_usage 还原原批次） |
 | `billing/subscription.py` | 142 | 包月订阅：订阅/续订/升级到账（30 天有效期、续订下周期生效、升级延期累积） |
 | `payments/xunhupay.py` | 102 | 虎皮椒签名/下单/回调验签（支付宝/微信双渠道凭证，回调两套 secret 各验一次） |
