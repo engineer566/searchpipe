@@ -8,7 +8,12 @@ FROM ghcr.io/astral-sh/uv:python${PYTHON_VERSION}-bookworm-slim AS builder
 
 ENV UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=never \
-    UV_HTTP_TIMEOUT=120
+    UV_HTTP_TIMEOUT=300
+
+# PyPI 源：境内服务器直连 PyPI 极慢且易超时（实测多次构建失败），默认走
+# 阿里云镜像；境外构建可用 --build-arg UV_DEFAULT_INDEX=https://pypi.org/simple 覆盖
+ARG UV_DEFAULT_INDEX=https://mirrors.aliyun.com/pypi/simple/
+ENV UV_DEFAULT_INDEX=${UV_DEFAULT_INDEX}
 
 # 字节码预编译（dockerd 默认 nofile=1024 的宿主上 uv 并行编译可能耗尽 fd，
 # 可用 --build-arg UV_COMPILE_BYTECODE=0 关闭；缺 .pyc 仅影响容器冷启动速度）
@@ -25,8 +30,8 @@ COPY README.md* ./
 COPY src/ ./src/
 
 # 同步依赖到 .venv（--frozen 保证按 lockfile 精确安装，不改写）
-# UV_HTTP_TIMEOUT=120 应对小机器网络慢导致的下载超时
-RUN UV_HTTP_TIMEOUT=120 uv sync --frozen --no-dev
+# UV_HTTP_TIMEOUT/UV_DEFAULT_INDEX 走上面 ENV，应对小机器网络慢与境内 PyPI 超时
+RUN uv sync --frozen --no-dev
 
 # ---- 运行阶段：精简运行镜像 ----
 FROM python:${PYTHON_VERSION}-slim-bookworm AS runtime
