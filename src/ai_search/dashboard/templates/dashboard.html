@@ -92,8 +92,8 @@
 {% endblock %}
 {% block script %}
 <script>
-// 近 30 天统计
-(async()=>{
+// 近 30 天统计（等待 AIS 对象就绪后执行）
+document.addEventListener('DOMContentLoaded', (async()=>{
   try{
     const end=new Date(), start=new Date(end.getTime()-30*864e5);
     const d=await AIS.api('/usage?granularity=day&start='+start.toISOString()+'&end='+end.toISOString());
@@ -102,7 +102,7 @@
     document.getElementById('stat-calls').textContent=calls;
     document.getElementById('stat-credits').textContent=credits;
   }catch(e){ /* 静默：统计失败不影响主功能 */ }
-})();
+}));
 
 // 快速搜索
 document.getElementById('quick-search').onsubmit=async e=>{
