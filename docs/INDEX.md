@@ -107,6 +107,7 @@ searchpipe/
 | 改计费/退款/订阅 | `billing/service.py` 头部 docstring | `billing/subscription.py` + `billing/pipeline.py` + `payments/service.py` |
 | 加测试 | `tests/conftest.py` 头部 docstring（loop 隔离硬约束） | 现有 `tests/test_auth.py` / `tests/test_feedback.py` 作范式 |
 | 部署到测试服 | `docs/memory/searchpipe-test-server.md` | `Dockerfile` / `docker-compose.test.yml` |
+| 部署到生产服 | `docs/memory/searchpipe-prod-server.md` | `Dockerfile` / `docker-compose.prod.yml` |
 | 版本迭代上线前全量回归 | `docs/REGRESSION_CHECKLIST.md`（随功能变更同步更新） | 路由核对用上方「路由速查」 |
 | 改配置/环境变量 | `config.py` | `.env.example`（同步更新） |
 
