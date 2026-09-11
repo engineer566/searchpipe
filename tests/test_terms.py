@@ -28,14 +28,14 @@ def _register_api(client, email: str, password: str = _PW) -> dict:
 def test_terms_page_200(client):
     resp = client.get("/terms")
     assert resp.status_code == 200
-    assert "服务条款" in resp.text
+    assert "Terms of Service" in resp.text
     # 2026-09-12 需求 6：法律上无效的「概不退款」类声明已全面移除
     assert "一经售出概不退款" not in resp.text
     assert "概不退款" not in resp.text
     assert "不予退款" not in resp.text
     # 关键产品规则仍保留
-    assert "不支持自动续订" in resp.text
-    assert "永久有效" in resp.text
+    assert "renew automatically" in resp.text
+    assert "never expire" in resp.text
 
 
 # ---------- 登录页勾选校验 ----------
@@ -45,7 +45,7 @@ def test_login_page_has_terms_checkbox(client):
     resp = client.get("/dashboard/login")
     assert resp.status_code == 200
     assert "agree_terms" in resp.text
-    assert "服务条款" in resp.text
+    assert "Terms of Service" in resp.text
     assert '/terms' in resp.text
 
 
@@ -54,7 +54,7 @@ def test_login_without_terms_checkbox_rejected(client):
     _register_api(client, email)
     resp = client.post("/dashboard/login", data={"email": email, "password": _PW})
     assert resp.status_code == 200
-    assert "请先阅读并同意《服务条款》" in resp.text
+    assert "Please read and agree to the Terms of Service" in resp.text
 
 
 def test_login_with_terms_checkbox_success(client):
@@ -76,7 +76,7 @@ def test_register_page_has_terms_checkbox(client):
     resp = client.get("/dashboard/register")
     assert resp.status_code == 200
     assert "agree_terms" in resp.text
-    assert "服务条款" in resp.text
+    assert "Terms of Service" in resp.text
     assert '/terms' in resp.text
 
 
@@ -87,7 +87,7 @@ def test_register_without_terms_checkbox_rejected(client):
         data={"email": email, "password": _PW, "password_confirm": _PW},
     )
     assert resp.status_code == 200
-    assert "请先阅读并同意《服务条款》" in resp.text
+    assert "Please read and agree to the Terms of Service" in resp.text
 
 
 def test_register_with_terms_checkbox_success(client):
@@ -122,7 +122,7 @@ def test_landing_footer_has_terms_link(client):
 
 
 def test_app_js_has_terms_custom_validity(client):
-    """app.js 对 #agree_terms 做 setCustomValidity，提示文案须体现"同意《服务条款》"。
+    """app.js 对 #agree_terms 做 setCustomValidity，提示文案须为英文 Terms of Service 提示。
 
     TestClient 不执行 JS，故直接检查 /static/app.js 静态资源内容。
     """
@@ -130,7 +130,7 @@ def test_app_js_has_terms_custom_validity(client):
     assert resp.status_code == 200
     assert "agree_terms" in resp.text
     assert "setCustomValidity" in resp.text
-    assert "同意《服务条款》" in resp.text
+    assert "Please agree to the Terms of Service" in resp.text
 
 
 def test_login_register_pages_load_app_js(client):

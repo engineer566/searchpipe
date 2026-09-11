@@ -108,7 +108,7 @@ def test_search_unverified_user_forbidden(client: TestClient):
         headers={"Authorization": f"Bearer {jwt}"},
     )
     assert resp.status_code == 403, resp.text
-    assert "验证邮箱" in resp.json()["detail"]
+    assert "verify your email" in resp.json()["detail"]
 
 
 def test_billing_balance_after_fixture(client: TestClient, auth_headers: dict):

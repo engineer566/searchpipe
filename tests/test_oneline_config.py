@@ -67,7 +67,7 @@ def test_agent_prompt_carries_key_and_mcp_url():
     assert mcp_url(base, key) in prompt
     assert f"{base}/agent-setup/SKILL.md" in prompt
     assert "ai_search_search" in prompt          # 告诉 Agent 用哪个工具
-    assert "不用再问我" in prompt                 # 一键配置：不再来回索要凭据
+    assert "you do not need to ask me for any" in prompt  # 一键配置：不再来回索要凭据
     # 尾斜杠不应造成双斜杠
     assert build_agent_prompt(base + "/", key) == prompt
 
@@ -83,8 +83,8 @@ def test_reveal_returns_same_prompt(client, sent_mails):
 def test_skill_md_tells_agent_to_reuse_prompt_credentials(client):
     """SKILL.md 指引 Agent：用户提示词里已给 Key/链接时直接用，别再索要。"""
     text = client.get("/agent-setup/SKILL.md").text
-    assert "先看用户的提示词" in text
-    assert "不要再向用户索要凭据" in text
+    assert "Check the user's prompt first" in text
+    assert "Do not ask the user for credentials again" in text
     # 原有契约不回归
     assert "/mcp?api_key=sp-" in text
     assert "ai_search_search" in text
@@ -101,14 +101,14 @@ def test_api_keys_page_has_oneliner_copy_only(client, sent_mails):
     text = page.text
 
     assert 'id="oneliner-copy"' in text
-    assert "复制一句话配置" in text
+    assert "Copy one-line setup" in text
     # 提示词/明文不入 HTML（复制按钮按需现拉）
     data = client.get("/api-keys/reveal").json()
     assert data["key"] not in text
     assert data["mcp_url"] not in text
     assert data["agent_prompt"] not in text
-    # 页面里那个「一句话配置」说明只是文案，不含 Key
-    assert "一句话配置" in text
+    # 页面里那个「One-line setup」说明只是文案，不含 Key
+    assert "One-line setup" in text
 
 
 # ---------- 概览页：SKILL.md 链接块改为只复制 ----------
@@ -122,7 +122,7 @@ def test_dashboard_home_replaces_skill_link_with_copy_button(client, sent_mails)
     text = page.text
 
     assert 'id="home-oneliner-copy"' in text
-    assert "复制一句话配置" in text
+    assert "Copy one-line setup" in text
     assert "/agent-setup/SKILL.md" not in text      # 原来的链接块已移除
     assert "或者把下面的链接发给你的 AI Agent" not in text
     # 明文 Key 不进 HTML
@@ -140,7 +140,7 @@ def test_landing_anonymous_has_no_oneliner_copy(client):
     page = client.get("/")
     assert page.status_code == 200
     assert 'id="hero-oneliner-copy"' not in page.text
-    assert "登录后一键配置 Agent" in page.text
+    assert "Sign in to configure your agent" in page.text
     assert "/dashboard/login?next=%2Fdashboard%2Fapi-keys" in page.text
 
 
@@ -159,7 +159,7 @@ def test_public_docs_mentions_oneliner_flow(client):
     client.cookies.clear()
     page = client.get("/docs")
     assert page.status_code == 200
-    assert "一句话配置" in page.text
+    assert "Copy one-line setup" in page.text
     assert "/dashboard/api-keys" in page.text
 
 
@@ -193,6 +193,6 @@ def test_dashboard_home_legacy_default_key_guides_to_new_key(client, sent_mails,
     page = client.get("/dashboard")
     assert page.status_code == 200
     text = page.text
-    assert "查看明文" in text and "新建一把 Key" in text
+    assert "reveal plaintext" in text and "create a new key" in text
     assert 'id="home-oneliner-copy"' not in text
     assert 'id="home-mcp-copy"' not in text

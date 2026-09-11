@@ -47,6 +47,18 @@
         <button type="submit" class="btn btn-block">Sign up</button>
       </form>
 
+      {% if oauth_github_enabled or oauth_google_enabled %}
+      <div style="display:flex;align-items:center;gap:10px;margin:16px 0;color:var(--faint);font-size:12px">
+        <span style="flex:1;border-top:1px solid var(--border)"></span>or<span style="flex:1;border-top:1px solid var(--border)"></span>
+      </div>
+      {% if oauth_github_enabled %}
+      <a class="btn btn-block" href="/auth/oauth/github" style="background:var(--card);color:var(--text);border:1px solid var(--border);margin-bottom:8px">Continue with GitHub</a>
+      {% endif %}
+      {% if oauth_google_enabled %}
+      <a class="btn btn-block" href="/auth/oauth/google" style="background:var(--card);color:var(--text);border:1px solid var(--border)">Continue with Google</a>
+      {% endif %}
+      {% endif %}
+
       <div class="auth-links">
         <a href="/dashboard/login{% if next %}?next={{ next | urlencode }}{% endif %}">Already have an account? Sign in</a>
       </div>

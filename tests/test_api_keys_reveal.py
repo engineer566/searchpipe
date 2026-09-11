@@ -115,7 +115,7 @@ def test_unverified_user_has_no_default_key(client, sent_mails):
     assert resp.status_code == 303
     page = client.get("/dashboard/api-keys")
     assert page.status_code == 200
-    assert "邮箱验证通过后会自动生成一把默认 Key" in page.text
+    assert "A default key is generated automatically once your email is verified" in page.text
     assert 'class="mcp-key-pick" value' not in page.text
 
 
@@ -230,7 +230,7 @@ def test_reveal_legacy_key_without_cipher_409(client, sent_mails, monkeypatch):
     monkeypatch.setattr(routes, "key_plaintext", lambda api_key: None)
     resp = client.get("/api-keys/reveal", headers=headers)
     assert resp.status_code == 409
-    assert "重新创建" in resp.json()["detail"]
+    assert "create a new one" in resp.json()["detail"]
 
 
 def test_revoked_key_cannot_be_revealed(client, sent_mails):
@@ -292,13 +292,13 @@ def test_api_keys_page_has_mcp_config_picker(client, sent_mails):
     page = client.get("/dashboard/api-keys")
     assert page.status_code == 200
     text = page.text
-    assert "MCP 配置" in text
+    assert "MCP setup" in text
     assert 'class="mcp-key-pick" value' in text
     assert "checked" in text  # 默认 Key 预勾选
     # 必须断言渲染出的元素本身：类名只出现在内联 JS 时也会「命中」，测不出模板条件写错
     assert 'class="btn btn-sm key-reveal-btn"' in text  # 可点击查看明文
-    assert "不可查看" not in text
-    assert "显示" in text
+    assert "Not revealable" not in text
+    assert "Show" in text
     # 页面本身不渲染明文（只渲染前缀掩码）
     keys = _list_keys(client, _login_jwt(client, email))
     plain = client.get("/api-keys/reveal").json()["key"]
@@ -407,5 +407,5 @@ def test_api_keys_page_shows_not_viewable_for_legacy_key(client, sent_mails, mon
     page = client.get("/dashboard/api-keys")
     assert page.status_code == 200
     text = page.text
-    assert "不可查看" in text
+    assert "Not revealable" in text
     assert 'class="btn btn-sm key-reveal-btn"' not in text

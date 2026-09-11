@@ -24,5 +24,5 @@ async def moderate_input(query: str) -> None:
     except ModerationError as e:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
-            f"输入内容违规: {e.labels}",
+            f"Input content violation: {e.labels}",
         ) from e

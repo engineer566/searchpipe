@@ -68,7 +68,7 @@ def get_provider() -> PaymentProvider:
 
             _provider = DodoProvider()
         else:
-            raise RuntimeError(f"未知支付提供方: {s.payment_provider}")
+            raise RuntimeError(f"Unknown payment provider: {s.payment_provider}")
     return _provider
 
 
@@ -90,7 +90,7 @@ def get_provider_by_name(name: str) -> PaymentProvider:
         from .dodo import DodoProvider
 
         return DodoProvider()
-    raise RuntimeError(f"未知支付提供方: {name}")
+    raise RuntimeError(f"Unknown payment provider: {name}")
 
 
 def _gen_order_no() -> str:
@@ -262,7 +262,7 @@ async def fulfill_order(
     else:
         plan = await db.get(Plan, order.plan_id) if order.plan_id else None
         if not plan:
-            raise RuntimeError(f"订单 {order.id} 关联套餐不存在")
+            raise RuntimeError(f"Order {order.id} references a missing plan")
         if order.kind == OrderKind.SUBSCRIBE.value:
             await fulfill_subscribe(
                 db,
@@ -287,7 +287,7 @@ async def fulfill_order(
             else:
                 await fulfill_upgrade(db, order, plan, sub)
         else:
-            raise RuntimeError(f"未知订单类型: {order.kind}")
+            raise RuntimeError(f"Unknown order kind: {order.kind}")
     logger.info("订单完成发放 order=%s kind=%s credits=%s", order.id, order.kind, order.credits)
 
 

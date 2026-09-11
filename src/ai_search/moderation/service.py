@@ -20,7 +20,7 @@ class ModerationError(Exception):
     def __init__(self, labels: list[str], stage: str = "input") -> None:
         self.labels = labels
         self.stage = stage
-        super().__init__(f"{stage} 内容违规: {labels}")
+        super().__init__(f"{stage} content violation: {labels}")
 
 
 _provider: ModerationProvider | None = None

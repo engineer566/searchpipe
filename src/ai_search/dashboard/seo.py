@@ -93,9 +93,9 @@ def is_private_path(path: str) -> bool:
 # 订阅 Starter $4.99→1,000/月、Pro $9.99→3,000/月、Max $19.99→10,000/月；$0.005 = 1 credit。
 RECHARGE_TIERS = (("$5", "1,000 credits"), ("$10", "2,100 credits"), ("$20", "4,400 credits"))
 SUBSCRIPTION_PLANS = (
-    ("Starter", "4.99", "4.99", "1,000 credits / month"),
-    ("Pro", "9.99", "9.99", "3,000 credits / month"),
-    ("Max", "19.99", "19.99", "10,000 credits / month"),
+    ("Starter", "4.99", "9.99", "1,000 credits / month"),
+    ("Pro", "9.99", "19.99", "3,000 credits / month"),
+    ("Max", "19.99", "39.99", "10,000 credits / month"),
 )
 RECHARGE_RATE = "0.005"  # $0.005 = 1 credit
 

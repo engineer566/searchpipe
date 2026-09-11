@@ -58,9 +58,9 @@ async def landing(request: Request) -> object:
             nav_active="home",
             page_title="SearchPipe — AI Search API & MCP Server for Agents | Tavily Alternative",
             page_description=(
-                "SearchPipe is an AI search API and remote MCP server for AI agents: "
-                "one call runs multi-engine retrieval, full-text fetching, LLM reranking and "
-                "summaries. A Tavily alternative that can search the Chinese web."
+                "AI search API and MCP server for agents: multi-engine retrieval, "
+                "page fetching and LLM reranking in one call. A Tavily alternative "
+                "covering the Chinese web."
             ),
             page_keywords=seo.SITE_KEYWORDS,
             canonical=seo.canonical_url("/"),
@@ -81,9 +81,8 @@ async def terms_page(request: Request) -> object:
             nav_active="terms",
             page_title="Terms of Service · SearchPipe AI Search API",
             page_description=(
-                "SearchPipe Terms of Service: credit recharges and monthly subscriptions "
-                "(recharged credits never expire, subscription credits valid 30 days), "
-                "account responsibilities, acceptable use, disclaimers and contact."
+                "SearchPipe Terms of Service: credit recharges, monthly subscriptions, "
+                "acceptable use, refunds, disclaimers and contact."
             ),
             page_keywords="SearchPipe terms of service,credits refund policy,subscription rules,acceptable use",
             canonical=seo.canonical_url("/terms"),
@@ -103,9 +102,8 @@ async def privacy_page(request: Request) -> object:
             nav_active="privacy",
             page_title="Privacy Policy · SearchPipe AI Search API",
             page_description=(
-                "SearchPipe Privacy Policy: what data we collect (email, API usage logs), "
-                "how payments are handled by our merchant of record, cookie usage, "
-                "third-party processors, data retention and your GDPR rights."
+                "SearchPipe Privacy Policy: what data we collect, how merchant-of-record "
+                "payments work, cookies, third-party processors, retention and GDPR rights."
             ),
             page_keywords="SearchPipe privacy policy,data collection,GDPR rights,MCP server privacy",
             canonical=seo.canonical_url("/privacy"),
@@ -124,9 +122,8 @@ async def public_docs(request: Request) -> object:
             request,
             page_title="Docs · SearchPipe AI Search API & MCP Integration",
             page_description=(
-                "SearchPipe docs: full POST /search parameter reference and response schema, "
-                "one-command MCP setup, curl / Python / JavaScript examples, error codes, "
-                "rate limits and billing."
+                "SearchPipe docs: POST /search reference, response schema, MCP setup, "
+                "curl/Python/JavaScript examples, error codes, rate limits and billing."
             ),
             page_keywords="SearchPipe docs,AI search API reference,MCP integration,POST /search,search API for agents",
             canonical=seo.canonical_url("/docs"),
@@ -145,9 +142,8 @@ async def mcp_server_page(request: Request) -> object:
             request,
             page_title="MCP Search Server: Add Web Search to Claude Code / Cursor · SearchPipe",
             page_description=(
-                "Connect the SearchPipe remote MCP server (streamable-http) to Claude Code, Cursor "
-                "or any MCP-compatible client in four steps — the API key is embedded in the MCP "
-                "URL, so your agent gets real-time web search with zero extra config."
+                "Connect the SearchPipe remote MCP server to Claude Code, Cursor or any "
+                "MCP-compatible client in minutes — API key embedded in the MCP URL."
             ),
             page_keywords="MCP search server,Claude Code web search,Cursor MCP config,MCP tutorial,remote MCP,streamable-http",
             canonical=seo.canonical_url("/mcp-server"),
@@ -166,9 +162,8 @@ async def pricing_page(request: Request) -> object:
             request,
             page_title="Pricing: Credit Recharges & Monthly Subscriptions · SearchPipe",
             page_description=(
-                "SearchPipe pricing: $0.005 = 1 credit, basic search 1 credit, advanced search 2 credits, "
-                "free tier 1,000 credits/month. Recharges from $5 (credits never expire) and monthly "
-                "subscriptions from $4.99 (credits valid 30 days)."
+                "SearchPipe pricing: $0.005 per credit, free tier 1,000 credits/month. "
+                "Recharges from $5 (never expire), monthly subscriptions from $4.99."
             ),
             page_keywords="AI search API pricing,Tavily alternative price,MCP server pricing,credit recharge,subscription",
             canonical=seo.canonical_url("/pricing"),
@@ -190,8 +185,8 @@ async def faq_page(request: Request) -> object:
             request,
             page_title="FAQ · SearchPipe AI Search API & MCP Server",
             page_description=(
-                "SearchPipe FAQ: what SearchPipe is, how credits and pricing work, MCP integration, "
-                "API key safety, rate limits, Chinese web coverage, failed-request refunds and more."
+                "SearchPipe FAQ: how credits and pricing work, MCP integration, API key "
+                "safety, rate limits, Chinese web coverage and refund policy."
             ),
             page_keywords="SearchPipe FAQ,AI search API questions,MCP integration,credits expiration,rate limit",
             canonical=seo.canonical_url("/faq"),

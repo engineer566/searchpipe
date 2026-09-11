@@ -29,7 +29,7 @@ def test_agent_setup_skill_md(client: TestClient):
     # 必须包含工具名
     assert "ai_search_search" in text
     # 必须包含验证指引
-    assert "配置验证" in text or "故障排查" in text
+    assert "Verification" in text or "Troubleshooting" in text
 
 
 def test_agent_setup_no_auth_required(client: TestClient):

@@ -47,7 +47,7 @@ def test_create_feedback_success(client):
     )
     assert resp.status_code == 201
     body = resp.json()
-    assert body["msg"] == "工单已提交"
+    assert body["msg"] == "Ticket submitted"
     assert "id" in body
 
 
@@ -88,7 +88,7 @@ def test_create_feedback_rate_limit(client):
     # 第二次 429
     resp = client.post("/feedback", json={"subject": "主题2", "content": "内容2"}, headers=headers)
     assert resp.status_code == 429
-    assert "秒后再试" in resp.json()["detail"]
+    assert "try again in" in resp.json()["detail"]
 
 
 def test_list_my_feedback(client):
@@ -235,6 +235,6 @@ def test_feedback_page_logged_in(client):
 
     resp = client.get("/dashboard/feedback")
     assert resp.status_code == 200
-    assert "反馈与工单" in resp.text
-    assert "提交工单" in resp.text
-    assert "我的工单" in resp.text
+    assert "Feedback &amp; tickets" in resp.text or "Feedback & tickets" in resp.text
+    assert "Submit a ticket" in resp.text
+    assert "My tickets" in resp.text

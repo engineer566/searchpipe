@@ -107,7 +107,7 @@ def test_forgot_password_neutral_response(client, sent_mails):
     """不存在的邮箱也返回 200（防枚举），且不发信。"""
     resp = client.post("/auth/forgot-password", json={"email": _unique_email()})
     assert resp.status_code == 200
-    assert "已发送" in resp.json()["detail"]
+    assert "reset link has been sent" in resp.json()["detail"]
     assert sent_mails == []
 
 
@@ -168,7 +168,7 @@ def test_login_page_email_only(client):
 def test_register_page_get(client):
     resp = client.get("/dashboard/register")
     assert resp.status_code == 200
-    assert "确认密码" in resp.text
+    assert "Confirm password" in resp.text
 
 
 def test_dashboard_register_success(client):
@@ -193,7 +193,7 @@ def test_dashboard_register_duplicate_email(client):
         data={"email": email, "password": _PW, "password_confirm": _PW, "agree_terms": "on"},
     )
     assert resp.status_code == 200
-    assert "该邮箱已注册" in resp.text
+    assert "already registered" in resp.text
 
 
 def test_dashboard_register_password_mismatch(client):
@@ -207,7 +207,7 @@ def test_dashboard_register_password_mismatch(client):
         },
     )
     assert resp.status_code == 200
-    assert "两次输入的密码不一致" in resp.text
+    assert "Passwords do not match" in resp.text
 
 
 def test_dashboard_login_wrong_password_renders_error(client):
@@ -217,7 +217,7 @@ def test_dashboard_login_wrong_password_renders_error(client):
         "/dashboard/login", data={"email": email, "password": "wrong-pass-1", "agree_terms": "on"}
     )
     assert resp.status_code == 200  # 页面内报错，而非裸 401
-    assert "密码错误" in resp.text
+    assert "Incorrect password" in resp.text
     assert email in resp.text  # 邮箱回填
 
 
@@ -227,11 +227,11 @@ def test_dashboard_login_unregistered_email_hint(client):
         "/dashboard/login", data={"email": _unique_email(), "password": _PW, "agree_terms": "on"}
     )
     assert resp.status_code == 200
-    assert "该邮箱未注册" in resp.text
+    assert "not registered" in resp.text
     # API 层保持统一话术
     resp = client.post("/auth/login", json={"email": _unique_email(), "password": _PW})
     assert resp.status_code == 401
-    assert resp.json()["detail"] == "邮箱或密码错误"
+    assert resp.json()["detail"] == "Invalid email or password"
 
 
 def test_dashboard_forgot_and_reset_pages(client, sent_mails):
@@ -245,19 +245,19 @@ def test_dashboard_forgot_and_reset_pages(client, sent_mails):
     # 提交 → 统一话术 + 发信（注册时已发一封验证邮件）
     resp = client.post("/dashboard/forgot-password", data={"email": email})
     assert resp.status_code == 200
-    assert "已发送" in resp.text
+    assert "reset link has been sent" in resp.text
     assert len(sent_mails) == 2
     token = _extract_reset_token(sent_mails[-1])
 
     # 重置页：有效 token 显示表单，伪造 token 显示失效
     resp = client.get(f"/dashboard/reset-password?token={token}")
     assert resp.status_code == 200
-    assert "设置新密码" in resp.text or "新密码" in resp.text
-    assert "无效或已过期" not in resp.text
+    assert "Set a new password" in resp.text or "New password" in resp.text
+    assert "invalid or has expired" not in resp.text
 
     resp = client.get("/dashboard/reset-password?token=forged")
     assert resp.status_code == 200
-    assert "无效或已过期" in resp.text
+    assert "invalid or has expired" in resp.text
 
     # 两次密码不一致 → 页面报错
     resp = client.post(
@@ -265,7 +265,7 @@ def test_dashboard_forgot_and_reset_pages(client, sent_mails):
         data={"token": token, "password": _PW_NEW, "password_confirm": "different-99"},
     )
     assert resp.status_code == 200
-    assert "两次输入的密码不一致" in resp.text
+    assert "Passwords do not match" in resp.text
 
     # 改密成功 → 303 跳登录页带提示；新密码可登录
     resp = client.post(
@@ -392,8 +392,8 @@ def test_landing_try_entry_logged_in(client):
     assert resp.status_code == 303  # 注册即登录，cookie 写入 jar
     resp = client.get("/")
     assert resp.status_code == 200
-    assert "在线体验" in resp.text
-    assert "已登录，提交后进入控制台" in resp.text
+    assert "Try it live" in resp.text
+    assert "signed in" in resp.text
 
 
 # ---------- 邮箱验证 ----------
@@ -411,7 +411,7 @@ def test_register_sends_verification_email(client, sent_mails):
     tokens = _register(client, email)
     assert len(sent_mails) == 1
     assert sent_mails[0]["to"] == email
-    assert "验证" in sent_mails[0]["subject"] or "verify" in sent_mails[0]["subject"].lower()
+    assert "Verification" in sent_mails[0]["subject"] or "verify" in sent_mails[0]["subject"].lower()
     # 提取 token 并验证链接格式
     token = _extract_verify_token(sent_mails[0])
     assert token
@@ -475,7 +475,7 @@ def test_dashboard_register_shows_verification_hint(client):
     # 跟随重定向到登录页，应显示验证邮件提示
     resp = client.get(resp.headers["location"])
     assert resp.status_code == 200
-    assert "验证邮件" in resp.text or "查收" in resp.text
+    assert "verification email" in resp.text or "verify" in resp.text.lower()
 
 
 def test_dashboard_unverified_user_sees_warning(client, sent_mails):
@@ -493,8 +493,8 @@ def test_dashboard_unverified_user_sees_warning(client, sent_mails):
     # 带 cookie 访问 dashboard → 未验证警告卡片
     resp = client.get("/dashboard")
     assert resp.status_code == 200
-    assert "邮箱未验证" in resp.text
-    assert "重发验证邮件" in resp.text
+    assert "Email not verified" in resp.text
+    assert "Re-send verification email" in resp.text
 
 
 def test_resend_verification_email(client, sent_mails, monkeypatch):
@@ -540,7 +540,7 @@ def test_api_resend_verification(client, sent_mails, monkeypatch):
         headers={"Authorization": f"Bearer {tokens['access_token']}"},
     )
     assert resp.status_code == 200
-    assert "已重新发送" in resp.json()["detail"]
+    assert "resent" in resp.json()["detail"]
     assert len(sent_mails) == initial_count + 1
 
 
@@ -559,4 +559,4 @@ def test_api_resend_verification_already_verified(client, sent_mails):
         headers={"Authorization": f"Bearer {tokens['access_token']}"},
     )
     assert resp.status_code == 400
-    assert "已验证" in resp.json()["detail"]
+    assert "already verified" in resp.json()["detail"]

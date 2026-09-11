@@ -165,7 +165,7 @@ def test_public_page_meta_complete(client, path):
     assert 15 <= len(title) <= 90, f"{path} title 长度不合适：{title}"
     assert 50 <= len(description) <= 200, f"{path} description 长度不合适"
 
-    assert '<html lang="zh-CN">' in html
+    assert '<html lang="en">' in html
     assert 'name="viewport"' in head
     assert 'name="author"' in head
 
@@ -173,7 +173,7 @@ def test_public_page_meta_complete(client, path):
     assert _attr(head, r'<meta property="og:title" content="([^"]*)"') == title
     assert _attr(head, r'<meta property="og:url" content="([^"]*)"') == seo.canonical_url(path)
     assert _attr(head, r'<meta property="og:image" content="([^"]*)"').endswith("/static/og-image.png")
-    assert "zh_CN" in head
+    assert "en_US" in head
     assert "<meta property=\"og:locale\"" in head
     assert _attr(head, r'<meta name="twitter:card" content="([^"]*)"') == "summary_large_image"
     assert _attr(head, r'<meta name="twitter:image" content="([^"]*)"').endswith("/static/og-image.png")
@@ -254,11 +254,11 @@ def test_landing_try_entry_anonymous(client):
     resp = client.get("/", cookies={"ai_search_session": "invalid"})
     assert resp.status_code == 200
     text = resp.text
-    assert "在线体验" in text
+    assert "Try it live" in text
     assert 'action="/dashboard"' in text
     assert 'name="q"' in text
-    assert "需登录后体验" in text
-    assert "已登录，提交后进入控制台" not in text
+    assert "Sign-in required" in text
+    assert "signed in" not in text
 
 
 # ---------- 内容页与结构化数据一致性 ----------
@@ -318,10 +318,10 @@ def test_pricing_page_structured_data_matches_visible_prices(client):
     prices = [offer["price"] for offer in product["offers"]]
     assert len(prices) >= 4
     for price in prices:
-        assert f"¥{price}" in html, f"结构化数据里的价格 ¥{price} 未在页面展示"
+        assert f"${price}" in html, f"结构化数据里的价格 ${price} 未在页面展示"
 
     # 页面展示的充值档位与费率
-    assert f"¥{seo.RECHARGE_RATE}" in html
+    assert f"${seo.RECHARGE_RATE}" in html
     for amount, credits in seo.RECHARGE_TIERS:
         assert amount in html and credits in html
 
@@ -408,13 +408,13 @@ def test_verification_metas_only_when_configured(client, monkeypatch):
     from ai_search.config import get_settings
 
     settings = get_settings()
-    monkeypatch.setattr(settings, "baidu_site_verification", "code-abc123", raising=False)
+    monkeypatch.setattr(settings, "google_site_verification", "code-abc123", raising=False)
     head = _head(client.get("/").text)
-    assert '<meta name="baidu-site-verification" content="code-abc123">' in head
+    assert '<meta name="google-site-verification" content="code-abc123">' in head
 
-    monkeypatch.setattr(settings, "baidu_site_verification", "", raising=False)
+    monkeypatch.setattr(settings, "google_site_verification", "", raising=False)
     head = _head(client.get("/").text)
-    assert "baidu-site-verification" not in head
+    assert "google-site-verification" not in head
 
 
 # ---------- 404 页 ----------
@@ -426,7 +426,7 @@ def test_404_renders_html_for_browsers(client):
     assert resp.status_code == 404
     assert "text/html" in resp.headers["content-type"]
     text = resp.text
-    assert "页面不存在" in text
+    assert "Page not found" in text
     assert 'href="/docs"' in text
     assert "noindex" in _attr(_head(text), r'<meta name="robots" content="([^"]*)"')
 

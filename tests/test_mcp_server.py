@@ -184,7 +184,7 @@ async def test_mcp_requires_api_key(mcp_client: Client):
             "ai_search_search",
             {"query": "test", "max_results": 3},
         )
-    assert "API Key" in str(exc.value)
+    assert "API key" in str(exc.value) or "API Key" in str(exc.value)
 
 
 async def test_mcp_invalid_api_key(mcp_client: Client):
@@ -194,7 +194,7 @@ async def test_mcp_invalid_api_key(mcp_client: Client):
             "ai_search_search",
             {"query": "test", "api_key": f"sp-{uuid.uuid4().hex}"},
         )
-    assert "无效或已吊销" in str(exc.value)
+    assert "Invalid or revoked" in str(exc.value)
 
 
 async def test_mcp_non_sp_prefix_rejected(mcp_client: Client):

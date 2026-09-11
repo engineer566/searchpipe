@@ -21,13 +21,14 @@ logger = logging.getLogger(__name__)
 # 单条候选喂给 LLM 的最大字符数（防止注入/超长）
 MAX_SNIPPET_CHARS = 1500
 # 强制 JSON 输出的指令
-RERANK_SYSTEM = """你是一个搜索结果相关性评估器。
-用户会给出一个查询和若干候选网页（标题+摘要）。请为每个候选打一个 0 到 1 的相关性分数，
-1 表示高度相关、0 表示无关。只返回 JSON，格式为 {"scores": [{"index": 0, "score": 0.9}, ...]}，
-不输出任何其他文字。"""
+RERANK_SYSTEM = """You are a search-result relevance evaluator.
+Given a query and several candidate web pages (title + snippet), assign each candidate a
+relevance score from 0 to 1, where 1 means highly relevant and 0 means irrelevant.
+Return only JSON in the form {"scores": [{"index": 0, "score": 0.9}, ...]} — no other text."""
 
-ANSWER_SYSTEM = """你是一个严谨的问答助手。只能基于给定的搜索结果回答问题。
-若结果不足以回答，直说"根据现有搜索结果无法回答"。回答末尾用 [n] 标注引用了第几条结果。"""
+ANSWER_SYSTEM = """You are a rigorous answering assistant. Answer only based on the given
+search results. If the results are insufficient, say so plainly. Cite sources at the end
+of your answer using [n] markers referring to result numbers."""
 
 
 def _sanitize(text: str) -> str:
@@ -62,9 +63,9 @@ class LLMReranker:
         for i, c in enumerate(candidates):
             body = c.raw_content or c.content
             lines.append(
-                f"[{i}] 标题: {_sanitize(c.title)} | 摘要: {_sanitize(body)}"
+                f"[{i}] Title: {_sanitize(c.title)} | Snippet: {_sanitize(body)}"
             )
-        user_msg = f"查询: {query}\n候选:\n" + "\n".join(lines)
+        user_msg = f"Query: {query}\nCandidates:\n" + "\n".join(lines)
 
         try:
             resp = await self._client.chat.completions.create(
@@ -118,7 +119,7 @@ class LLMReranker:
             # 用正文优先，没有则用摘要
             body = r.raw_content or r.content
             lines.append(f"[{i}] {_sanitize(r.title)}\n{_sanitize(body)}")
-        user_msg = f"问题: {query}\n搜索结果:\n" + "\n\n".join(lines)
+        user_msg = f"Question: {query}\nSearch results:\n" + "\n\n".join(lines)
 
         try:
             resp = await self._client.chat.completions.create(

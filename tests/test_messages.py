@@ -92,7 +92,7 @@ def test_admin_send_to_user_then_user_reads(client):
     # 标记已读
     resp = client.post(f"/messages/{item['id']}/read", headers=_headers(user_jwt))
     assert resp.status_code == 200
-    assert resp.json()["msg"] == "已读"
+    assert resp.json()["msg"] == "Marked as read"
 
     # 已读后未读数下降、状态翻转（重复标记幂等）
     resp = client.post(f"/messages/{item['id']}/read", headers=_headers(user_jwt))
@@ -296,8 +296,8 @@ def test_messages_page_logged_in(client):
 
     resp = client.get("/dashboard/messages")
     assert resp.status_code == 200
-    assert "站内信" in resp.text
-    assert "我的消息" in resp.text
+    assert "Messages" in resp.text
+    assert "Inbox" in resp.text or "messages" in resp.text.lower()
 
     # 导航入口与未读角标脚本
     resp = client.get("/dashboard")

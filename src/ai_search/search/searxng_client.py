@@ -53,7 +53,7 @@ class SearXNGClient:
             raise SearXNGError(f"SearXNG HTTP {e.response.status_code}") from e
         except httpx.RequestError as e:
             logger.error("SearXNG 请求失败: %s", e)
-            raise SearXNGError(f"SearXNG 不可达: {e}") from e
+            raise SearXNGError(f"SearXNG unreachable: {e}") from e
 
         results = data.get("results", [])
         logger.info("SearXNG 返回 %d 条结果 (query=%r)", len(results), query)
