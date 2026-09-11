@@ -95,6 +95,14 @@ ssh -i ...work.pem root@47.89.243.229 "cd /opt/searchpipe && docker compose -f d
 - **冒烟清理**：2 笔 pending 订单 + 冒烟用户的 account/lot/tx 已删（备份在生产机 `/root/smoke-user-backup-20260911.json`）；users 剩真实用户 1 个，孤儿订单 0。
 - **注意**：真实微信付款后的异步回调链（虎皮椒→`/payments/callback`→发积分）尚未走真钱验证，原理与测试一致（验签=同一 `_sign`），待首笔真实收款时观察日志确认。
 
+## 退款声明整改 + 充值邮箱验证门禁部署（main a4394c6，2026-09-14）
+
+- **背景**：history/20260912.txt 需求 6（取消「一经售出概不退款」类法律无效声明：terms/pricing/landing/billing 全站整改）与需求 7（POST /payments/orders 增加 require_email_verified 门禁 + /dashboard/billing 未验证用户横幅引导）。dev 全量 pytest 184 passed / 5 skipped，测试服已先行验证（见 searchpipe-test-server.md 十二次部署）。
+- **部署**：dev 快进合入 main（6b22b30→a4394c6，无冲突）→ rsync（work.pem）→ 服务器原生 `docker build`（~30s）→ `docker compose -f docker-compose.prod.yml up -d app`。无迁移。
+- **验证（外网 HTTPS + SSH 内网全过）**：healthz 内外双通（注意 compose up 后 app 有数十秒启动窗口，外网会瞬时 502，等 healthy 再验）；/terms、/pricing、/ 落地页「概不退款/不予退款」**0 残留**，产品规则（不支持自动续订/永久有效）与 meta description 正常；未验证用户 POST /payments/orders **403**「请先验证邮箱才能使用此功能」；未验证 /dashboard/billing 横幅 + 重发按钮命中；Redis 按 user_id 精确匹配 verify:token 验证后横幅消失、页面正常；容器日志无 error。
+- **坑/注意**：①SSH 远程脚本里 `UID` 是 bash 只读变量，别拿来存用户 id（踩实）；②生产 Redis 里 verify:token:* 有多个用户 token，`head -1` 取会拿错导致 verify_error——要按 GET 值（user_id）匹配；③**验证时观察到 2026-09-11 记录中的真实用户 `57307365-…` 已不在 users 表**（其 API Key/积分记录亦随之不在；本次所有清理均按 verify% 邮箱/测试 UUID 限定，未触碰该用户，应为负责人自行注销），当前仅剩真实用户 ferriswym@163.com（未验证，受门禁限制）；④测试用户已按无 FK 约束纪律清干净（users 剩 1）。
+- **真实下单未测**：避免真实虎皮椒下单，放行路径由 pytest（mock provider）覆盖。
+
 ## 品牌图标换新部署（main 278108e → 080b816，2026-09-11）
 
 - **背景**：用户提供 `searchpipe-brand/` 品牌包（钥匙形 logo，替换原 🔍 放大镜 emoji 风格）。favicon 全系（svg/ico 16+32+48/favicon-16/32.png/apple-touch-icon/icon-192+512）、webmanifest 补 icon-192、og-image 左上角小图标按新品牌重绘（PIL 抹除旧图标+8x 超采样绘制，其余像素不动）；6 个模板（base/base_public/login/register/forgot/reset）🔍 全换内联 SVG（currentColor，css 新增 `.brand-mark`）；app.css 版本号 bump `?v=20260914` 打爆旧缓存。品牌源文件已入仓库 `searchpipe-brand/`。
