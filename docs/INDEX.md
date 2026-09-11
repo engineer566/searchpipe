@@ -39,7 +39,7 @@ searchpipe/
 │   │   ├── session.py        # get_db 依赖
 │   │   └── models/           # user(含 OAuthAccount)/api_key(含 key_cipher 密文与 is_default 默认 Key 标记)/billing(Plan/Order 含订阅字段)/credit(含 CreditLot 批次)/subscription/usage/feedback_ticket/site_message(站内信，batch_id 聚合已读统计)
 │   ├── billing/              # 积分计费：批次化扣费/退款/赠送/过期清理（service 396 行；pipeline 89 行；subscription 订阅/续订/升级到账 142 行）
-│   ├── payments/             # 虎皮椒支付（支付宝/微信，按已配置凭证动态开通渠道，当前仅微信）：catalog/四类下单/回调/状态查询（routes 265 行；service 266 行；下单响应含 pay_channel）
+│   ├── payments/             # 虎皮椒支付（支付宝/微信，按已配置凭证动态开通渠道，当前仅微信）：catalog/四类下单（下单需邮箱已验证，未验证 403）/回调/状态查询（routes 275 行；service 266 行；下单响应含 pay_channel）
 │   ├── api_keys/             # sp- 前缀 API Key CRUD + 默认 Key + 明文可查看（crypto.py 47 行 Fernet 加解密；service 207 行；routes 180 行，含 /reveal）
 │   ├── usage/                # 用量日志中间件 + 统计/导出（middleware 75 行）
 │   ├── rate_limit/           # Redis ZSET 滑动窗口限流（service 42 行）

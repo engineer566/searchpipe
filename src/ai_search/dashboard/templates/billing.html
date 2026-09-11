@@ -1,6 +1,20 @@
 {% extends "base.html" %}
 {% block title %}充值 · SearchPipe{% endblock %}
 {% block content %}
+{% if not user.email_verified %}
+<div class="card" style="border-left:3px solid var(--warn);margin-bottom:24px">
+  <div class="row" style="align-items:center;gap:12px">
+    <span style="font-size:20px">⚠️</span>
+    <div class="grow">
+      <strong>充值前请先完成邮箱验证</strong>
+      <p class="muted" style="margin:4px 0 0;font-size:13px">为避免财务纠纷，充值与订阅需验证邮箱后才能下单。请查收注册邮件中的验证链接。</p>
+    </div>
+    <form action="/dashboard/resend-verification" method="post" style="margin:0">
+      <button type="submit" class="btn btn-sm">重发验证邮件</button>
+    </form>
+  </div>
+</div>
+{% endif %}
 <div class="page-head">
   <h1>充值与订阅</h1>
   <p>¥0.03 = 1 积分，1 积分 = 1 次请求。充值积分永久有效，订阅积分 30 天有效。<span id="pay-channel-text">支持支付宝、微信支付。</span></p>
