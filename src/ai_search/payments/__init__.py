@@ -1,23 +1,23 @@
-"""支付充值包 —— 虎皮椒过渡（后续换官方商户只换 provider 实现）。"""
+"""支付充值包 —— MoR 代收平台（Creem / Dodo），托管收银台 + webhook 模式。"""
 
-from .provider import PaymentProvider
+from .provider import PaymentEvent, PaymentProvider, WebhookVerificationError
 from .routes import router
 from .service import (
     create_order,
     fulfill_order,
     get_order,
     get_provider,
-    handle_callback,
+    handle_webhook,
 )
-from .xunhupay import XunHuPayProvider
 
 __all__ = [
+    "PaymentEvent",
     "PaymentProvider",
-    "XunHuPayProvider",
+    "WebhookVerificationError",
     "create_order",
     "fulfill_order",
     "get_order",
     "get_provider",
-    "handle_callback",
+    "handle_webhook",
     "router",
 ]

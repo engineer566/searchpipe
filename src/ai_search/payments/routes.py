@@ -1,10 +1,12 @@
 """支付路由 —— /payments/* 。
 
-- GET  /payments/catalog     购买目录：充值档 + 订阅档 + 自定义汇率/上限 + 当前订阅状态
-- POST /payments/orders      下单（kind=recharge/subscribe/renew/upgrade）→ 返回支付链接
-- POST /payments/callback    虎皮椒异步回调（验签 + 幂等 + 发积分）
-- GET  /payments/orders/{id} 查订单状态（前端轮询）
-- GET  /payments/packages    充值套餐列表（兼容旧前端，语义同 /billing/plans）
+- GET  /payments/catalog                购买目录：充值档 + 订阅档 + 自定义汇率/上限 + 当前订阅状态
+- POST /payments/orders                 下单（kind=recharge/subscribe/upgrade）→ 返回托管收银台 URL
+- POST /payments/webhooks/{provider}    平台 webhook（Creem/Dodo：raw body + 签名校验 + 幂等发积分）
+- GET  /payments/orders/{id}            查订单状态（前端轮询）
+- GET  /payments/packages               充值套餐列表（兼容旧前端，语义同 /billing/plans）
+
+国内版虎皮椒回调 /payments/callback 已随 archive/china-2026-09 封存删除。
 """
 
 import logging
@@ -12,7 +14,6 @@ from datetime import datetime
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,7 +31,8 @@ from ..billing.subscription import get_active_subscription
 from ..config import get_settings
 from ..db.models import Order, OrderKind, Plan, PlanKind, User
 from ..db.session import get_db
-from .service import create_order, get_order, get_provider, handle_callback
+from .provider import WebhookVerificationError
+from .service import create_order, get_order, get_provider, handle_webhook
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/payments", tags=["payments"])
@@ -40,14 +42,14 @@ class PackageItem(BaseModel):
     id: str
     name: str
     credits: int
-    price_yuan: float
+    price: float  # 美元（price_cents / 100）
 
 
 class CreateOrderRequest(BaseModel):
     kind: str = OrderKind.RECHARGE.value  # recharge/subscribe/renew/upgrade
     plan_id: str | None = None
-    amount_cents: int | None = None       # 自定义充值金额（分）
-    pay_channel: str | None = None        # alipay/wechat；留空用支付方首个已配置渠道
+    amount_cents: int | None = None       # 自定义充值金额（美分）
+    pay_channel: str | None = None        # card/paypal；留空用支付方首个已声明渠道
 
 
 class CreateOrderResponse(BaseModel):
@@ -77,8 +79,8 @@ class PlanInfo(BaseModel):
     level: int | None
     credits: int
     price_cents: int
-    price_yuan: float
-    original_price_yuan: float | None  # 标价（划线价）；限时折扣期高于 price_yuan
+    price: float                    # 现价（美元）
+    original_price: float | None    # 标价（划线价）；限时折扣期高于 price
     period: str | None
 
 
@@ -88,14 +90,16 @@ class SubscriptionInfo(BaseModel):
     level: int | None
     period_start: datetime
     period_end: datetime
+    status: str = "active"
 
 
 class CatalogResponse(BaseModel):
     recharge_plans: list[PlanInfo]
     subscription_plans: list[PlanInfo]
-    credit_yuan_rate: str        # ¥0.03 = 1 积分
-    max_recharge_yuan: int       # 自定义充值上限
-    pay_channels: list[str]      # 已配置渠道，如 ["wechat"] 或 ["alipay", "wechat"]
+    credit_price_rate: str       # $0.005 = 1 积分
+    max_recharge_amount: int     # 自定义充值上限（美元）
+    currency: str                # 全站结算货币，如 "USD"
+    pay_channels: list[str]      # 已声明渠道，如 ["card", "paypal"]
     subscription: SubscriptionInfo | None  # 当前有效订阅（未登录/无订阅为 None）
 
 
@@ -107,8 +111,8 @@ def _plan_info(p: Plan) -> PlanInfo:
         level=p.level,
         credits=p.credits,
         price_cents=p.price_cents,
-        price_yuan=p.price_cents / 100,
-        original_price_yuan=(
+        price=p.price_cents / 100,
+        original_price=(
             p.original_price_cents / 100 if p.original_price_cents else None
         ),
         period=p.period,
@@ -137,7 +141,7 @@ async def catalog(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> CatalogResponse:
-    """购买目录。登录用户附带当前订阅状态（供前端决定显示订阅/续订/升级）。"""
+    """购买目录。登录用户附带当前订阅状态（供前端决定显示订阅/管理入口）。"""
     stmt = select(Plan).where(Plan.is_active.is_(True)).order_by(Plan.price_cents)
     rows = (await db.execute(stmt)).scalars().all()
     recharge = [_plan_info(p) for p in rows if p.kind == PlanKind.RECHARGE.value]
@@ -158,14 +162,16 @@ async def catalog(
                 level=plan.level if plan else None,
                 period_start=sub.current_period_start,
                 period_end=sub.current_period_end,
+                status=sub.status,
             )
 
     s = get_settings()
     return CatalogResponse(
         recharge_plans=recharge,
         subscription_plans=subs,
-        credit_yuan_rate=s.credit_yuan_rate,
-        max_recharge_yuan=s.max_recharge_yuan,
+        credit_price_rate=s.credit_price_rate,
+        max_recharge_amount=s.max_recharge_usd,
+        currency=s.currency,
         pay_channels=get_provider().available_channels(),
         subscription=subscription,
     )
@@ -185,7 +191,7 @@ async def packages(db: AsyncSession = Depends(get_db)) -> list[PackageItem]:
             id=str(p.id),
             name=p.name,
             credits=p.credits,
-            price_yuan=p.price_cents / 100,
+            price=p.price_cents / 100,
         )
         for p in rows
     ]
@@ -197,7 +203,7 @@ async def create_order_route(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> CreateOrderResponse:
-    # 邮箱未验证不允许下单（2026-09-12 需求 7：避免财务纠纷；admin/owner 豁免）
+    # 邮箱未验证不允许下单（避免财务纠纷；admin/owner 豁免）
     try:
         require_email_verified(user)
     except EmailNotVerifiedError as e:
@@ -210,6 +216,7 @@ async def create_order_route(
             plan_id=req.plan_id,
             amount_cents=req.amount_cents,
             pay_channel=req.pay_channel,
+            customer_email=user.email,
         )
     except ValueError as e:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e)) from e
@@ -226,32 +233,55 @@ async def create_order_route(
     )
 
 
-@router.post("/callback", response_class=PlainTextResponse)
-async def callback(
+@router.post("/webhooks/{provider}")
+async def payment_webhook(
+    provider: str,
     request: Request,
     db: AsyncSession = Depends(get_db),
-) -> str:
-    """虎皮椒异步回调。成功返回 "success"（虎皮椒要求）。"""
-    # 虎皮椒可能 GET 或 POST 回调，参数兼容
-    if request.method == "POST":
-        try:
-            params = dict(await request.form())
-        except Exception:  # noqa: BLE001
-            params = dict(request.query_params)
-    else:
-        params = dict(request.query_params)
-
+) -> dict:
+    """支付平台 webhook（Creem/Dodo）。验签失败 400；暂时性处理失败 500（平台会重试）。"""
+    if provider not in ("creem", "dodo"):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown payment provider")
+    raw_body = await request.body()
+    headers = {k.lower(): v for k, v in request.headers.items()}
     try:
-        ok = await handle_callback(db, params)
+        ok = await handle_webhook(db, provider, headers=headers, raw_body=raw_body)
+    except WebhookVerificationError as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e)) from e
     except Exception as e:  # noqa: BLE001
-        logger.exception("支付回调处理异常: %s", e)
-        ok = False
+        logger.exception("webhook 处理异常: %s", e)
+        await db.rollback()
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Webhook processing failed") from e
 
     if ok:
         await db.commit()
-        return "success"
+        return {"received": True}
     await db.rollback()
-    return "fail"
+    raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Webhook not processable yet")
+
+
+@router.get("/portal")
+async def customer_portal(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """生成当前用户订阅的 Customer Portal 链接（取消/改档/换支付方式）。"""
+    from ..db.models import Subscription
+    from .service import get_provider_by_name
+
+    stmt = select(Subscription).where(
+        Subscription.user_id == user.id, Subscription.status == "active"
+    )
+    sub = (await db.execute(stmt)).scalar_one_or_none()
+    if not sub or not sub.provider_customer_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No active subscription found")
+    provider = get_provider_by_name(sub.provider) if sub.provider else get_provider()
+    url = await provider.customer_portal_url(sub.provider_customer_id)
+    if not url:
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY, "Failed to generate customer portal link"
+        )
+    return {"portal_url": url}
 
 
 @router.get("/orders/{order_id}", response_model=OrderStatusResponse)
@@ -262,7 +292,7 @@ async def order_status(
 ) -> OrderStatusResponse:
     order = await get_order(db, user.id, order_id)
     if not order:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "订单不存在")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Order not found")
     return OrderStatusResponse(
         order_id=str(order.id),
         status=order.status,

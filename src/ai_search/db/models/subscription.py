@@ -45,3 +45,5 @@ class Subscription(Base, PkMixin, TimestampMixin):
     # 原生自动续订：平台托管扣款，webhook 按这两个字段定位本地订阅
     provider: Mapped[str | None] = mapped_column(String(16))
     provider_subscription_id: Mapped[str | None] = mapped_column(String(128))
+    # 平台 customer id（生成 Customer Portal 链接：取消/改档/换支付方式）
+    provider_customer_id: Mapped[str | None] = mapped_column(String(128))

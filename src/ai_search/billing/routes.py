@@ -59,8 +59,8 @@ class PlanItem(BaseModel):
     level: int | None
     credits: int
     price_cents: int
-    price_yuan: float
-    original_price_yuan: float | None
+    price: float
+    original_price: float | None
     period: str | None
 
 
@@ -112,8 +112,8 @@ async def plans(db: AsyncSession = Depends(get_db)) -> list[PlanItem]:
             level=p.level,
             credits=p.credits,
             price_cents=p.price_cents,
-            price_yuan=p.price_cents / 100,
-            original_price_yuan=(
+            price=p.price_cents / 100,
+            original_price=(
                 p.original_price_cents / 100 if p.original_price_cents else None
             ),
             period=p.period,

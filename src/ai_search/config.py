@@ -73,7 +73,7 @@ class Settings(BaseSettings):
     dodo_api_key: str = ""
     dodo_webhook_secret: str = ""
     # test 模式用 https://test.dodopayments.com
-    dodo_api_base: str = "https://api.dodopayments.com"
+    dodo_api_base: str = "https://live.dodopayments.com"
     dodo_credit_product_id: str = ""
 
     # --- 商业化后端：充值/订阅规则 ---

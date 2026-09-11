@@ -2,11 +2,11 @@
 
 规则（与服务条款一致）：
 - 订阅积分自到账起 30 天有效（固定 30 天）。
-- 续订：手动发起，积分批次从下一周期起点生效（不累积到当前周期），
-  订阅 period_end 顺延 30 天，可链式叠加。
+- 出海版改为原生自动续订：平台（Creem/Dodo）托管周期扣款，续期由 webhook
+  事件驱动到账（fulfill_subscription_payment），周期以平台事件里的
+  period_start/period_end 为准；本地 fulfill_renew 保留给手工续订路径。
 - 升级：付新档位当前实际售价全额；新档位积分从升级时刻起算 30 天；
   原档位未用完的限时积分延期至与新档位同期；不支持降级。
-- 不支持自动续订。
 """
 
 import logging
@@ -49,36 +49,93 @@ async def get_active_subscription(
     return sub
 
 
-async def fulfill_subscribe(db: AsyncSession, order: Order, plan: Plan) -> None:
-    """首次订阅到账：建订阅（now → now+30d）+ 限时积分批次。"""
+async def fulfill_subscribe(
+    db: AsyncSession,
+    order: Order,
+    plan: Plan,
+    *,
+    sub: Subscription | None = None,
+    provider: str | None = None,
+    provider_subscription_id: str | None = None,
+    provider_customer_id: str | None = None,
+) -> Subscription:
+    """首次订阅到账：订阅（now → now+30d）+ 限时积分批次。
+
+    sub 非空时复用已绑定平台字段的订阅行（webhook 先建绑定、后到款的场景），
+    否则新建。
+    """
     now = datetime.now(timezone.utc)
-    db.add(
-        Subscription(
-            user_id=order.user_id,
-            plan_id=plan.id,
-            status=SubscriptionStatus.ACTIVE.value,
-            current_period_start=now,
-            current_period_end=now + SUBSCRIPTION_PERIOD,
-        )
-    )
+    if sub is None:
+        sub = Subscription(user_id=order.user_id, plan_id=plan.id)
+        db.add(sub)
+    sub.plan_id = plan.id
+    sub.status = SubscriptionStatus.ACTIVE.value
+    sub.current_period_start = now
+    sub.current_period_end = now + SUBSCRIPTION_PERIOD
+    if provider:
+        sub.provider = provider
+    if provider_subscription_id:
+        sub.provider_subscription_id = provider_subscription_id
+    if provider_customer_id:
+        sub.provider_customer_id = provider_customer_id
+    await db.flush()
+
     await grant_credits(
         db,
         user_id=order.user_id,
         amount=Decimal(order.credits),
         tx_type=CreditTxType.RECHARGE.value,
-        remark=f"订阅 {plan.name}（订单 {order.provider_order_id}）",
+        remark=f"Subscribe {plan.name} (order {order.provider_order_id})",
         lot_source="subscribe",
         lot_order_id=order.id,
         lot_effective_at=now,
         lot_expires_at=now + SUBSCRIPTION_PERIOD,
     )
     logger.info("订阅到账 user=%s plan=%s", order.user_id, plan.name)
+    return sub
+
+
+async def fulfill_subscription_payment(
+    db: AsyncSession,
+    order: Order,
+    plan: Plan,
+    sub: Subscription,
+    *,
+    period_start: datetime | None = None,
+    period_end: datetime | None = None,
+) -> None:
+    """平台周期扣款到账（原生自动续订续期）：发放下一周期限时积分。
+
+    周期以平台 webhook 事件的 period_start/period_end 为准；缺省回退
+    本地 period_end → +30d。幂等由调用方（event_id 订单查重）保证。
+    """
+    now = datetime.now(timezone.utc)
+    effective = period_start or max(now, sub.current_period_end)
+    expiry = period_end or (effective + SUBSCRIPTION_PERIOD)
+    sub.current_period_start = effective
+    sub.current_period_end = expiry
+    if sub.status != SubscriptionStatus.ACTIVE.value:
+        sub.status = SubscriptionStatus.ACTIVE.value
+    await grant_credits(
+        db,
+        user_id=order.user_id,
+        amount=Decimal(order.credits),
+        tx_type=CreditTxType.RECHARGE.value,
+        remark=f"Renew {plan.name} (order {order.provider_order_id})",
+        lot_source="renew",
+        lot_order_id=order.id,
+        lot_effective_at=effective,
+        lot_expires_at=expiry,
+    )
+    logger.info(
+        "续期到账 user=%s plan=%s 生效=%s", order.user_id, plan.name, effective
+    )
 
 
 async def fulfill_renew(
     db: AsyncSession, order: Order, plan: Plan, sub: Subscription
 ) -> None:
-    """续订到账：积分批次下一周期生效（原 period_end → +30d），period_end 顺延。"""
+    """手工续订到账：积分批次下一周期生效（原 period_end → +30d），period_end 顺延。"""
     old_end = sub.current_period_end
     new_end = old_end + SUBSCRIPTION_PERIOD
     sub.current_period_end = new_end
@@ -87,7 +144,7 @@ async def fulfill_renew(
         user_id=order.user_id,
         amount=Decimal(order.credits),
         tx_type=CreditTxType.RECHARGE.value,
-        remark=f"续订 {plan.name}（订单 {order.provider_order_id}）",
+        remark=f"Renew {plan.name} (order {order.provider_order_id})",
         lot_source="renew",
         lot_order_id=order.id,
         lot_effective_at=old_end,
@@ -131,7 +188,7 @@ async def fulfill_upgrade(
         user_id=order.user_id,
         amount=Decimal(order.credits),
         tx_type=CreditTxType.RECHARGE.value,
-        remark=f"升级 {plan.name}（订单 {order.provider_order_id}）",
+        remark=f"Upgrade {plan.name} (order {order.provider_order_id})",
         lot_source="upgrade",
         lot_order_id=order.id,
         lot_effective_at=now,

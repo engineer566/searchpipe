@@ -57,6 +57,8 @@ def upgrade() -> None:
     # --- subscriptions：平台托管订阅定位 ---
     op.add_column('subscriptions', sa.Column('provider', sa.String(length=16), nullable=True))
     op.add_column('subscriptions', sa.Column('provider_subscription_id', sa.String(length=128), nullable=True))
+    # 平台 customer id（Customer Portal 链接生成、取消/改档入口）
+    op.add_column('subscriptions', sa.Column('provider_customer_id', sa.String(length=128), nullable=True))
     op.create_index('ix_subscriptions_provider_sub', 'subscriptions',
                     ['provider', 'provider_subscription_id'], unique=True)
 
@@ -98,6 +100,7 @@ def downgrade() -> None:
         {"ids": list(_OLD_PLAN_IDS)},
     )
     op.drop_index('ix_subscriptions_provider_sub', table_name='subscriptions')
+    op.drop_column('subscriptions', 'provider_customer_id')
     op.drop_column('subscriptions', 'provider_subscription_id')
     op.drop_column('subscriptions', 'provider')
     op.drop_column('plans', 'provider_products')
