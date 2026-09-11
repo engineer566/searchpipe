@@ -12,7 +12,11 @@
   <p class="lead">一条命令接入 Claude Code、Cursor 等 Agent——实时搜索、正文抓取、LLM 重排一次完成，直接返回 Agent 可消费的结构化结果，无需自己维护检索管线。</p>
   <div class="cta-row">
     <a href="/dashboard/register" class="btn btn-lg">获取 API Key</a>
-    <button type="button" class="btn btn-ghost btn-lg" onclick="AIS.copy('{{ site_url }}/agent-setup/SKILL.md', this)">复制配置提示词</button>
+    {% if logged_in %}
+    <button type="button" class="btn btn-ghost btn-lg" id="hero-oneliner-copy">复制一句话配置</button>
+    {% else %}
+    <a href="/dashboard/login?next=%2Fdashboard%2Fapi-keys" class="btn btn-ghost btn-lg">登录后一键配置 Agent</a>
+    {% endif %}
   </div>
   <form class="hero-demo" id="try" action="/dashboard" method="get" aria-label="在线体验">
     <input type="text" name="q" placeholder="输入问题，体验完整搜索管线（检索→抓取→重排→摘要）" required>
@@ -244,4 +248,25 @@ claude mcp add --transport http searchpipe \
   </div>
 </section>
 </main>
+{% endblock %}
+{% block script %}
+<script>
+// 落地页 hero：「复制一句话配置」——提示词里已带用户的 API Key 与 MCP 链接，
+// 内容不渲染到页面（匿名访客拿不到 Key，按钮降级为跳登录）。
+(function(){
+  const btn=document.getElementById('hero-oneliner-copy');
+  if(!btn) return;
+  btn.onclick=async()=>{
+    btn.disabled=true;
+    try{
+      const d=await AIS.api('/api-keys/reveal');
+      AIS.copy(d.agent_prompt, btn);
+    }catch(e){
+      // 未登录/凭据失效：AIS.api 已引导去登录页；其它错误退回控制台自行复制
+      if(e && e.message && !/401|未提供认证凭据/.test(e.message)) alert(e.message);
+      else window.location.href='/dashboard/login?next=%2Fdashboard%2Fapi-keys';
+    }finally{ btn.disabled=false; }
+  };
+})();
+</script>
 {% endblock %}

@@ -49,6 +49,7 @@ claude mcp add --transport http searchpipe "{{ site_url }}/mcp?api_key=sp-你的
       <h2 id="agent-setup">Agent 自举配置</h2>
       <p>把下面的链接发给你的 AI Agent，它可以读取这份说明自行完成 MCP 配置与验证：</p>
       <div class="code-block" data-copy><pre><code>{{ site_url }}/agent-setup/SKILL.md</code></pre></div>
+      <p>更省事的做法：登录控制台后打开 <a href="/dashboard/api-keys">API Keys</a> 页，点「复制一句话配置」——那段提示词里已经带上你的 API Key 与 MCP 链接，粘贴给 Agent 即可一键接入（出于安全考虑，提示词内容不在页面上展示）。</p>
 
       <h2 id="auth">REST API 认证</h2>
       <p>程序直接调用 / 自建 Agent 管线时使用 REST API。所有调用需要认证，使用 API Key（<a href="/dashboard/api-keys">创建</a>），支持两种传递方式：</p>

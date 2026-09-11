@@ -77,12 +77,23 @@
 
 <div class="card">
   <h2>接入你的 Agent</h2>
-  <p class="card-sub">先在「<a href="/dashboard/api-keys">API Keys</a>」页创建 Key（创建弹窗会给出完整 MCP 链接），然后一条命令接入 Claude Code / Cursor，详细参数见<a href="/docs">开发文档</a>。</p>
-  <p class="card-sub">MCP 接入（推荐）</p>
-  <div class="code-block mb" data-copy><pre><code>claude mcp add --transport http searchpipe \
-  "{{ request.base_url }}mcp?api_key=sp-你的密钥"</code></pre></div>
-  <p class="card-sub">或者把下面的链接发给你的 AI Agent，自动完成配置</p>
-  <div class="code-block mb" data-copy><pre><code>{{ request.base_url }}agent-setup/SKILL.md</code></pre></div>
+  <p class="card-sub">MCP 接入（推荐）默认使用你的<strong>默认 API Key</strong>{% if default_key %}（<code>{{ default_key.key_prefix }}…</code>）{% endif %}；换 Key 或查看明文见「<a href="/dashboard/api-keys">API Keys</a>」页，详细参数见<a href="/docs">开发文档</a>。</p>
+  {% if default_key %}
+  <p class="card-sub">一句话配置（最省事）：提示词里已带上你的默认 API Key 与 MCP 链接，复制后直接粘给 AI Agent，它会自己读完接入说明并配置好。</p>
+  <div class="row mb" style="gap:10px;flex-wrap:wrap;align-items:center">
+    <button type="button" class="btn" id="home-oneliner-copy">复制一句话配置</button>
+    <span class="muted" style="font-size:13px">出于安全考虑，这句话不在页面上展示，只把完整内容复制到剪贴板（含 API Key）。</span>
+  </div>
+  <p class="card-sub">MCP 接入命令行（想手动接就复制这条，同样含 Key）</p>
+  <div class="code-block mb" id="home-mcp-block"><pre><code id="home-mcp-cmd">claude mcp add --transport http searchpipe \
+  "{{ request.base_url }}mcp?api_key={{ default_key.key_prefix }}••••••••"</code></pre></div>
+  <div class="row mb" style="gap:10px;flex-wrap:wrap;align-items:center">
+    <button type="button" class="btn btn-sm" id="home-mcp-copy">复制完整接入命令（含 Key）</button>
+    <span class="muted" style="font-size:13px">页面只显示打码链接，复制到的是完整命令。</span>
+  </div>
+  {% else %}
+  <div class="empty">完成邮箱验证后系统会自动生成一把默认 API Key（也可在「<a href="/dashboard/api-keys">API Keys</a>」页手动创建），之后这里会给出可直接复制的接入命令与一句话配置。</div>
+  {% endif %}
   <p class="card-sub">REST API（程序直接调用）</p>
   <div class="code-block" data-copy><pre><code>curl -X POST {{ request.base_url }}search \
   -H "Authorization: Bearer sp-你的密钥" \
@@ -142,6 +153,34 @@ document.getElementById('quick-search').onsubmit=async e=>{
     document.getElementById('q').value=initialQ;
     document.getElementById('quick-search').requestSubmit();
   }
+})();
+
+// 复制完整 MCP 接入命令：命令里的 Key 明文走 /api-keys/reveal 现拉，页面不渲染明文
+(function(){
+  const btn=document.getElementById('home-mcp-copy');
+  if(!btn) return;
+  btn.onclick=async()=>{
+    btn.disabled=true;
+    try{
+      const d=await AIS.api('/api-keys/reveal');
+      AIS.copy('claude mcp add --transport http searchpipe\n  "'+d.mcp_url+'"', btn);
+    }catch(e){ alert(e.message); }
+    finally{ btn.disabled=false; }
+  };
+})();
+
+// 一句话配置：内容（含 Key）不渲染到页面，只按需复制到剪贴板
+(function(){
+  const btn=document.getElementById('home-oneliner-copy');
+  if(!btn) return;
+  btn.onclick=async()=>{
+    btn.disabled=true;
+    try{
+      const d=await AIS.api('/api-keys/reveal');
+      AIS.copy(d.agent_prompt, btn);
+    }catch(e){ alert(e.message); }
+    finally{ btn.disabled=false; }
+  };
 })();
 </script>
 {% endblock %}

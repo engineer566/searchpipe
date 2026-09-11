@@ -57,7 +57,7 @@ docker logs ai-search-app --tail 200 | grep -i reset
 
 - [ ] `curl -s 127.0.0.1:8001/healthz` → 200，`{"status":"ok"}`
 - [ ] 浏览器打开 `/`（落地页）→ 200，h1 含「让你的 AI Agent 联网」
-- [ ] 落地页首屏 → 含 MCP 接入命令（`claude mcp add` 代码块）和「复制配置提示词」按钮
+- [ ] 落地页首屏 → 含 MCP 接入命令（`claude mcp add` 代码块）；匿名访客的副按钮为「登录后一键配置 Agent」（已登录时为「复制一句话配置」，且页面 HTML 不含明文 Key）
 - [ ] 落地页定价区 → 含订阅三档（包月·基础/进阶/旗舰）
 - [ ] 落地页首屏「在线体验」搜索框：未登录提交 → 302 到 `/dashboard/login?next=/dashboard?q=...`，登录后自动回跳并预填触发搜索；已登录提交 → 302 进 `/dashboard?q=...` 自动开始搜索
 - [ ] `curl -s 127.0.0.1:8001/terms` → 200，含「概不退款」「不支持自动续订」条款
@@ -95,6 +95,8 @@ docker logs ai-search-app --tail 200 | grep -i reset
 - [ ] 用日志中的重置链接打开 `/dashboard/reset-password?token=...` → 200，提交新密码 → 302 登录页；用新密码可登录
 - [ ] 同一重置 token 二次使用 → 失效被拒（一次性 token）
 - [ ] 1 分钟内重复提交忘记密码 → 触发 60s 发信冷却提示
+- [ ] 邮箱验证门禁：新注册账号（未点验证链接）调 `POST /search` 与 MCP `tools/call ai_search_search` → 403「请先验证邮箱」；点邮件验证链接后再调 → 正常（admin/owner 豁免）
+- [ ] 邮箱验证通过后 `/api-keys` 立即出现自动生成的「默认 Key」（见第四节默认 API Key 检查点）
 
 ## 三、搜索核心
 
@@ -111,7 +113,14 @@ docker logs ai-search-app --tail 200 | grep -i reset
 
 - [ ] `/dashboard` → 200，含余额/统计卡、「接入你的 Agent」快速上手卡（MCP 命令优先）、快速搜索入口
 - [ ] 快速搜索：提交一次搜索 → 加载态为 spinner +「搜索中…」（**不含任何秒数/时间预期提示**），有结果返回；TTL（默认 300s）内重复相同 query → 秒回（结果缓存命中）
-- [ ] `/dashboard/api-keys` → 200；创建 Key → 弹窗显示完整 MCP 链接（`{APP_BASE_URL}/mcp?api_key=sp-…`），列表行含链接格式；吊销 Key 后该 Key 调 /search 被拒
+- [ ] `/dashboard/api-keys` → 200；创建 Key → 弹窗显示完整 MCP 链接（`{APP_BASE_URL}/mcp?api_key=sp-…`）；吊销 Key 后该 Key 调 /search 被拒
+- [ ] 默认 API Key：新账号完成邮箱验证后 `/api-keys` 即有一把「默认 Key」（`is_default=true`，列表带「默认」标签），无需手动创建；未验证邮箱的账号没有
+- [ ] Key 明文可查看（平时隐藏）：列表 Key 列只显示 `sp-xxxxxxxx…` 打码；点「显示」→ 出明文，再点「隐藏」→ 恢复打码，刷新页面仍为打码；带 sp- Key 调 `GET /api-keys/reveal` → 401（Key 不能读 Key）
+- [ ] MCP 配置卡选 Key：勾选任一有效 Key → MCP 链接随该 Key 切换；链接默认打码，点「显示完整链接」出明文，点「复制 MCP 链接」剪贴板是完整链接
+- [ ] 一句话配置只留复制按钮：`/dashboard/api-keys` 与 `/dashboard` 页面看不到提示词正文，HTML 里也没有 `sp-` 明文 Key；点「复制一句话配置」→ 剪贴板内容含 `{APP_BASE_URL}/mcp?api_key=sp-…`、`sp-…` 与 `/agent-setup/SKILL.md`，粘给 Agent 即可按要求自动配置
+- [ ] 落地页（`/`）匿名访问 → 无「复制一句话配置」按钮、显示「登录后一键配置 Agent」（登录后回到 `/dashboard/api-keys`）；登录态访问 → 有该按钮且页面无明文 Key
+- [ ] 吊销默认 Key → 剩下最新一把自动升为默认（「默认」标签随之移动）；有效 Key 全部吊销后再取配置 → 自动新建一把默认 Key
+- [ ] 迁移 `f0a2b7c4d9e1`（api_keys.key_cipher / is_default）已 upgrade：老 Key 无密文时点「显示」提示「无法查看明文，请吊销后重新创建」而非 500
 - [ ] `/dashboard/usage` → 200，用量统计/日志可见刚产生的搜索记录
 - [ ] `/dashboard/billing` → 200，含充值 4 档（¥10/¥20/¥50/¥100）+ 自定义金额（≤¥100）、订阅 3 档（限时 5 折划线价）、余额与流水
 - [ ] 计费页点击充值/订阅 → 弹出**二次确认弹窗**，确认后才下单

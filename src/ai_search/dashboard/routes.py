@@ -427,6 +427,13 @@ async def dashboard_home(
     from ..billing.service import get_balance
 
     balance = await get_balance(db, user.id)
+
+    # 默认 API Key（history/20260912.txt #4）：邮箱已验证但还没有 Key 的老用户
+    # 首次进控制台即自动补一把，保证「MCP 接入」卡片的复制按钮拿得到 Key。
+    from ..api_keys.service import ensure_default_key
+
+    default_key = await ensure_default_key(db, user.id) if user.email_verified else None
+    await db.commit()
     return render_with_base(
         request,
         "dashboard.html",
@@ -437,6 +444,7 @@ async def dashboard_home(
             "initial_q": q,
             "resend_success": resend_success,
             "resend_cooldown": resend_cooldown,
+            "default_key": default_key,
         },
     )
 
@@ -446,14 +454,29 @@ async def dashboard_api_keys(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> object:
+    """API Keys 管理页：Key 列表（可点击查看明文）+ MCP 配置卡片（选 Key 生成链接）。"""
     user = await _user_from_session(request, db)
     if not user:
         return RedirectResponse(url="/dashboard/login", status_code=status.HTTP_303_SEE_OTHER)
-    from ..api_keys.service import list_keys
+    from ..api_keys.service import ensure_default_key, list_keys, list_valid_keys
 
+    if user.email_verified:
+        await ensure_default_key(db, user.id)
     keys = await list_keys(db, user.id)
+    valid_keys = await list_valid_keys(db, user.id)
+    await db.commit()
+    # list_valid_keys 已把默认 Key 排在最前（is_default desc），故取首位的 id 即可
+    default_key_id = str(valid_keys[0].id) if valid_keys and valid_keys[0].is_default else ""
     return render_with_base(
-        request, "api_keys.html", {"user": user, "keys": keys, "active": "keys"}
+        request,
+        "api_keys.html",
+        {
+            "user": user,
+            "keys": keys,
+            "valid_keys": valid_keys,
+            "default_key_id": default_key_id,
+            "active": "keys",
+        },
     )
 
 

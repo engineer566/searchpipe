@@ -90,6 +90,27 @@ def test_search_empty_query_rejected(client: TestClient, api_key_headers: dict):
     assert resp.status_code == 422
 
 
+def test_search_unverified_user_forbidden(client: TestClient):
+    """邮箱未验证的用户调用 /search 应 403（门禁见 auth/core.require_email_verified）。
+
+    2026-09-12 新增：/search 与 MCP 均要求邮箱已验证（admin/owner 豁免），
+    此处覆盖普通用户未验证的拒绝路径。
+    """
+    email = f"unverified-{uuid.uuid4().hex[:8]}@example.com"
+    resp = client.post(
+        "/auth/register", json={"email": email, "password": "test-pass-1234"}
+    )
+    assert resp.status_code == 201, resp.text
+    jwt = resp.json()["access_token"]
+    resp = client.post(
+        "/search",
+        json={"query": "test", "max_results": 3, "include_answer": False},
+        headers={"Authorization": f"Bearer {jwt}"},
+    )
+    assert resp.status_code == 403, resp.text
+    assert "验证邮箱" in resp.json()["detail"]
+
+
 def test_billing_balance_after_fixture(client: TestClient, auth_headers: dict):
     """注册即送 free_tier_credits，余额应可见且 > 0。"""
     resp = client.get("/billing/balance", headers=auth_headers)

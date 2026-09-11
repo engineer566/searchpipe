@@ -13,12 +13,12 @@
 searchpipe/
 ├── src/ai_search/
 │   ├── main.py               # FastAPI 入口：中间件/路由汇聚 + /search 依赖链 + /healthz + /agent-setup/SKILL.md + 订阅积分过期清理后台任务（279 行；/static no-cache 防旧缓存；私有路径 X-Robots-Tag noindex 中间件 + 浏览器 404 HTML 页；Swagger 在 /api-docs；/search 增加邮箱验证检查）
-│   ├── config.py             # pydantic-settings 全部配置（含 SMTP、OAuth、支付双渠道、审核、限流、充值规则、抓取超时/并发、结果缓存 TTL）（102 行）
+│   ├── config.py             # pydantic-settings 全部配置（含 SMTP、OAuth、支付双渠道、审核、限流、充值规则、抓取超时/并发、结果缓存 TTL、API Key 加密主密钥）（112 行）
 │   ├── schemas.py            # /search 请求/响应模型
 │   ├── mcp_server.py         # FastMCP streamable-http 子应用（/mcp，共用商业管线；鉴权支持 URL ?api_key= / Authorization 头 / 工具参数；增加邮箱验证检查）（225 行）
-│   ├── agent_setup.py        # /agent-setup/SKILL.md 生成：Tavily 式 URL 内嵌 Key 的 MCP 接入指南（172 行）
+│   ├── agent_setup.py        # /agent-setup/SKILL.md 生成（Tavily 式 URL 内嵌 Key 的 MCP 接入指南）+ mcp_url()/build_agent_prompt()（一句话配置，agent_setup.py:180/185）（199 行）
 │   ├── auth/                 # 鉴权：JWT + session cookie + API Key 三通道
-│   │   ├── routes.py         # /auth/*：注册/登录/refresh/忘记密码/重置/邮箱验证/OAuth stub/me（~380 行）
+│   │   ├── routes.py         # /auth/*：注册/登录/refresh/忘记密码/重置/邮箱验证（通过即自动建默认 API Key）/OAuth stub/me（387 行）
 │   │   ├── dependencies.py   # get_current_user 等 DI 依赖（cookie 兜底）（139 行）
 │   │   ├── core.py           # 协议无关鉴权核（resolve_jwt/resolve_api_key/require_email_verified）（111 行）
 │   │   ├── jwt_handler.py    # python-jose HS256 签发/解码（39 行）
@@ -29,18 +29,18 @@ searchpipe/
 │   │   ├── oauth.py          # GitHub/微信 OAuth 客户端（106 行）
 │   │   └── errors.py         # AuthError（17 行）
 │   ├── dashboard/            # 控制台 + 公开站点（Jinja2 SSR + session cookie）
-│   │   ├── routes.py         # 控制台 /dashboard/* 页面（543 行） + 登录/注册/忘记密码表单处理（支持 ?next= 站内回跳）+ 反馈工单页 + 站内信页；/dashboard?q= 预填快速搜索；/dashboard/docs → 301 /docs
+│   │   ├── routes.py         # 控制台 /dashboard/* 页面（566 行） + 登录/注册/忘记密码表单处理（支持 ?next= 站内回跳）+ 反馈工单页 + 站内信页；/dashboard?q= 预填快速搜索；/dashboard/docs → 301 /docs；/dashboard 与 /dashboard/api-keys 对已验证用户惰性补默认 API Key
 │   │   ├── public_pages.py   # 公开可索引页（173 行；2026-09-13 SEO 整改从 routes.py 拆出 + 新增内容页）：/ 落地页 /terms 条款 /docs 开发文档 /mcp-server MCP 接入指南 /pricing 定价 /faq 常见问题
 │   │   ├── seo.py            # SEO 基建（597 行；2026-09-13 新增）：PUBLIC_PAGES 单一事实来源 + robots.txt/sitemap.xml/llms.txt/favicon/og-image 路由 + JSON-LD 构造 + 私有路径判定 + 站长验证 meta
-│   │   ├── templates/        # base(控制台壳)/base_public(公开站点壳，含完整 SEO head)/landing/public_docs/mcp_server/pricing/faq/terms/not_found/login/register/forgot_password/reset_password/dashboard/api_keys/usage/billing/feedback/messages/admin_*（22 个模板；公开页全部 extends base_public.html）
+│   │   ├── templates/        # base(控制台壳)/base_public(公开站点壳，含完整 SEO head)/landing/public_docs/mcp_server/pricing/faq/terms/not_found/login/register/forgot_password/reset_password/dashboard/api_keys/usage/billing/feedback/messages/admin_*（22 个模板；公开页全部 extends base_public.html）；api_keys.html = Key 打码+点击查看 + MCP 配置卡（复选框选 Key / MCP 链接 / 一句话配置只留复制按钮）；dashboard.html 概览卡同款复制按钮 + 打码 MCP 命令
 │   │   └── static/           # app.css（双主题设计系统）+ app.js + favicon.ico/svg、apple-touch-icon.png、icon-512.png、og-image.png、site.webmanifest
 │   ├── db/
 │   │   ├── base.py           # engine/session 工厂 + dispose_engine（44 行）
 │   │   ├── session.py        # get_db 依赖
-│   │   └── models/           # user(含 OAuthAccount)/api_key/billing(Plan/Order 含订阅字段)/credit(含 CreditLot 批次)/subscription/usage/feedback_ticket/site_message(站内信，batch_id 聚合已读统计)
+│   │   └── models/           # user(含 OAuthAccount)/api_key(含 key_cipher 密文与 is_default 默认 Key 标记)/billing(Plan/Order 含订阅字段)/credit(含 CreditLot 批次)/subscription/usage/feedback_ticket/site_message(站内信，batch_id 聚合已读统计)
 │   ├── billing/              # 积分计费：批次化扣费/退款/赠送/过期清理（service 396 行；pipeline 89 行；subscription 订阅/续订/升级到账 142 行）
 │   ├── payments/             # 虎皮椒支付（支付宝/微信双渠道）：catalog/四类下单/回调/状态查询（routes 263 行；service 253 行）
-│   ├── api_keys/             # sp- 前缀 API Key CRUD（service 91 行）
+│   ├── api_keys/             # sp- 前缀 API Key CRUD + 默认 Key + 明文可查看（crypto.py 47 行 Fernet 加解密；service 207 行；routes 180 行，含 /reveal）
 │   ├── usage/                # 用量日志中间件 + 统计/导出（middleware 75 行）
 │   ├── rate_limit/           # Redis ZSET 滑动窗口限流（service 42 行）
 │   ├── moderation/           # 阿里云内容安全（输入/输出审核）（aliyun 109 行）
@@ -74,13 +74,17 @@ searchpipe/
 | 文件 | 行数 | 职责 |
 |------|------|------|
 | `main.py` | 279 | 入口汇聚 + /search 依赖链编排 + /agent-setup/SKILL.md + X-Robots-Tag 中间件 + 404 页（/static 挂 _NoCacheStaticFiles；Swagger 挪到 /api-docs；/search 增加邮箱验证检查） |
-| `auth/routes.py` | ~380 | 注册/登录/refresh/忘记密码/重置密码/邮箱验证/OAuth stub/me |
+| `auth/routes.py` | 387 | 注册/登录/refresh/忘记密码/重置密码/邮箱验证（验证通过即自动生成默认 API Key）/OAuth stub/me |
 | `auth/dependencies.py` | 139 | JWT/API Key/cookie 三通道 DI |
 | `auth/password_reset.py` | 87 | Redis 一次性重置 token（`pwdreset:token:*`）+ 冷却（`pwdreset:cooldown:*`） |
 | `auth/email_verification.py` | ~110 | Redis 一次性验证 token（`verify:token:*`）+ 冷却（`verify:cooldown:*`） |
-| `dashboard/routes.py` | 543 | 控制台 SSR 页面 + 表单登录/注册/密码重置/反馈工单/站内信页（失败重渲染，不裸 4xx；登录/注册支持 ?next= 站内回跳）+ `/dashboard/docs` 301 → `/docs` |
+| `dashboard/routes.py` | 566 | 控制台 SSR 页面 + 表单登录/注册/密码重置/反馈工单/站内信页（失败重渲染，不裸 4xx；登录/注册支持 ?next= 站内回跳）+ `/dashboard/docs` 301 → `/docs` + /dashboard 与 /dashboard/api-keys 对已验证用户惰性补默认 API Key |
 | `dashboard/public_pages.py` | 173 | 公开可索引页：`/` `/terms` `/docs` `/mcp-server` `/pricing` `/faq`（统一走 `base_public.html` 壳 + 注入 canonical/og/JSON-LD） |
 | `dashboard/seo.py` | 597 | SEO 基建：`PUBLIC_PAGES` 单一事实来源、JSON-LD 构造、robots.txt/sitemap.xml/llms.txt/favicon/og-image 路由、`is_private_path()`、站长验证 meta |
+| `api_keys/service.py` | 207 | API Key：创建（key_hash + key_cipher 双写）/列表/吊销（默认 Key 自动顺延）/ensure_default_key/明文解密 |
+| `api_keys/routes.py` | 180 | /api-keys CRUD + GET /api-keys/reveal 与 GET /api-keys/{id}/reveal（返回明文 + MCP 链接 + 一句话配置；仅控制台登录态） |
+| `api_keys/crypto.py` | 47 | key_cipher 的 Fernet 对称加解密（主密钥由 KEY_ENCRYPTION_SECRET / SESSION_COOKIE_SECRET 派生） |
+| `agent_setup.py` | 199 | SKILL.md 生成 + `mcp_url()`（agent_setup.py:180）+ `build_agent_prompt()` 一句话配置渲染（agent_setup.py:185） |
 | `feedback/__init__.py` | 162 | 用户反馈工单：POST/GET /feedback + Redis 频率限制 |
 | `messages/__init__.py` | 134 | 站内信用户侧：GET /messages（列表+未读数）、GET /messages/unread-count、POST /messages/{id}/read（越权 404） |
 | `admin/routes.py` | 660 | 管理端：用户/积分/订单/统计/反馈工单（Accept: text/html 渲染管理页）/站内信（GET/POST /admin/messages，定向+广播）/运营监控 SSR 页（含注册用户列表） |
@@ -94,11 +98,11 @@ searchpipe/
 
 ## 路由速查
 
-**API（JWT/API Key）**：`/auth/register|login|refresh|forgot-password|reset-password|verify-email|resend-verification|me`（auth/routes.py）· `/api-keys` CRUD · `/billing/balance|transactions|plans` · `/payments/catalog|packages|orders|callback` · `/usage|/usage/logs|/usage/export` · `/feedback` 提交/列表 · `/messages` 列表/未读数/标记已读（messages/__init__.py）· `/admin/users|credits|orders|stats|feedback|messages|monitor` · `POST /search`（main.py:197）· `GET /agent-setup/SKILL.md`（main.py:190）
+**API（JWT/API Key）**：`/auth/register|login|refresh|forgot-password|reset-password|verify-email|resend-verification|me`（auth/routes.py）· `/api-keys` CRUD + `GET /api-keys/reveal`（默认 Key 明文）/ `GET /api-keys/{id}/reveal`（指定 Key 明文，返回明文 + MCP 链接 + 一句话配置；仅控制台登录态）· `/billing/balance|transactions|plans` · `/payments/catalog|packages|orders|callback` · `/usage|/usage/logs|/usage/export` · `/feedback` 提交/列表 · `/messages` 列表/未读数/标记已读（messages/__init__.py）· `/admin/users|credits|orders|stats|feedback|messages|monitor` · `POST /search`（main.py:197）· `GET /agent-setup/SKILL.md`（main.py:190）
 
-**公开页（可索引，seo.py + public_pages.py）**：`GET /` 落地页 · `GET /docs` 开发文档 · `GET /mcp-server` MCP 接入指南 · `GET /pricing` 定价 · `GET /faq` 常见问题 · `GET /terms` 服务条款 · `GET /robots.txt` · `GET /sitemap.xml`（application/xml） · `GET /llms.txt` · `GET /favicon.ico|/favicon.svg|/apple-touch-icon.png|/og-image.png`
+**公开页（可索引，seo.py + public_pages.py）**：`GET /` 落地页（hero 已登录给「复制一句话配置」按钮，匿名降级为「登录后一键配置 Agent」跳登录并回跳 `/dashboard/api-keys`） · `GET /docs` 开发文档 · `GET /mcp-server` MCP 接入指南 · `GET /pricing` 定价 · `GET /faq` 常见问题 · `GET /terms` 服务条款 · `GET /robots.txt` · `GET /sitemap.xml`（application/xml） · `GET /llms.txt` · `GET /favicon.ico|/favicon.svg|/apple-touch-icon.png|/og-image.png`
 
-**控制台（session cookie，noindex）**：`/dashboard/login|register|forgot-password|reset-password|logout`（login/register 支持 ?next= 回跳） · `/dashboard[|/api-keys|/usage|/billing|/feedback|/messages]`（/dashboard 支持 ?q= 预填并自动触发快速搜索） · `/dashboard/docs` → 301 `/docs` · Swagger UI 在 `/api-docs`（`/docs` 已被公开文档页占用）
+**控制台（session cookie，noindex）**：`/dashboard/login|register|forgot-password|reset-password|logout`（login/register 支持 ?next= 回跳） · `/dashboard[|/api-keys|/usage|/billing|/feedback|/messages]`（/dashboard 支持 ?q= 预填并自动触发快速搜索；/api-keys 页含 MCP 配置卡：选 Key → MCP 链接 + 一句话配置复制） · `/dashboard/docs` → 301 `/docs` · Swagger UI 在 `/api-docs`（`/docs` 已被公开文档页占用）
 
 ## 按任务跳转表
 
@@ -109,6 +113,7 @@ searchpipe/
 | 改邮箱验证 | `docs/memory/searchpipe-auth-design.md` | `auth/email_verification.py` + `auth/routes.py`（verify-email/resend-verification） |
 | 改控制台页面 | `dashboard/routes.py` 头部 docstring 路由表 | 对应 `dashboard/templates/*.html` |
 | 改公开页/元信息/robots/sitemap | `docs/memory/searchpipe-seo.md`（SEO 不变量） | `dashboard/seo.py` + `dashboard/public_pages.py` + `base_public.html` |
+| 改 API Key（默认 Key／明文可查看／MCP 链接与一句话配置） | `api_keys/service.py` 头部 docstring | `api_keys/crypto.py` + `api_keys/routes.py` + `agent_setup.py` + 模板 `api_keys.html`/`dashboard.html` |
 | 改站内信 | `messages/__init__.py`（用户侧）+ `admin/routes.py` 站内信段（管理端） | `db/models/site_message.py` + 模板 `messages.html`/`admin_messages.html`/`admin_feedback.html` |
 | 改搜索管线 | `core/search_service.py` | `search/orchestrator.py` → `extract/fetcher.py` → `rerank/llm_reranker.py` |
 | 改计费/退款/订阅 | `billing/service.py` 头部 docstring | `billing/subscription.py` + `billing/pipeline.py` + `payments/service.py` |

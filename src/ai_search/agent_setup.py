@@ -32,11 +32,16 @@ SearchPipe 是**远程 MCP Server**：API Key 直接内嵌在 MCP URL 的 `api_k
 
 ## API Key 与 MCP 链接获取步骤
 
-1. 访问 `{base_url}/dashboard/register` 注册账号（注册即送免费额度）。
-2. 登录后进入「API Keys」页面：`{base_url}/dashboard/api-keys`。
-3. 点击「创建」生成 `sp-` 开头的 API Key——创建成功弹窗里会直接给出完整的
-   **MCP 链接**（`{base_url}/mcp?api_key=sp-...`），复制即可。
-4. 把该 MCP 链接配置到客户端（见下方配置示例）。
+**先看用户的提示词**：如果里面已经给出 **MCP 链接**（形如 `{base_url}/mcp?api_key=sp-...`）
+或 **API Key**（`sp-` 开头），直接拿它完成配置，不要再向用户索要凭据，也不要要求用户
+手动操作控制台。只有当提示词里既没有 Key 也没有链接时，才按下面步骤引导：
+
+1. 访问 `{base_url}/dashboard/register` 注册账号（注册即送免费额度）；完成邮箱验证后
+   系统会**自动生成一把默认 API Key**，无需手动创建。
+2. 登录后进入「API Keys」页面：`{base_url}/dashboard/api-keys`——Key 平时打码隐藏，
+   点「显示」查看明文；页面「MCP 配置」卡片可切换 Key，并直接复制 MCP 链接与
+   **一句话配置**（提示词里带上 Key，可直接粘给 Agent 使用）。
+3. 把 MCP 链接配置到客户端（见下方配置示例）。
 
 ## MCP 客户端配置示例
 
@@ -170,3 +175,25 @@ def render_skill_md() -> str:
     settings = get_settings()
     base_url = settings.app_base_url.rstrip("/")
     return SKILL_TEMPLATE.format(base_url=base_url)
+
+
+def mcp_url(base_url: str, api_key: str) -> str:
+    """按站点基址 + API Key 拼 MCP 链接（Key 内嵌 URL，Tavily 式）。"""
+    return f"{base_url.rstrip('/')}/mcp?api_key={api_key}"
+
+
+def build_agent_prompt(base_url: str, api_key: str) -> str:
+    """生成「一句话配置」提示词：直接粘给 AI Agent 即可自动完成 MCP 配置。
+
+    需求（history/20260912.txt #5）：这句话默认带上用户的 API Key 与 MCP 链接，
+    Agent 读到即可一键配置，无需再来回索要凭据。
+    控制台只提供复制按钮、页面不展示内容（见 api_keys.html / dashboard.html），
+    故由服务端（/api-keys/reveal）按登录用户渲染，而不是抄在模板里。
+    """
+    base = base_url.rstrip("/")
+    url = mcp_url(base, api_key)
+    return (
+        f"请阅读 {base}/agent-setup/SKILL.md 并按其中说明帮我配置 SearchPipe 的 MCP 服务，"
+        f"不用再问我任何信息：MCP 链接是 {url}，我的 API Key 是 {api_key}"
+        f"（工具名 ai_search_search）。配置完成后用它搜索「FastAPI 部署最佳实践」验证一次。"
+    )

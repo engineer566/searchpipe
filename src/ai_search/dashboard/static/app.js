@@ -38,7 +38,9 @@
     if (!r.ok) {
       var detail = (data && data.detail) || ('请求失败 (' + r.status + ')');
       if (r.status === 401) { window.location.href = '/dashboard/login'; }
-      throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+      var err = new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+      err.status = r.status;   // 调用方可按状态码分流（如 409 老 Key 无密文）
+      throw err;
     }
     return data;
   }
