@@ -166,13 +166,20 @@ async def catalog(
             )
 
     s = get_settings()
+    try:
+        channels = get_provider().available_channels()
+    except RuntimeError:
+        # provider 配置缺失/未知时 catalog 降级为「支付未开通」（下单时会明确报错），
+        # 不让配置问题打挂整个购买目录
+        logger.warning("支付 provider 不可用，catalog 降级为空渠道: %s", s.payment_provider)
+        channels = []
     return CatalogResponse(
         recharge_plans=recharge,
         subscription_plans=subs,
         credit_price_rate=s.credit_price_rate,
         max_recharge_amount=s.max_recharge_usd,
         currency=s.currency,
-        pay_channels=get_provider().available_channels(),
+        pay_channels=channels,
         subscription=subscription,
     )
 
