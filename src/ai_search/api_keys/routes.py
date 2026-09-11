@@ -57,6 +57,9 @@ class KeyItem(BaseModel):
     name: str
     key_prefix: str
     is_default: bool
+    # 是否可查看明文：可查看功能上线前创建的老 Key 没有 key_cipher 密文，
+    # 前端据此隐藏「显示」按钮并给提示，避免点一下弹 409。
+    viewable: bool
     last_used_at: datetime | None
     revoked_at: datetime | None
     created_at: datetime
@@ -130,6 +133,7 @@ async def list_all(
             name=k.name,
             key_prefix=k.key_prefix,
             is_default=k.is_default,
+            viewable=k.key_cipher is not None,
             last_used_at=k.last_used_at,
             revoked_at=k.revoked_at,
             created_at=k.created_at,

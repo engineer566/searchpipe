@@ -329,3 +329,39 @@ def test_ensure_default_key_is_idempotent(client, sent_mails):
     for _ in range(3):
         assert client.get("/api-keys/reveal", headers=headers).status_code == 200
     assert len(_list_keys(client, jwt)) == before == 1
+
+
+def test_legacy_key_reports_not_viewable(client, sent_mails, monkeypatch):
+    """上线前创建的老 Key（无 key_cipher）→ 列表 viewable=false，前端据此隐藏「显示」。
+
+    用轻量替身注入 list_keys，避免绕开 conftest「夹具不直连 DB」的约束。
+    """
+    import uuid as _uuid
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+
+    import ai_search.api_keys.routes as routes
+
+    email, jwt = _verified_user(client, sent_mails, "legacyview")
+    headers = {"Authorization": f"Bearer {jwt}"}
+
+    legacy = SimpleNamespace(
+        id=_uuid.uuid4(),
+        name="老 Key",
+        key_prefix="sp-LEGACY",
+        is_default=True,
+        key_cipher=None,          # 关键：没有密文
+        last_used_at=None,
+        revoked_at=None,
+        created_at=datetime.now(timezone.utc),
+    )
+    async def _fake_list(db, user_id):
+        return [legacy]
+
+    monkeypatch.setattr(routes, "list_keys", _fake_list)
+    items = client.get("/api-keys", headers=headers).json()
+    assert items[0]["viewable"] is False
+    # 正常新 Key 应 viewable=true（同一接口的对照组）
+    monkeypatch.undo()
+    fresh = client.get("/api-keys", headers=headers).json()
+    assert all(item["viewable"] is True for item in fresh)

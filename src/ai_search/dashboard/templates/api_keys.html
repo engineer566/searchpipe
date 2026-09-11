@@ -22,7 +22,7 @@
   <div class="row" style="flex-wrap:wrap;gap:10px 20px">
     {% for k in valid_keys %}
     <label style="display:flex;gap:6px;align-items:center;font-weight:500">
-      <input type="checkbox" class="mcp-key-pick" value="{{ k.id }}" data-prefix="{{ k.key_prefix }}" style="width:auto"{% if k.is_default %} checked{% endif %}>
+      <input type="checkbox" class="mcp-key-pick" value="{{ k.id }}" data-prefix="{{ k.key_prefix }}" data-viewable="{{ '1' if k.key_cipher else '0' }}" style="width:auto"{% if k.is_default %} checked{% endif %}>
       {{ k.name }}
       <code class="muted">{{ k.key_prefix }}…</code>
       {% if k.is_default %}<span class="tag tag-ok">默认</span>{% endif %}
@@ -61,8 +61,10 @@
           <td style="font-weight:500">{{ k.name }}{% if k.is_default and not k.revoked_at %} <span class="tag tag-ok">默认</span>{% endif %}</td>
           <td>
             <code class="key-cell" data-id="{{ k.id }}" data-mask="{{ k.key_prefix }}…">{{ k.key_prefix }}…</code>
-            {% if not k.revoked_at %}
+            {% if not k.revoked_at and k.viewable %}
             <button class="btn btn-sm key-reveal-btn" data-id="{{ k.id }}" style="margin-left:6px">显示</button>
+            {% elif not k.revoked_at %}
+            <span class="muted" style="font-size:12px;margin-left:6px" title="该 Key 创建于「查看明文」功能上线前，只有 hash 没有密文；如需查看明文请在下方新建一把">不可查看</span>
             {% endif %}
           </td>
           <td class="muted">{{ k.last_used_at.strftime('%Y-%m-%d %H:%M') if k.last_used_at else '—' }}</td>
@@ -161,11 +163,19 @@ document.querySelectorAll('.key-reveal-btn').forEach(b=>{
     render();
   }
 
+  // 拉取失败（典型：老 Key 无密文 → 409）：给出可操作提示，别显示半截状态
+  function loadFailed(e){
+    state.mcp=''; state.prompt='';
+    urlEl.textContent=e.status===409
+      ? '当前选中的 Key 创建于「查看明文」功能上线前，无法生成链接——请勾选其它 Key，或在下方新建一把。'
+      : '加载失败：'+e.message;
+  }
+
   picks.forEach(p=>{
     p.onchange=()=>{
       if(!p.checked){ p.checked=true; return; }
       picks.forEach(o=>{ if(o!==p) o.checked=false; });
-      load(p.value).catch(e=>{ urlEl.textContent='加载失败：'+e.message; });
+      load(p.value).catch(loadFailed);
     };
   });
 
@@ -178,7 +188,7 @@ document.querySelectorAll('.key-reveal-btn').forEach(b=>{
   // ⚠️ app.js 是 defer 加载：内联脚本执行时 AIS 尚未定义，首屏拉取必须等
   // DOMContentLoaded（defer 脚本在它之前跑完），否则首屏 MCP 链接会「加载失败」。
   document.addEventListener('DOMContentLoaded',()=>{
-    load(first.value).catch(e=>{ urlEl.textContent='加载失败：'+e.message; });
+    load(first.value).catch(loadFailed);
   });
 })();
 
