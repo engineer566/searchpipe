@@ -9,6 +9,7 @@
 - 订阅：…0001=档1 ¥9.99/1000 …0002=档2 ¥24.99/3000 …0003=档3 ¥49.99/10000
 """
 
+import re
 import uuid
 
 import pytest
@@ -50,11 +51,32 @@ def fake_provider(monkeypatch):
     return p
 
 
-def _register(client) -> dict:
+@pytest.fixture()
+def sent_mails(monkeypatch) -> list:
+    """捕获邮件（注册验证链接里的 token 要靠它取）。"""
+    from ai_search.utils import mailer
+
+    out: list[dict] = []
+
+    async def fake_send(to: str, subject: str, text: str) -> bool:
+        out.append({"to": to, "subject": subject, "text": text})
+        return True
+
+    monkeypatch.setattr(mailer, "send_mail", fake_send)
+    return out
+
+
+def _register(client, sent_mails) -> dict:
+    """API 注册 + 完成邮箱验证 → 返回认证头（2026-09-12 需求 7：下单需已验证）。"""
     email = f"pay-{uuid.uuid4().hex[:8]}@example.com"
     resp = client.post("/auth/register", json={"email": email, "password": _PW})
     assert resp.status_code == 201, resp.text
-    return {"Authorization": f"Bearer {resp.json()['access_token']}"}
+    headers = {"Authorization": f"Bearer {resp.json()['access_token']}"}
+    m = re.search(r"token=([A-Za-z0-9_\-]+)", sent_mails[-1]["text"])
+    assert m, f"验证邮件里没有 token：{sent_mails[-1]}"
+    resp = client.get(f"/auth/verify-email?token={m.group(1)}", follow_redirects=False)
+    assert resp.status_code == 302
+    return headers
 
 
 def _create_order(client, headers: dict, **body) -> dict:
@@ -102,8 +124,8 @@ def test_catalog_public(client, fake_provider):
 # ---------- 充值 ----------
 
 
-def test_recharge_fixed_plan(client, fake_provider):
-    headers = _register(client)
+def test_recharge_fixed_plan(client, fake_provider, sent_mails):
+    headers = _register(client, sent_mails)
     order = _create_order(
         client, headers, kind="recharge", plan_id=PLAN_R10, pay_channel="alipay"
     )
@@ -125,16 +147,16 @@ def test_recharge_fixed_plan(client, fake_provider):
     assert _balance(client, headers)["balance"] == pytest.approx(1350.0)
 
 
-def test_recharge_custom_amount(client, fake_provider):
-    headers = _register(client)
+def test_recharge_custom_amount(client, fake_provider, sent_mails):
+    headers = _register(client, sent_mails)
     order = _create_order(client, headers, kind="recharge", amount_cents=500)
     assert order["credits"] == "166.67"  # ¥5 ÷ 0.03
     _pay(client, fake_provider, order)
     assert _balance(client, headers)["balance"] == pytest.approx(1166.67)
 
 
-def test_recharge_custom_validation(client, fake_provider):
-    headers = _register(client)
+def test_recharge_custom_validation(client, fake_provider, sent_mails):
+    headers = _register(client, sent_mails)
     # 未给金额
     assert client.post(
         "/payments/orders", json={"kind": "recharge"}, headers=headers
@@ -163,8 +185,8 @@ def test_recharge_custom_validation(client, fake_provider):
     ).status_code == 400
 
 
-def test_pay_channel_wechat(client, fake_provider):
-    headers = _register(client)
+def test_pay_channel_wechat(client, fake_provider, sent_mails):
+    headers = _register(client, sent_mails)
     order = _create_order(
         client, headers, kind="recharge", plan_id=PLAN_R10, pay_channel="wechat"
     )
@@ -194,9 +216,9 @@ def test_wechat_only_catalog(client, wechat_only_provider):
     assert resp.json()["pay_channels"] == ["wechat"]
 
 
-def test_wechat_only_default_channel(client, wechat_only_provider):
+def test_wechat_only_default_channel(client, wechat_only_provider, sent_mails):
     """不传 pay_channel 时自动落到已配置的微信渠道。"""
-    headers = _register(client)
+    headers = _register(client, sent_mails)
     order = _create_order(client, headers, kind="recharge", plan_id=PLAN_R10)
     assert "channel=wechat" in order["pay_url"]
     assert order["pay_channel"] == "wechat"  # 响应携带实际渠道（供前端显示）
@@ -204,9 +226,9 @@ def test_wechat_only_default_channel(client, wechat_only_provider):
     assert _balance(client, headers)["balance"] == pytest.approx(1350.0)
 
 
-def test_wechat_only_rejects_alipay(client, wechat_only_provider):
+def test_wechat_only_rejects_alipay(client, wechat_only_provider, sent_mails):
     """未开通的渠道下单返回 400，且提示可用渠道。"""
-    headers = _register(client)
+    headers = _register(client, sent_mails)
     resp = client.post(
         "/payments/orders",
         json={"kind": "recharge", "plan_id": PLAN_R10, "pay_channel": "alipay"},
@@ -240,8 +262,8 @@ def test_xunhupay_available_channels_by_credentials(monkeypatch):
 # ---------- 订阅 ----------
 
 
-def test_subscribe_flow(client, fake_provider):
-    headers = _register(client)
+def test_subscribe_flow(client, fake_provider, sent_mails):
+    headers = _register(client, sent_mails)
     order = _create_order(
         client, headers, kind="subscribe", plan_id=PLAN_SUB1, pay_channel="alipay"
     )
@@ -269,8 +291,8 @@ def test_subscribe_flow(client, fake_provider):
     assert resp.status_code == 400
 
 
-def test_renew_flow(client, fake_provider):
-    headers = _register(client)
+def test_renew_flow(client, fake_provider, sent_mails):
+    headers = _register(client, sent_mails)
     order = _create_order(client, headers, kind="subscribe", plan_id=PLAN_SUB1)
     _pay(client, fake_provider, order)
     sub1 = client.get("/payments/catalog", headers=headers).json()["subscription"]
@@ -301,8 +323,8 @@ def test_renew_flow(client, fake_provider):
     assert resp.status_code == 400
 
 
-def test_upgrade_flow(client, fake_provider):
-    headers = _register(client)
+def test_upgrade_flow(client, fake_provider, sent_mails):
+    headers = _register(client, sent_mails)
     order = _create_order(client, headers, kind="subscribe", plan_id=PLAN_SUB1)
     _pay(client, fake_provider, order)
 
@@ -319,8 +341,8 @@ def test_upgrade_flow(client, fake_provider):
     assert sub["level"] == 2
 
 
-def test_subscription_rules_rejected(client, fake_provider):
-    headers = _register(client)
+def test_subscription_rules_rejected(client, fake_provider, sent_mails):
+    headers = _register(client, sent_mails)
     # 无订阅时续订/升级被拒
     assert client.post(
         "/payments/orders", json={"kind": "renew", "plan_id": PLAN_SUB1}, headers=headers
@@ -337,3 +359,51 @@ def test_subscription_rules_rejected(client, fake_provider):
     )
     assert resp.status_code == 400
     assert "降级" in resp.json()["detail"]
+
+
+# ---------- 邮箱验证门禁（2026-09-12 需求 7）----------
+
+
+def test_order_requires_email_verified(client, fake_provider):
+    """邮箱未验证的用户不允许下单（充值/订阅/续订/升级均 403）。"""
+    email = f"pay-unverified-{uuid.uuid4().hex[:8]}@example.com"
+    resp = client.post("/auth/register", json={"email": email, "password": _PW})
+    assert resp.status_code == 201, resp.text
+    headers = {"Authorization": f"Bearer {resp.json()['access_token']}"}
+
+    for body in (
+        {"kind": "recharge", "plan_id": PLAN_R10},
+        {"kind": "subscribe", "plan_id": PLAN_SUB1},
+        {"kind": "renew", "plan_id": PLAN_SUB1},
+        {"kind": "upgrade", "plan_id": PLAN_SUB2},
+    ):
+        resp = client.post("/payments/orders", json=body, headers=headers)
+        assert resp.status_code == 403, (body, resp.text)
+        assert "验证邮箱" in resp.json()["detail"]
+
+
+def test_order_ok_after_email_verified(client, fake_provider, sent_mails):
+    """同一用户完成邮箱验证后即可正常下单。"""
+    headers = _register(client, sent_mails)
+    order = _create_order(client, headers, kind="recharge", plan_id=PLAN_R10)
+    assert order["status"] == "pending"
+
+
+def test_billing_page_prompts_unverified_user(client):
+    """未验证用户访问 /dashboard/billing：页面提示先验证邮箱，不放行购买流程。"""
+    email = f"pay-dash-{uuid.uuid4().hex[:8]}@example.com"
+    resp = client.post(
+        "/dashboard/register",
+        data={
+            "email": email,
+            "password": _PW,
+            "password_confirm": _PW,
+            "agree_terms": "on",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    page = client.get("/dashboard/billing")
+    assert page.status_code == 200
+    assert "充值前请先完成邮箱验证" in page.text
+    assert "重发验证邮件" in page.text

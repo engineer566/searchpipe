@@ -17,7 +17,12 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..auth.core import API_KEY_PREFIX, resolve_jwt
+from ..auth.core import (
+    API_KEY_PREFIX,
+    EmailNotVerifiedError,
+    require_email_verified,
+    resolve_jwt,
+)
 from ..auth.dependencies import get_current_user
 from ..auth.errors import AuthError
 from ..auth.session import read_session_cookie
@@ -192,6 +197,11 @@ async def create_order_route(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> CreateOrderResponse:
+    # 邮箱未验证不允许下单（2026-09-12 需求 7：避免财务纠纷；admin/owner 豁免）
+    try:
+        require_email_verified(user)
+    except EmailNotVerifiedError as e:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(e)) from e
     try:
         order, pay_url = await create_order(
             db,
