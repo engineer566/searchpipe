@@ -43,6 +43,11 @@ class Settings(BaseSettings):
     refresh_token_ttl_days: int = 30
     session_cookie_secret: str = "change-me-too"
 
+    # --- API Key 明文可查看（api_keys.key_cipher 的对称加密主密钥）---
+    # 留空则回退 session_cookie_secret 派生。生产建议显式配置并妥善备份：
+    # 换掉该密钥后历史 Key 仍可正常鉴权（鉴权走 argon2 hash），但无法再看明文。
+    key_encryption_secret: str = ""
+
     # --- 商业化后端：积分计费 ---
     free_tier_credits: int = 1000  # 内测免费额度/月
     credit_cost_basic: int = 1     # basic 搜索扣 1
