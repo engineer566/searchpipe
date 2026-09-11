@@ -1,114 +1,114 @@
 {% extends "base_public.html" %}
 {% block content %}
 <div class="page-wrap">
-  <nav class="breadcrumb" aria-label="面包屑">
-    <a href="/">首页</a><span aria-hidden="true">/</span><span>MCP 接入指南</span>
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a href="/">Home</a><span aria-hidden="true">/</span><span>MCP Setup Guide</span>
   </nav>
 
   <div class="page-head">
-    <h1>MCP Server 接入指南：让 Claude Code / Cursor 联网搜索</h1>
-    <p>SearchPipe 是一个远程 MCP Server（streamable-http 传输）：把 MCP 链接填进客户端，你的 Agent 就获得实时联网检索、正文抓取与带引用摘要的能力，不需要本地部署任何服务。</p>
+    <h1>MCP Server Setup: web search for Claude Code / Cursor</h1>
+    <p>SearchPipe is a remote MCP Server (streamable-http transport): paste the MCP link into your client and your agent gains real-time web retrieval, full-text extraction and cited answers — nothing to deploy locally.</p>
   </div>
 
   <div class="prose">
-    <h2>什么是 MCP，为什么要用远程 MCP Server</h2>
-    <p><strong>MCP（Model Context Protocol）</strong>是给 AI 客户端接入外部工具与数据源的开放协议。传统做法是把搜索服务跑在本地（stdio 传输的 MCP Server），需要装依赖、升级版本、管理进程；远程 MCP Server 把这一切放到服务端，客户端只填一个 URL：</p>
+    <h2>What is MCP, and why a remote MCP Server</h2>
+    <p><strong>MCP (Model Context Protocol)</strong> is an open protocol for connecting AI clients to external tools and data sources. The traditional approach runs the search server locally (a stdio MCP server) — you install dependencies, upgrade versions and manage processes yourself. A remote MCP Server moves all of that to our side; the client only needs a URL:</p>
     <ul>
-      <li><strong>零安装</strong>：不用 npm / pip 装包，换机器不用重配。</li>
-      <li><strong>零运维</strong>：检索管线（多引擎聚合、正文抓取、LLM 重排、摘要）由服务端持续迭代。</li>
-      <li><strong>Key 内嵌</strong>：SearchPipe 把 API Key 编在 MCP 链接里（与 Tavily 同款），不支持自定义请求头的客户端也能直接使用。</li>
-      <li><strong>可多端共用</strong>：同一个链接可填进 Claude Code、Cursor、Cline 等多个客户端。</li>
+      <li><strong>Zero install</strong>: no npm/pip packages, no reconfiguration when you switch machines.</li>
+      <li><strong>Zero ops</strong>: the retrieval pipeline (multi-engine aggregation, extraction, LLM reranking, answers) is continuously improved on the server side.</li>
+      <li><strong>Key-in-URL</strong>: SearchPipe embeds the API key in the MCP link (same style as Tavily), so clients without custom-header support work out of the box.</li>
+      <li><strong>Multi-client</strong>: the same link works in Claude Code, Cursor, Cline and more.</li>
     </ul>
 
-    <h2>四步接入</h2>
+    <h2>Setup in four steps</h2>
     <div class="steps" style="margin:18px 0 8px">
       <div class="step-card" id="step-1">
-        <h3>注册并获取 API Key</h3>
-        <p>注册 SearchPipe 账号并完成邮箱验证后，系统会<strong>自动生成一把默认 API Key</strong>；进入控制台「<a href="/dashboard/api-keys">API Keys</a>」页即可查看（平时打码，点「显示」看明文，也可随时再查）。想手动多建几把也可以。</p>
-        <div class="code-block" data-copy><pre><code>sp-你的API密钥</code></pre></div>
+        <h3>Sign up and get an API key</h3>
+        <p>Register a SearchPipe account and verify your email — a <strong>default API key is generated automatically</strong>. Find it under "<a href="/dashboard/api-keys">API Keys</a>" in the console (masked by default; click "Show" to reveal the plaintext, as often as you like). You can create additional keys anytime.</p>
+        <div class="code-block" data-copy><pre><code>sp-YOUR_API_KEY</code></pre></div>
       </div>
       <div class="step-card" id="step-2">
-        <h3>拼接 MCP 链接</h3>
-        <p>把 Key 拼到 <code>/mcp</code> 后面，形成完整地址——这就是客户端要填的 URL：</p>
-        <div class="code-block" data-copy><pre><code>{{ site_url }}/mcp?api_key=sp-你的API密钥</code></pre></div>
+        <h3>Build the MCP link</h3>
+        <p>Append the key to <code>/mcp</code> to form the full URL — this is what the client asks for:</p>
+        <div class="code-block" data-copy><pre><code>{{ site_url }}/mcp?api_key=sp-YOUR_API_KEY</code></pre></div>
       </div>
       <div class="step-card" id="step-3">
-        <h3>写入客户端配置</h3>
-        <p>按下面的客户端示例填入链接（Claude Code 用命令行，Cursor / Cline / VS Code 用 JSON 配置）。</p>
+        <h3>Add it to your client</h3>
+        <p>Follow the per-client examples below (Claude Code uses the CLI; Cursor / Cline / VS Code use a JSON config).</p>
       </div>
       <div class="step-card" id="step-4">
-        <h3>让 Agent 验证一次检索</h3>
-        <p>在对话里让它「用 ai_search_search 查一下今天的新闻」，看到带链接与摘要的结果就说明接入成功。</p>
+        <h3>Have the agent verify a search</h3>
+        <p>In a conversation, ask it to "use ai_search_search to look up today's news" — results with links and snippets confirm the setup worked.</p>
       </div>
     </div>
 
     <h2 id="claude-code">Claude Code</h2>
-    <p>一条命令添加（<code>--transport http</code> 指定远程 HTTP 传输）：</p>
+    <p>One command (<code>--transport http</code> selects the remote HTTP transport):</p>
     <div class="code-block" data-copy><pre><code>claude mcp add --transport http searchpipe \
-  "{{ site_url }}/mcp?api_key=sp-你的API密钥"
+  "{{ site_url }}/mcp?api_key=sp-YOUR_API_KEY"
 
-# 查看已添加的服务
+# List configured servers
 claude mcp list</code></pre></div>
 
     <h2 id="cursor">Cursor / Cline / VS Code</h2>
-    <p>在客户端的 MCP 配置（Cursor 为 <code>~/.cursor/mcp.json</code>，VS Code 为 <code>.vscode/mcp.json</code> 或用户级配置）中添加一个 <code>mcpServers</code> 条目：</p>
+    <p>Add an <code>mcpServers</code> entry to your client's MCP config (Cursor: <code>~/.cursor/mcp.json</code>; VS Code: <code>.vscode/mcp.json</code> or the user-level config):</p>
     <div class="code-block" data-copy><pre><code>{
   "mcpServers": {
     "searchpipe": {
-      "url": "{{ site_url }}/mcp?api_key=sp-你的API密钥"
+      "url": "{{ site_url }}/mcp?api_key=sp-YOUR_API_KEY"
     }
   }
 }</code></pre></div>
-    <p>部分客户端要求声明为远程 HTTP 服务，可写成：</p>
+    <p>Some clients require an explicit remote HTTP declaration:</p>
     <div class="code-block" data-copy><pre><code>{
   "mcpServers": {
     "searchpipe": {
       "type": "http",
       "url": "{{ site_url }}/mcp",
-      "headers": { "Authorization": "Bearer sp-你的API密钥" }
+      "headers": { "Authorization": "Bearer sp-YOUR_API_KEY" }
     }
   }
 }</code></pre></div>
-    <p>支持自定义请求头的客户端建议用 <code>Authorization: Bearer</code> 方式，Key 不会出现在 URL 与日志里。</p>
+    <p>If your client supports custom headers, prefer the <code>Authorization: Bearer</code> style — the key never appears in URLs or logs.</p>
 
-    <h2 id="tool">可用工具与参数</h2>
-    <p>MCP Server 暴露一个工具 <code>ai_search_search</code>，参数与 REST API 的 <code>POST /search</code> 完全一致：</p>
+    <h2 id="tool">Available tools &amp; parameters</h2>
+    <p>The MCP server exposes a single tool, <code>ai_search_search</code>, with parameters identical to the REST API's <code>POST /search</code>:</p>
     <div class="table-wrap mb">
       <table>
-        <thead><tr><th>参数</th><th>类型</th><th>默认</th><th>说明</th></tr></thead>
+        <thead><tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>query</code> <span class="tag tag-err">必填</span></td><td class="muted">string</td><td class="muted">—</td><td>搜索问题或关键词</td></tr>
-          <tr><td><code>max_results</code></td><td class="muted">int</td><td class="muted">5</td><td>返回结果数（1–20）</td></tr>
-          <tr><td><code>include_answer</code></td><td class="muted">bool</td><td class="muted">false</td><td>生成带引用编号的摘要</td></tr>
-          <tr><td><code>include_raw_content</code></td><td class="muted">bool</td><td class="muted">false</td><td>返回抓取的完整正文</td></tr>
-          <tr><td><code>search_depth</code></td><td class="muted">string</td><td class="muted">basic</td><td>basic / advanced，影响扣费</td></tr>
+          <tr><td><code>query</code> <span class="tag tag-err">required</span></td><td class="muted">string</td><td class="muted">—</td><td>Search question or keywords</td></tr>
+          <tr><td><code>max_results</code></td><td class="muted">int</td><td class="muted">5</td><td>Number of results (1–20)</td></tr>
+          <tr><td><code>include_answer</code></td><td class="muted">bool</td><td class="muted">false</td><td>Generate a cited answer</td></tr>
+          <tr><td><code>include_raw_content</code></td><td class="muted">bool</td><td class="muted">false</td><td>Return the full extracted page body</td></tr>
+          <tr><td><code>search_depth</code></td><td class="muted">string</td><td class="muted">basic</td><td>basic / advanced; affects credit cost</td></tr>
         </tbody>
       </table>
     </div>
-    <p>想看字段级的返回结构，见 <a href="/docs#response">开发文档 · 响应结构</a>。</p>
+    <p>For the field-level response shape, see <a href="/docs#response">API docs · Response shape</a>.</p>
 
-    <h2 id="troubleshoot">常见连接问题</h2>
-    <h3>客户端报 406 Not Acceptable</h3>
-    <p>这是 MCP streamable-http 的正常校验：请求头必须同时接受 JSON 与 SSE。用 curl 手工验证时加 <code>-H "Accept: application/json, text/event-stream"</code>；浏览器直接打开 <code>/mcp</code> 报 406 也属正常，不是服务故障。</p>
-    <h3>直接请求 /mcp 被 307 重定向</h3>
-    <p>端点规范路径是 <code>/mcp/</code>（带尾斜杠）。客户端会自动跟随重定向；用 curl 手工调试时加 <code>-L</code> 或直接请求 <code>/mcp/</code>。</p>
-    <h3>提示无效或已吊销的 Key</h3>
-    <p>检查三点：Key 是否以 <code>sp-</code> 开头；是否在控制台被吊销；复制链接时是否把结尾的 <code>sp-…</code> 截断了。Key 泄露时请在控制台立即吊销并重建。</p>
-    <h3>搜索偶尔较慢</h3>
-    <p>冷启动查询会跑完「多引擎检索 → 正文抓取 → LLM 重排」全链路，通常数秒；相同 query 与参数在缓存有效期（默认 300 秒）内毫秒级返回。</p>
+    <h2 id="troubleshoot">Common connection issues</h2>
+    <h3>Client reports 406 Not Acceptable</h3>
+    <p>This is normal streamable-http validation: the request must accept both JSON and SSE. When testing with curl, add <code>-H "Accept: application/json, text/event-stream"</code>; a browser opening <code>/mcp</code> directly and getting 406 is also expected — not a service outage.</p>
+    <h3>Direct requests to /mcp get a 307 redirect</h3>
+    <p>The canonical endpoint is <code>/mcp/</code> (trailing slash). Clients follow redirects automatically; with curl, add <code>-L</code> or request <code>/mcp/</code> directly.</p>
+    <h3>"Invalid or revoked key" errors</h3>
+    <p>Check three things: the key starts with <code>sp-</code>; it hasn't been revoked in the console; and the trailing <code>sp-…</code> wasn't truncated when copying the link. If a key leaks, revoke and recreate it in the console immediately.</p>
+    <h3>Searches occasionally slow</h3>
+    <p>A cold query runs the full "multi-engine retrieval → extraction → LLM reranking" chain and typically takes a few seconds; identical query and parameters within the cache TTL (default 300s) return in milliseconds.</p>
 
-    <h2>相关页面</h2>
+    <h2>Related pages</h2>
     <ul>
-      <li><a href="/docs">开发文档</a>：REST API 参数、示例与错误码</li>
-      <li><a href="/pricing">定价</a>：积分制与订阅规则</li>
-      <li><a href="/faq">常见问题</a>：计费、限流、Key 安全等</li>
+      <li><a href="/docs">API docs</a>: REST parameters, examples and error codes</li>
+      <li><a href="/pricing">Pricing</a>: credit system and plan rules</li>
+      <li><a href="/faq">FAQ</a>: billing, rate limits, key security and more</li>
     </ul>
   </div>
 
   <div class="cta-band" style="margin-top:44px">
-    <h2>三分钟把实时网络接进你的 Agent</h2>
-    <p>注册即送免费额度，复制 MCP 链接即可使用，无需安装任何本地服务。</p>
-    <a href="/dashboard/register" class="btn btn-lg">获取 API Key</a>
+    <h2>Live web search in your agent, in three minutes</h2>
+    <p>Free credits on signup — copy the MCP link and go. Nothing to install locally.</p>
+    <a href="/dashboard/register" class="btn btn-lg">Get an API Key</a>
   </div>
 </div>
 {% endblock %}

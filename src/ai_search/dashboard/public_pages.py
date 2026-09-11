@@ -56,11 +56,11 @@ async def landing(request: Request) -> object:
         _public_context(
             request,
             nav_active="home",
-            page_title="SearchPipe — 让 AI Agent 接入实时网络的搜索 API 与 MCP Server",
+            page_title="SearchPipe — AI Search API & MCP Server for Agents | Tavily Alternative",
             page_description=(
-                "SearchPipe 是为 AI Agent 而生的联网搜索 API 与远程 MCP Server："
-                "一条命令接入 Claude Code、Cursor 等客户端，一次调用完成多引擎检索、正文抓取、"
-                "LLM 重排与摘要，返回带相关性评分的结构化结果。"
+                "SearchPipe is an AI search API and remote MCP server for AI agents: "
+                "one call runs multi-engine retrieval, full-text fetching, LLM reranking and "
+                "summaries. A Tavily alternative that can search the Chinese web."
             ),
             page_keywords=seo.SITE_KEYWORDS,
             canonical=seo.canonical_url("/"),
@@ -72,21 +72,44 @@ async def landing(request: Request) -> object:
 
 @router.get("/terms", response_class=HTMLResponse)
 async def terms_page(request: Request) -> object:
-    """服务条款页（公开可索引）。"""
+    """Terms of Service page (public, indexable)."""
     return render_with_base(
         request,
         "terms.html",
         _public_context(
             request,
             nav_active="terms",
-            page_title="服务条款 · SearchPipe 联网搜索服务",
+            page_title="Terms of Service · SearchPipe AI Search API",
             page_description=(
-                "SearchPipe 服务条款：积分充值与包月订阅规则（充值积分永久有效、"
-                "订阅积分 30 天有效）、账号责任、禁止用途、免责声明与争议解决。"
+                "SearchPipe Terms of Service: credit recharges and monthly subscriptions "
+                "(recharged credits never expire, subscription credits valid 30 days), "
+                "account responsibilities, acceptable use, disclaimers and contact."
             ),
-            page_keywords="SearchPipe 服务条款,积分退款政策,订阅规则,使用规范",
+            page_keywords="SearchPipe terms of service,credits refund policy,subscription rules,acceptable use",
             canonical=seo.canonical_url("/terms"),
             jsonld=seo.terms_ld(),
+        ),
+    )
+
+
+@router.get("/privacy", response_class=HTMLResponse)
+async def privacy_page(request: Request) -> object:
+    """Privacy Policy page (public, indexable)."""
+    return render_with_base(
+        request,
+        "privacy.html",
+        _public_context(
+            request,
+            nav_active="privacy",
+            page_title="Privacy Policy · SearchPipe AI Search API",
+            page_description=(
+                "SearchPipe Privacy Policy: what data we collect (email, API usage logs), "
+                "how payments are handled by our merchant of record, cookie usage, "
+                "third-party processors, data retention and your GDPR rights."
+            ),
+            page_keywords="SearchPipe privacy policy,data collection,GDPR rights,MCP server privacy",
+            canonical=seo.canonical_url("/privacy"),
+            jsonld=seo.privacy_ld(),
         ),
     )
 
@@ -99,12 +122,13 @@ async def public_docs(request: Request) -> object:
         "public_docs.html",
         _public_context(
             request,
-            page_title="开发文档 · SearchPipe 联网搜索 API 与 MCP 接入",
+            page_title="Docs · SearchPipe AI Search API & MCP Integration",
             page_description=(
-                "SearchPipe 开发文档：POST /search 全部参数与响应字段、MCP 一键接入命令，"
-                "以及 curl / Python / JavaScript 调用示例、错误码与限流计费说明。"
+                "SearchPipe docs: full POST /search parameter reference and response schema, "
+                "one-command MCP setup, curl / Python / JavaScript examples, error codes, "
+                "rate limits and billing."
             ),
-            page_keywords="SearchPipe 文档,搜索 API 文档,MCP 接入,POST /search,AI 搜索接口",
+            page_keywords="SearchPipe docs,AI search API reference,MCP integration,POST /search,search API for agents",
             canonical=seo.canonical_url("/docs"),
             jsonld=seo.docs_ld(),
         ),
@@ -119,12 +143,13 @@ async def mcp_server_page(request: Request) -> object:
         "mcp_server.html",
         _public_context(
             request,
-            page_title="MCP Server 接入指南：让 Claude Code / Cursor 联网搜索 · SearchPipe",
+            page_title="MCP Search Server: Add Web Search to Claude Code / Cursor · SearchPipe",
             page_description=(
-                "四步把 SearchPipe 远程 MCP Server（streamable-http）接入 Claude Code、Cursor 等 AI 客户端："
-                "API Key 内嵌在 MCP 链接里，零配置即可获得实时联网搜索、正文抓取与引用摘要能力。"
+                "Connect the SearchPipe remote MCP server (streamable-http) to Claude Code, Cursor "
+                "or any MCP-compatible client in four steps — the API key is embedded in the MCP "
+                "URL, so your agent gets real-time web search with zero extra config."
             ),
-            page_keywords="MCP Server,Claude Code 联网搜索,Cursor MCP 配置,MCP 教程,远程 MCP,streamable-http",
+            page_keywords="MCP search server,Claude Code web search,Cursor MCP config,MCP tutorial,remote MCP,streamable-http",
             canonical=seo.canonical_url("/mcp-server"),
             jsonld=seo.mcp_page_ld(),
         ),
@@ -139,12 +164,13 @@ async def pricing_page(request: Request) -> object:
         "pricing.html",
         _public_context(
             request,
-            page_title="定价：积分充值与包月订阅 · SearchPipe 搜索 API",
+            page_title="Pricing: Credit Recharges & Monthly Subscriptions · SearchPipe",
             page_description=(
-                "SearchPipe 定价：¥0.03 = 1 积分，基础搜索 1 积分/次、高级搜索 2 积分/次，注册即送免费额度；"
-                "支持 ¥10/¥20/¥50/¥100 积分充值（永久有效）与包月订阅（30 天有效，限时 5 折）。"
+                "SearchPipe pricing: $0.005 = 1 credit, basic search 1 credit, advanced search 2 credits, "
+                "free tier 1,000 credits/month. Recharges from $5 (credits never expire) and monthly "
+                "subscriptions from $4.99 (credits valid 30 days)."
             ),
-            page_keywords="AI 搜索 API 价格,搜索 API 计费,MCP Server 价格,积分充值,包月订阅",
+            page_keywords="AI search API pricing,Tavily alternative price,MCP server pricing,credit recharge,subscription",
             canonical=seo.canonical_url("/pricing"),
             jsonld=seo.pricing_page_ld(),
             recharge_tiers=seo.RECHARGE_TIERS,
@@ -162,12 +188,12 @@ async def faq_page(request: Request) -> object:
         "faq.html",
         _public_context(
             request,
-            page_title="常见问题 · SearchPipe 联网搜索 API 与 MCP Server",
+            page_title="FAQ · SearchPipe AI Search API & MCP Server",
             page_description=(
-                "SearchPipe 常见问题：如何接入 MCP、Key 是否安全、计费与积分有效期、"
-                "限流额度、搜索慢的原因、失败是否扣费等，共 12 组问答。"
+                "SearchPipe FAQ: what SearchPipe is, how credits and pricing work, MCP integration, "
+                "API key safety, rate limits, Chinese web coverage, failed-request refunds and more."
             ),
-            page_keywords="SearchPipe 常见问题,MCP 接入问题,搜索 API 计费,积分有效期,限流",
+            page_keywords="SearchPipe FAQ,AI search API questions,MCP integration,credits expiration,rate limit",
             canonical=seo.canonical_url("/faq"),
             jsonld=seo.faq_page_ld(),
             faq_items=seo.FAQ_ITEMS,

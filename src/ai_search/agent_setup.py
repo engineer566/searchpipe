@@ -20,45 +20,49 @@ This skill utilizes the SearchPipe MCP server, providing clean, real-time web se
 
 ## MCP Endpoint
 
-| 项目 | 值 |
-|------|-----|
-| **传输协议** | streamable-http（远程 MCP） |
-| **MCP URL** | `{base_url}/mcp?api_key=sp-你的API密钥` |
-| **工具名** | `ai_search_search` |
+| Item | Value |
+|------|-------|
+| **Transport** | streamable-http (remote MCP) |
+| **MCP URL** | `{base_url}/mcp?api_key=sp-YOUR_API_KEY` |
+| **Tool name** | `ai_search_search` |
 
-SearchPipe 是**远程 MCP Server**：API Key 直接内嵌在 MCP URL 的 `api_key` 参数里
-（与 Tavily 的 `?tavilyApiKey=` 同款），任何支持 streamable-http 的客户端都能直接用，
-不需要自定义请求头。
+SearchPipe is a **remote MCP server**: the API key is embedded directly in the MCP URL via
+the `api_key` parameter (same pattern as Tavily's `?tavilyApiKey=`). Any client that
+supports streamable-http can use it out of the box — no custom request headers required.
 
-## API Key 与 MCP 链接获取步骤
+## How to Obtain an API Key and MCP Link
 
-**先看用户的提示词**：如果里面已经给出 **MCP 链接**（形如 `{base_url}/mcp?api_key=sp-...`）
-或 **API Key**（`sp-` 开头），直接拿它完成配置，不要再向用户索要凭据，也不要要求用户
-手动操作控制台。只有当提示词里既没有 Key 也没有链接时，才按下面步骤引导：
+**Check the user's prompt first**: if it already contains an **MCP link** (in the form
+`{base_url}/mcp?api_key=sp-...`) or an **API key** (starting with `sp-`), use it to
+complete the configuration directly. Do not ask the user for credentials again, and do
+not ask the user to operate the dashboard manually. Only walk through the steps below
+when neither a key nor a link is present in the prompt:
 
-1. 访问 `{base_url}/dashboard/register` 注册账号（注册即送免费额度）；完成邮箱验证后
-   系统会**自动生成一把默认 API Key**，无需手动创建。
-2. 登录后进入「API Keys」页面：`{base_url}/dashboard/api-keys`——Key 平时打码隐藏，
-   点「显示」查看明文；页面「MCP 配置」卡片可切换 Key，并直接复制 MCP 链接与
-   **一句话配置**（提示词里带上 Key，可直接粘给 Agent 使用）。
-3. 把 MCP 链接配置到客户端（见下方配置示例）。
+1. Visit `{base_url}/dashboard/register` to create an account (free credits included
+   upon registration). Once email verification is complete, the system will
+   **automatically generate a default API key** — no manual creation needed.
+2. After logging in, open the "API Keys" page: `{base_url}/dashboard/api-keys` — keys
+   are masked by default; click "Show" to reveal the plaintext. The "MCP Configuration"
+   card on that page lets you switch keys and copy the MCP link or the
+   **one-line setup prompt** (includes the key, ready to paste to your agent).
+3. Configure the MCP link in your client (see the examples below).
 
-## MCP 客户端配置示例
+## MCP Client Configuration Examples
 
 ### Claude Code
 
 ```bash
-claude mcp add --transport http searchpipe "{base_url}/mcp?api_key=sp-你的API密钥"
+claude mcp add --transport http searchpipe "{base_url}/mcp?api_key=sp-YOUR_API_KEY"
 ```
 
-或手工编辑 `.mcp.json`：
+Or edit `.mcp.json` manually:
 
 ```json
 {{
   "mcpServers": {{
     "searchpipe": {{
       "type": "http",
-      "url": "{base_url}/mcp?api_key=sp-你的API密钥"
+      "url": "{base_url}/mcp?api_key=sp-YOUR_API_KEY"
     }}
   }}
 }}
@@ -66,34 +70,35 @@ claude mcp add --transport http searchpipe "{base_url}/mcp?api_key=sp-你的API�
 
 ### Cursor
 
-在 Cursor Settings → MCP 中添加：
+Add the following in Cursor Settings → MCP:
 
 ```json
 {{
   "mcpServers": {{
     "searchpipe": {{
-      "url": "{base_url}/mcp?api_key=sp-你的API密钥"
+      "url": "{base_url}/mcp?api_key=sp-YOUR_API_KEY"
     }}
   }}
 }}
 ```
 
-### 其他支持 streamable-http 的 MCP 客户端
+### Other streamable-http MCP Clients
 
-通用配置格式（URL 内嵌 Key）：
+Generic configuration format (key embedded in URL):
 
 ```json
 {{
   "mcpServers": {{
     "searchpipe": {{
       "transport": "streamable-http",
-      "url": "{base_url}/mcp?api_key=sp-你的API密钥"
+      "url": "{base_url}/mcp?api_key=sp-YOUR_API_KEY"
     }}
   }}
 }}
 ```
 
-如果客户端支持自定义请求头，也可以用 Header 鉴权（与 URL 方式二选一）：
+If the client supports custom request headers, you can also use header-based
+authentication (choose one of the two approaches):
 
 ```json
 {{
@@ -101,72 +106,72 @@ claude mcp add --transport http searchpipe "{base_url}/mcp?api_key=sp-你的API�
     "searchpipe": {{
       "url": "{base_url}/mcp",
       "headers": {{
-        "Authorization": "Bearer sp-你的API密钥"
+        "Authorization": "Bearer sp-YOUR_API_KEY"
       }}
     }}
   }}
 }}
 ```
 
-## 可用工具
+## Available Tools
 
-| 工具 | 描述 |
-|------|------|
-| `ai_search_search` | 网络搜索（聚合多引擎 → 正文抓取 → LLM 重排 → 可选摘要） |
+| Tool | Description |
+|------|-------------|
+| `ai_search_search` | Web search (aggregates multiple engines → fetches page content → LLM reranking → optional AI answer) |
 
-## 参数说明
+## Parameters
 
 ### ai_search_search
 
-| 参数 | 必填 | 默认值 | 说明 |
-|------|------|--------|------|
-| `query` | 是 | - | 搜索查询内容 |
-| `max_results` | 否 | 5 | 最大返回结果数量（1–20） |
-| `include_answer` | 否 | false | 是否生成带引用的 AI 摘要 |
-| `include_raw_content` | 否 | false | 是否返回抓取的完整正文 |
-| `search_depth` | 否 | basic | 搜索深度：`basic`（扣 1 积分）/ `advanced`（扣 2 积分） |
+| Parameter | Required | Default | Description |
+|-----------|----------|---------|-------------|
+| `query` | Yes | - | The search query |
+| `max_results` | No | 5 | Maximum number of results to return (1–20) |
+| `include_answer` | No | false | Whether to generate an AI answer with citations |
+| `include_raw_content` | No | false | Whether to return the full fetched page content |
+| `search_depth` | No | basic | Search depth: `basic` (costs 1 credit) / `advanced` (costs 2 credits) |
 
-## 输出格式
+## Output Format
 
-返回 JSON 格式结构化结果：
+Returns structured results in JSON:
 
 ```json
 {{
-  "query": "搜索内容",
-  "answer": "AI 摘要答案（含引用标注 [0][1]）",
+  "query": "your search query",
+  "answer": "AI-generated answer with citations [0][1]",
   "ai_generated": true,
   "results": [
     {{
       "url": "https://example.com",
-      "title": "页面标题",
-      "content": "正文摘要片段",
+      "title": "Page title",
+      "content": "Content snippet",
       "score": 0.95,
-      "raw_content": "完整正文（仅 include_raw_content=true 时）"
+      "raw_content": "Full page content (only when include_raw_content=true)"
     }}
   ]
 }}
 ```
 
-## 配置验证
+## Verification
 
-配置完成后，向 Agent 发送测试指令：
+After configuration, send a test instruction to the agent:
 
-> 请使用 searchpipe 工具搜索 "FastAPI 部署最佳实践"。
+> Please use the searchpipe tool to search for "FastAPI deployment best practices".
 
-Agent 应能成功调用 `ai_search_search` 并返回结构化搜索结果。
+The agent should successfully call `ai_search_search` and return structured results.
 
-## 故障排查
+## Troubleshooting
 
-| 现象 | 原因 | 解决 |
-|------|------|------|
-| "API Key 无效或已吊销" | Key 不存在或已被删除 | 到控制台重新创建 API Key |
-| "积分不足" | 免费额度用完 | 到 `{base_url}/dashboard/billing` 充值 |
-| "检索源失败" | SearXNG 检索异常 | 已自动退款，可安全重试 |
-| "输入/输出内容违规" | 触发内容审核 | 调整查询内容；输出违规已自动退款 |
+| Symptom | Cause | Solution |
+|---------|-------|----------|
+| "Invalid or revoked API key" | Key does not exist or has been revoked | Create a new API key in the dashboard |
+| "Insufficient credits" | Free credits exhausted | Top up at `{base_url}/dashboard/billing` |
+| "Search backend failure" | SearXNG search backend error | Credits are automatically refunded; safe to retry |
+| "Input/Output content violation" | Content moderation triggered | Rephrase the query; output violations are automatically refunded |
 
 ---
 
-*SearchPipe — 为 AI Agent 而生的联网搜索 · {base_url}*
+*SearchPipe — real-time web search built for AI agents · {base_url}*
 """
 
 
@@ -193,7 +198,9 @@ def build_agent_prompt(base_url: str, api_key: str) -> str:
     base = base_url.rstrip("/")
     url = mcp_url(base, api_key)
     return (
-        f"请阅读 {base}/agent-setup/SKILL.md 并按其中说明帮我配置 SearchPipe 的 MCP 服务，"
-        f"不用再问我任何信息：MCP 链接是 {url}，我的 API Key 是 {api_key}"
-        f"（工具名 ai_search_search）。配置完成后用它搜索「FastAPI 部署最佳实践」验证一次。"
+        f"Please read {base}/agent-setup/SKILL.md and follow the instructions there to "
+        f"configure the SearchPipe MCP server for me — you do not need to ask me for any "
+        f"further information: the MCP URL is {url}, my API key is {api_key} "
+        f"(tool name: ai_search_search). After configuration, verify it by running a "
+        f"search for \"FastAPI deployment best practices\"."
     )

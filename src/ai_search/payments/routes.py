@@ -239,9 +239,10 @@ async def payment_webhook(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """支付平台 webhook（Creem/Dodo）。验签失败 400；暂时性处理失败 500（平台会重试）。"""
-    if provider not in ("creem", "dodo"):
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown payment provider")
+    """支付平台 webhook。验签失败 400；暂时性处理失败 500（平台会重试）。
+
+    provider 路径段对应支付方名（creem/dodo；测试环境为注入的 fake provider 名）。
+    """
     raw_body = await request.body()
     headers = {k.lower(): v for k, v in request.headers.items()}
     try:

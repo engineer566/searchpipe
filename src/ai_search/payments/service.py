@@ -73,10 +73,15 @@ def get_provider() -> PaymentProvider:
 
 
 def get_provider_by_name(name: str) -> PaymentProvider:
-    """webhook 路由按路径里的 provider 名取实例（与当前激活配置无关）。
+    """webhook 路由按路径里的 provider 名取实例。
 
-    避免切换 PAYMENT_PROVIDER 期间旧平台的在途 webhook 无法验签。
+    优先匹配当前激活的 provider 单例（测试注入 FakeProvider 也走这里），
+    否则按名字新建 Creem/Dodo 实例——避免切换 PAYMENT_PROVIDER 期间
+    旧平台的在途 webhook 无法验签。
     """
+    active = get_provider()
+    if active.name == name:
+        return active
     if name == "creem":
         from .creem import CreemProvider
 
