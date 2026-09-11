@@ -295,7 +295,9 @@ def test_api_keys_page_has_mcp_config_picker(client, sent_mails):
     assert "MCP 配置" in text
     assert 'class="mcp-key-pick" value' in text
     assert "checked" in text  # 默认 Key 预勾选
-    assert "key-reveal-btn" in text  # 可点击查看明文
+    # 必须断言渲染出的元素本身：类名只出现在内联 JS 时也会「命中」，测不出模板条件写错
+    assert 'class="btn btn-sm key-reveal-btn"' in text  # 可点击查看明文
+    assert "不可查看" not in text
     assert "显示" in text
     # 页面本身不渲染明文（只渲染前缀掩码）
     keys = _list_keys(client, _login_jwt(client, email))
@@ -365,3 +367,45 @@ def test_legacy_key_reports_not_viewable(client, sent_mails, monkeypatch):
     monkeypatch.undo()
     fresh = client.get("/api-keys", headers=headers).json()
     assert all(item["viewable"] is True for item in fresh)
+
+
+def test_api_keys_page_shows_not_viewable_for_legacy_key(client, sent_mails, monkeypatch):
+    """老 Key（key_cipher 为空）→ 列表渲染灰色「不可查看」，不渲染「显示」按钮。
+
+    模板遍历的是 ORM 对象（不是 API 的 KeyItem），必须按 key_cipher 判定——
+    2026-09-12 生产实测踩过：写成 k.viewable 时条件恒为假，所有 Key 都显示「不可查看」。
+    """
+    import uuid as _uuid
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+
+    from ai_search.api_keys import service as keys_service
+
+    email, _ = _verified_user(client, sent_mails, "legacyui")
+    client.cookies.clear()
+    client.post(
+        "/dashboard/login",
+        data={"email": email, "password": _PW, "agree_terms": "on"},
+        follow_redirects=False,
+    )
+
+    legacy = SimpleNamespace(
+        id=_uuid.uuid4(),
+        name="老 Key",
+        key_prefix="sp-LEGACY",
+        is_default=True,
+        key_cipher=None,          # 关键：没有密文
+        last_used_at=None,
+        revoked_at=None,
+        created_at=datetime.now(timezone.utc),
+    )
+
+    async def _fake_list(db, user_id):
+        return [legacy]
+
+    monkeypatch.setattr(keys_service, "list_keys", _fake_list)
+    page = client.get("/dashboard/api-keys")
+    assert page.status_code == 200
+    text = page.text
+    assert "不可查看" in text
+    assert 'class="btn btn-sm key-reveal-btn"' not in text

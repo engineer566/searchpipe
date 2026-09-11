@@ -61,7 +61,8 @@
           <td style="font-weight:500">{{ k.name }}{% if k.is_default and not k.revoked_at %} <span class="tag tag-ok">默认</span>{% endif %}</td>
           <td>
             <code class="key-cell" data-id="{{ k.id }}" data-mask="{{ k.key_prefix }}…">{{ k.key_prefix }}…</code>
-            {% if not k.revoked_at and k.viewable %}
+            {# 注意：keys 是 ORM 对象（不是 API 的 KeyItem），是否可查看要看 key_cipher 字段 #}
+            {% if not k.revoked_at and k.key_cipher %}
             <button class="btn btn-sm key-reveal-btn" data-id="{{ k.id }}" style="margin-left:6px">显示</button>
             {% elif not k.revoked_at %}
             <span class="muted" style="font-size:12px;margin-left:6px" title="该 Key 创建于「查看明文」功能上线前，只有 hash 没有密文；如需查看明文请在下方新建一把">不可查看</span>
