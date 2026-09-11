@@ -56,25 +56,30 @@ class Settings(BaseSettings):
     # --- 商业化后端：OAuth ---
     oauth_github_client_id: str = ""
     oauth_github_client_secret: str = ""
-    oauth_wechat_app_id: str = ""
-    oauth_wechat_app_secret: str = ""
+    oauth_google_client_id: str = ""
+    oauth_google_client_secret: str = ""
     oauth_redirect_base: str = "http://localhost:8001"  # 回调基址
 
-    # --- 商业化后端：支付（虎皮椒过渡）---
-    # 虎皮椒按渠道各建一个应用：支付宝、微信各一套 appid/appsecret。
-    # 渠道专属配置留空时回退到通用 XUNHUPAY_APPID/APPSECRET（单渠道兼容）。
-    payment_provider: str = "xunhupay"
-    xunhupay_appid: str = ""
-    xunhupay_appsecret: str = ""
-    xunhupay_appid_alipay: str = ""
-    xunhupay_appsecret_alipay: str = ""
-    xunhupay_appid_wechat: str = ""
-    xunhupay_appsecret_wechat: str = ""
-    xunhupay_notify_url: str = ""
+    # --- 商业化后端：支付（MoR 代收：Creem / Dodo Payments）---
+    # 两家都是「托管收银台 redirect + JSON webhook 签名验证」模式，配置切换即可。
+    # 国内版虎皮椒实现已在 archive/china-2026-09 tag 封存。
+    payment_provider: str = "creem"      # creem | dodo
+    creem_api_key: str = ""
+    creem_webhook_secret: str = ""
+    # test 模式用 https://test-api.creem.io
+    creem_api_base: str = "https://api.creem.io"
+    # 自定义金额充值用的「$1/单位」按量 product id（units=美元数）
+    creem_credit_product_id: str = ""
+    dodo_api_key: str = ""
+    dodo_webhook_secret: str = ""
+    # test 模式用 https://test.dodopayments.com
+    dodo_api_base: str = "https://api.dodopayments.com"
+    dodo_credit_product_id: str = ""
 
     # --- 商业化后端：充值/订阅规则 ---
-    credit_yuan_rate: str = "0.03"   # ¥0.03 = 1 积分（自定义充值汇率）
-    max_recharge_yuan: int = 100     # 单笔充值上限
+    currency: str = "USD"                # 全站结算货币
+    credit_price_rate: str = "0.005"     # $0.005 = 1 积分（自定义充值汇率）
+    max_recharge_usd: int = 500          # 单笔充值上限（美元）
 
     # --- 商业化后端：内容审核（合规）---
     moderation_provider: str = "aliyun"
@@ -99,7 +104,6 @@ class Settings(BaseSettings):
     # --- SEO：站长平台验证（留空则不渲染对应 meta 标签）---
     google_site_verification: str = ""   # Google Search Console 的 HTML 标记值（content 内容）
     bing_site_verification: str = ""     # Bing Webmaster Tools 的 msvalidate.01
-    baidu_site_verification: str = ""    # 百度搜索资源平台的 code 值
 
     # --- MCP server（第二协议入口）---
     # True：MCP tool 必须带 sp- API Key、走计费扣积分（对齐 Tavily，方案 A）。
