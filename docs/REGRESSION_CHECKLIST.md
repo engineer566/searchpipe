@@ -130,6 +130,7 @@ docker logs ai-search-app --tail 200 | grep -i reset
 ## 五、支付
 
 - [ ] `curl -s 127.0.0.1:8001/payments/catalog -H "Authorization: Bearer <token>"` → 200，结构含：**充值 4 档**（¥10/¥20/¥50/¥100）+ **订阅 3 档**（现价/原价双价）+ 自定义充值汇率（¥0.03=1 积分）与上限 + **支付宝/微信双渠道**
+- [ ] **下单邮箱验证门禁（2026-09-12 需求 7）**：未验证邮箱的用户 POST /payments/orders → **403**（提示验证邮箱）；已完成验证的用户正常下单；/dashboard/billing 对未验证用户显示「充值前请先完成邮箱验证」横幅与重发验证邮件按钮
 - [ ] **真实下单与回调（虎皮椒）**：⚠️ 需先在测试服 `.env` 配置 `XUNHUPAY_APPID_ALIPAY/APPSECRET_ALIPAY/APPID_WECHAT/APPSECRET_WECHAT/XUNHUPAY_NOTIFY_URL` 真实凭证；**未配置时本节跳过并在执行记录中注明**。配置后：
   - [ ] POST /payments/orders（kind=recharge）→ 返回 order_id + pay_url，订单状态 pending
   - [ ] 真实扫码支付小额 → 回调后订单转 paid，积分按 ¥0.03=1 积分到账（2 位小数），流水有 recharge 记录
