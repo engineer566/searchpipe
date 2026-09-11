@@ -121,7 +121,9 @@ function renderPayChannels(){
   }).join('')||'<span class="muted">暂无可用支付渠道</span>';
 }
 
-(async()=>{
+// 首屏加载需等 AIS 就绪（app.js 是 defer，内联脚本先于它执行）：
+// 包进 DOMContentLoaded（defer 脚本在它之前跑完），否则首屏套餐「加载失败」。
+document.addEventListener('DOMContentLoaded',(async()=>{
   try{
     CATALOG=await AIS.api('/payments/catalog');
     RATE=parseFloat(CATALOG.credit_yuan_rate);
@@ -133,7 +135,7 @@ function renderPayChannels(){
     document.getElementById('plans').innerHTML='<div class="empty" style="grid-column:1/-1">加载失败：'+AIS.esc(e.message)+'</div>';
     document.getElementById('sub-plans').innerHTML='';
   }
-})();
+}));
 
 function priceHtml(p){
   var s='<div class="price">¥'+p.price_yuan.toFixed(2)+'</div>';
