@@ -76,13 +76,13 @@ async def send_verification_email(db: AsyncSession, email: str) -> bool:
         f"/auth/verify-email?token={token}"
     )
     text = (
-        "你好，\n\n"
-        "欢迎注册 SearchPipe！请点击以下链接验证你的邮箱地址：\n\n"
+        "Hello,\n\n"
+        "Welcome to SearchPipe! Please click the link below to verify your email address:\n\n"
         f"{link}\n\n"
-        "链接 24 小时内有效。如果这不是你的操作，请忽略本邮件。\n\n"
-        "—— SearchPipe"
+        "This link is valid for 24 hours. If you did not sign up, please ignore this email.\n\n"
+        "-- SearchPipe"
     )
-    sent = await mailer.send_mail(email, "SearchPipe 邮箱验证", text)
+    sent = await mailer.send_mail(email, "SearchPipe Email Verification", text)
     return sent
 
 
@@ -105,11 +105,12 @@ async def resend_verification_email(db: AsyncSession, user_id: str) -> bool:
         f"/auth/verify-email?token={token}"
     )
     text = (
-        "你好，\n\n"
-        "你请求重新发送 SearchPipe 邮箱验证链接。请点击以下链接验证你的邮箱地址：\n\n"
+        "Hello,\n\n"
+        "You requested a new SearchPipe email verification link. Please click the link below "
+        "to verify your email address:\n\n"
         f"{link}\n\n"
-        "链接 24 小时内有效。如果这不是你的操作，请忽略本邮件。\n\n"
-        "—— SearchPipe"
+        "This link is valid for 24 hours. If you did not request this, please ignore this email.\n\n"
+        "-- SearchPipe"
     )
-    sent = await mailer.send_mail(user.email, "SearchPipe 邮箱验证（重发）", text)
+    sent = await mailer.send_mail(user.email, "SearchPipe Email Verification (Resent)", text)
     return sent

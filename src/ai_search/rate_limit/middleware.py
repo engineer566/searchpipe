@@ -40,7 +40,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             logger.warning("限流触发 identifier=%s path=%s", identifier, request.url.path)
             return JSONResponse(
                 status_code=429,
-                content={"detail": f"请求过于频繁，每分钟限 {settings.rate_limit_rpm} 次"},
+                content={"detail": f"Too many requests, limit is {settings.rate_limit_rpm} per minute"},
                 headers={"Retry-After": str(WINDOW_SEC)},
             )
 

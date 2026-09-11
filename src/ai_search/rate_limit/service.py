@@ -39,4 +39,4 @@ async def check_rate_limit(identifier: str) -> None:
     count = results[1]
     # burst：允许短时突发到 limit + burst
     if count > limit + settings.rate_limit_burst:
-        raise RateLimitExceeded(f"请求过于频繁，每分钟限 {limit} 次")
+        raise RateLimitExceeded(f"Too many requests, limit is {limit} per minute")

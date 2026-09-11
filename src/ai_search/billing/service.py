@@ -40,7 +40,7 @@ class InsufficientCreditsError(Exception):
     def __init__(self, balance: Decimal, required: Decimal) -> None:
         self.balance = balance
         self.required = required
-        super().__init__(f"积分不足：余额 {balance}，需要 {required}")
+        super().__init__(f"Insufficient credits: balance {balance}, required {required}")
 
 
 async def _lock_account(db: AsyncSession, user_id: uuid.UUID) -> CreditAccount:
@@ -102,7 +102,7 @@ async def sweep_expired(
             delta=-total,
             type=CreditTxType.EXPIRE.value,
             balance_after=acc.balance,
-            remark=f"订阅积分到期清零 {total}",
+            remark=f"Subscription credits expired: {total} cleared",
         )
     )
     await db.flush()
@@ -178,7 +178,7 @@ async def deduct_credits(
     """
     amount = _q(amount)
     if amount <= 0:
-        raise ValueError("扣费金额必须为正")
+        raise ValueError("Deduction amount must be positive")
 
     now = datetime.now(timezone.utc)
     await sweep_expired(db, user_id, now=now)
@@ -238,7 +238,7 @@ async def grant_credits(
     """
     amount = _q(amount)
     if amount <= 0:
-        raise ValueError("入账金额必须为正")
+        raise ValueError("Grant amount must be positive")
 
     acc = await _lock_account(db, user_id)
     acc.balance += amount
@@ -288,7 +288,7 @@ async def refund_credits(
     """
     amount = _q(amount)
     if amount <= 0:
-        raise ValueError("退款金额必须为正")
+        raise ValueError("Refund amount must be positive")
 
     now = datetime.now(timezone.utc)
 

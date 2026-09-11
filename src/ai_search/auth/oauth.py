@@ -1,7 +1,8 @@
-"""OAuth 登录 —— GitHub（完整）+ 微信（stub 占位）。
+"""OAuth 登录 —— GitHub + Google。
 
 GitHub：authorize → access_token → /user，建/绑 OAuthAccount。
-微信：待个体工商户后接微信开放平台，当前抛 NotImplementedError。
+Google：authorize → oauth2 token → openid userinfo，建/绑 OAuthAccount。
+国内版微信 stub 已随 archive/china-2026-09 封存删除。
 """
 
 import logging
@@ -83,24 +84,62 @@ class GitHubOAuth:
         )
 
 
-class WeChatOAuth:
-    """微信扫码登录 —— stub。
+class GoogleOAuth:
+    """Google OAuth（OIDC）流程。"""
 
-    接微信开放平台需企业/个体户资质 + 网站应用审核。待个体工商户注册后接入，
-    届时实现 authorize_url / fetch_user（sns/oauth2/access_token + sns/userinfo）。
-    """
+    AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+    TOKEN_URL = "https://oauth2.googleapis.com/token"
+    USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo"
 
     def __init__(self) -> None:
         s = get_settings()
-        self.app_id = s.oauth_wechat_app_id
-        self.app_secret = s.oauth_wechat_app_secret
+        self.client_id = s.oauth_google_client_id
+        self.client_secret = s.oauth_google_client_secret
+        self.redirect_base = s.oauth_redirect_base.rstrip("/")
 
     @property
     def enabled(self) -> bool:
-        return False  # 永久 stub，直至接入
+        return bool(self.client_id and self.client_secret)
 
     def authorize_url(self, state: str) -> str:
-        raise NotImplementedError("微信登录待个体工商户后接入微信开放平台")
+        redirect = f"{self.redirect_base}/auth/oauth/google/callback"
+        return (
+            f"{self.AUTHORIZE_URL}?client_id={self.client_id}"
+            f"&redirect_uri={redirect}&response_type=code"
+            f"&scope=openid%20email%20profile&state={state}"
+        )
 
     async def fetch_user(self, code: str) -> OAuthUserInfo:
-        raise NotImplementedError("微信登录待个体工商户后接入微信开放平台")
+        redirect = f"{self.redirect_base}/auth/oauth/google/callback"
+        async with httpx.AsyncClient(timeout=15) as client:
+            # 1. code → access_token
+            resp = await client.post(
+                self.TOKEN_URL,
+                data={
+                    "client_id": self.client_id,
+                    "client_secret": self.client_secret,
+                    "code": code,
+                    "grant_type": "authorization_code",
+                    "redirect_uri": redirect,
+                },
+            )
+            resp.raise_for_status()
+            token_data = resp.json()
+            access_token = token_data.get("access_token")
+            if not access_token:
+                raise ValueError(f"Google 未返回 access_token: {token_data}")
+
+            # 2. access_token → userinfo
+            resp = await client.get(
+                self.USERINFO_URL,
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+            resp.raise_for_status()
+            u = resp.json()
+
+        return OAuthUserInfo(
+            provider="google",
+            provider_uid=str(u.get("sub")),
+            email=u.get("email"),
+            name=u.get("name"),
+        )

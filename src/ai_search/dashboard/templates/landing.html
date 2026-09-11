@@ -1,53 +1,53 @@
 {% extends "base_public.html" %}
-{% block title %}SearchPipe — 让 AI Agent 接入实时网络的搜索 API 与 MCP Server{% endblock %}
-{% block description %}SearchPipe 是为 AI Agent 而生的联网搜索 API 与远程 MCP Server：一条命令接入 Claude Code、Cursor 等客户端，一次调用完成多引擎检索、正文抓取、LLM 重排与摘要，返回带相关性评分的结构化结果。{% endblock %}
-{% block keywords %}AI搜索API,MCP Server,Claude Code 联网搜索,Cursor MCP 配置,AI Agent 联网,联网搜索 API,实时搜索,搜索接口{% endblock %}
+{% block title %}SearchPipe — Web Search API & MCP Server that put your AI agent online{% endblock %}
+{% block description %}SearchPipe is a web search API and remote MCP Server built for AI agents: one command connects Claude Code, Cursor and other clients; a single call runs multi-engine retrieval, full-text extraction, LLM reranking and summarization, returning structured results with relevance scores.{% endblock %}
+{% block keywords %}AI search API,MCP server,Claude Code web search,Cursor MCP config,AI agent web access,real-time search API,search API for agents{% endblock %}
 {% block canonical %}{{ site_url }}/{% endblock %}
 {% block og_url %}{{ site_url }}/{% endblock %}
 
 {% block content %}
 <header class="hero">
-  <span class="eyebrow">远程 MCP Server · 为 AI Agent 而生 · 开箱即用</span>
-  <h1>让你的 AI Agent 联网</h1>
-  <p class="lead">一条命令接入 Claude Code、Cursor 等 Agent——实时搜索、正文抓取、LLM 重排一次完成，直接返回 Agent 可消费的结构化结果，无需自己维护检索管线。</p>
+  <span class="eyebrow">Remote MCP Server · Built for AI agents · Zero setup</span>
+  <h1>Put your AI agent on the web</h1>
+  <p class="lead">Connect Claude Code, Cursor and other agents with a single command — real-time search, full-text extraction and LLM reranking in one call, returning structured results your agent can consume directly. No search pipeline to maintain.</p>
   <div class="cta-row">
-    <a href="/dashboard/register" class="btn btn-lg">获取 API Key</a>
+    <a href="/dashboard/register" class="btn btn-lg">Get an API Key</a>
     {% if logged_in %}
-    <button type="button" class="btn btn-ghost btn-lg" id="hero-oneliner-copy">复制一句话配置</button>
+    <button type="button" class="btn btn-ghost btn-lg" id="hero-oneliner-copy">Copy one-line setup</button>
     {% else %}
-    <a href="/dashboard/login?next=%2Fdashboard%2Fapi-keys" class="btn btn-ghost btn-lg">登录后一键配置 Agent</a>
+    <a href="/dashboard/login?next=%2Fdashboard%2Fapi-keys" class="btn btn-ghost btn-lg">Sign in to configure your agent</a>
     {% endif %}
   </div>
-  <form class="hero-demo" id="try" action="/dashboard" method="get" aria-label="在线体验">
-    <input type="text" name="q" placeholder="输入问题，体验完整搜索管线（检索→抓取→重排→摘要）" required>
-    <button type="submit" class="btn btn-lg">在线体验</button>
+  <form class="hero-demo" id="try" action="/dashboard" method="get" aria-label="Live demo">
+    <input type="text" name="q" placeholder="Ask a question and try the full pipeline (retrieve → extract → rerank → summarize)" required>
+    <button type="submit" class="btn btn-lg">Try it live</button>
   </form>
   {% if logged_in %}
-  <p class="hero-demo-hint">已登录，提交后进入控制台并自动开始搜索</p>
+  <p class="hero-demo-hint">You're signed in — submitting takes you to the console and starts the search automatically.</p>
   {% else %}
-  <p class="hero-demo-hint">需登录后体验——未登录会先引导注册/登录，完成后自动回到你的搜索</p>
+  <p class="hero-demo-hint">Sign-in required — you'll be guided to register or log in first, then returned to your search.</p>
   {% endif %}
-  <div class="code-block hero-code" data-copy><pre><code># 一条命令，把实时网络搜索装进你的 Agent
+  <div class="code-block hero-code" data-copy><pre><code># One command puts live web search into your agent
 claude mcp add --transport http searchpipe \
-  "{{ site_url }}/mcp?api_key=sp-你的API密钥"</code></pre></div>
+  "{{ site_url }}/mcp?api_key=sp-YOUR_API_KEY"</code></pre></div>
 </header>
 
 <main>
 <section class="section" id="mcp" aria-labelledby="mcp-heading">
   <div class="section-head">
-    <h2 id="mcp-heading">MCP 一键接入</h2>
-    <p>SearchPipe 是远程 MCP Server（streamable-http），API Key 直接内嵌在链接里——任何兼容 MCP 的 Agent 客户端填入即用。</p>
+    <h2 id="mcp-heading">One-command MCP setup</h2>
+    <p>SearchPipe is a remote MCP Server (streamable-http) with the API key embedded in the URL — drop it into any MCP-compatible agent client and it just works.</p>
   </div>
   <div class="grid2" style="align-items:start">
     <div>
       <p class="card-sub" style="margin:0 0 8px">Claude Code</p>
       <div class="code-block mb" data-copy><pre><code>claude mcp add --transport http searchpipe \
-  "{{ site_url }}/mcp?api_key=sp-你的API密钥"</code></pre></div>
-      <p class="card-sub" style="margin:0 0 8px">Cursor / 通用 MCP 客户端</p>
+  "{{ site_url }}/mcp?api_key=sp-YOUR_API_KEY"</code></pre></div>
+      <p class="card-sub" style="margin:0 0 8px">Cursor / generic MCP clients</p>
       <div class="code-block" data-copy><pre><code>{
   "mcpServers": {
     "searchpipe": {
-      "url": "{{ site_url }}/mcp?api_key=sp-你的API密钥"
+      "url": "{{ site_url }}/mcp?api_key=sp-YOUR_API_KEY"
     }
   }
 }</code></pre></div>
@@ -55,54 +55,54 @@ claude mcp add --transport http searchpipe \
     <div class="feature-grid" style="grid-template-columns:1fr">
       <div class="feature">
         <div class="f-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg></div>
-        <h3>URL 内嵌 Key，零配置</h3>
-        <p>Key 编在 MCP 链接里（与 Tavily 同款），不支持自定义请求头的客户端也能直接用。工具名：<code>ai_search_search</code>。</p>
+        <h3>Key-in-URL, zero config</h3>
+        <p>The key is embedded in the MCP link (same style as Tavily), so clients without custom-header support work out of the box. Tool name: <code>ai_search_search</code>.</p>
       </div>
       <div class="feature">
         <div class="f-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="m8 10-2 2 2 2m4 0 2-2-2-2"/></svg></div>
-        <h3>Agent 自服务接入</h3>
-        <p>把一个链接发给你的 AI Agent，它会自动完成全部 MCP 配置：<code>/agent-setup/SKILL.md</code>。</p>
+        <h3>Self-serve for agents</h3>
+        <p>Send the link to your AI agent and it will complete the whole MCP setup by itself: <code>/agent-setup/SKILL.md</code>.</p>
       </div>
       <div class="feature">
         <div class="f-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
-        <h3>生产级护栏</h3>
-        <p>输入/输出内容审核、按次计费、失败自动退款、限流保护——Agent 高频调用也放心。</p>
+        <h3>Production-grade guardrails</h3>
+        <p>Input/output content moderation, per-call billing with automatic refunds on failure, and rate limiting — safe even for high-frequency agent calls.</p>
       </div>
     </div>
   </div>
   <p class="card-sub" style="text-align:center;margin-top:22px">
-    完整的客户端配置、参数与排障说明见 <a href="/mcp-server">MCP 接入指南</a>。
+    Full client configuration, parameters and troubleshooting: <a href="/mcp-server">MCP setup guide</a>.
   </p>
 </section>
 
 <section class="section" id="features" aria-labelledby="features-heading">
   <div class="section-head">
-    <h2 id="features-heading">一个端点，整条管线</h2>
-    <p>Agent 发一个 query，我们在后台跑完搜索、抓取、打分、摘要四步，返回带相关性评分的干净结果。</p>
+    <h2 id="features-heading">One endpoint, the whole pipeline</h2>
+    <p>Your agent sends a single query; we run search, extraction, scoring and summarization in the background, and return clean results ranked by relevance.</p>
   </div>
   <div class="pipeline">
-    <div class="step"><div class="step-no">01</div><h3>多引擎检索</h3><p>聚合多个搜索引擎，自建可控，零第三方 API 费用。</p></div>
-    <div class="step"><div class="step-no">02</div><h3>正文抓取清洗</h3><p>自动抓取 Top-N 页面并提取正文，过滤导航、广告与噪声。</p></div>
-    <div class="step"><div class="step-no">03</div><h3>LLM 重排</h3><p>大模型按查询意图打相关性分（0–1），最相关的结果排在前面。</p></div>
-    <div class="step"><div class="step-no">04</div><h3>AI 摘要</h3><p>可选生成带引用标注的直接答案，为 Agent 提供可直接消费的事实上下文。</p></div>
+    <div class="step"><div class="step-no">01</div><h3>Multi-engine retrieval</h3><p>Aggregates multiple search engines — self-hosted, fully under our control, no third-party search API fees.</p></div>
+    <div class="step"><div class="step-no">02</div><h3>Extraction &amp; cleanup</h3><p>Automatically fetches top-N pages and extracts the article body, filtering out navigation, ads and noise.</p></div>
+    <div class="step"><div class="step-no">03</div><h3>LLM reranking</h3><p>A large model scores relevance (0–1) against the query intent, so the most relevant results come first.</p></div>
+    <div class="step"><div class="step-no">04</div><h3>AI answer</h3><p>Optionally generates a direct answer with citation markers, giving your agent ready-to-consume factual context.</p></div>
   </div>
 </section>
 
 <section class="section" id="api" aria-labelledby="api-heading">
   <div class="section-head">
-    <h2 id="api-heading">为 Agent 设计</h2>
-    <p>一次调用直接拿到带评分的结构化结果，Agent 无需再解析网页；也支持 REST API 直接调用，接入你的自有管线。</p>
+    <h2 id="api-heading">Designed for agents</h2>
+    <p>One call returns structured, scored results — no HTML parsing required. A plain REST API is also available if you want to wire it into your own pipeline.</p>
   </div>
   <div class="grid2" style="align-items:start">
     <div class="code-block" data-copy><pre><code>{
-  "query": "FastAPI 怎么部署",
-  "answer": "FastAPI 可通过 uvicorn 部署，
-    常见做法是配合 gunicorn…[0][2][3]",
+  "query": "How to deploy FastAPI",
+  "answer": "FastAPI is typically served with uvicorn,
+    often behind gunicorn…[0][2][3]",
   "results": [
     {
       "url": "https://…",
       "title": "…",
-      "content": "摘要片段…",
+      "content": "Summary snippet…",
       "score": 0.98
     }
   ]
@@ -110,122 +110,123 @@ claude mcp add --transport http searchpipe \
     <div class="feature-grid" style="grid-template-columns:1fr">
       <div class="feature">
         <div class="f-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg></div>
-        <h3>一次调用，直接可用</h3>
-        <p>不再需要自己拼装搜索 API、爬虫、正文提取和排序模型，把整条数据管线的维护成本交给我们。</p>
+        <h3>One call, ready to use</h3>
+        <p>No more gluing together search APIs, crawlers, extractors and rerankers — hand the whole data pipeline to us.</p>
       </div>
       <div class="feature">
         <div class="f-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>
-        <h3>REST API 同样开放</h3>
-        <p>自建 Agent 框架或后端服务？<code>POST /search</code> 一个端点跑完同样管线，参数与 MCP 工具一致。</p>
+        <h3>Open REST API too</h3>
+        <p>Building your own agent framework or backend service? A single <code>POST /search</code> endpoint runs the same pipeline with identical parameters.</p>
       </div>
     </div>
   </div>
   <p class="card-sub" style="text-align:center;margin-top:22px">
-    参数表、返回字段、错误码与多语言调用示例见 <a href="/docs">开发文档</a>。
+    Parameter reference, response fields, error codes and multi-language examples: <a href="/docs">API docs</a>.
   </p>
 </section>
 
 <section class="section" id="usecases" aria-labelledby="usecases-heading">
   <div class="section-head">
-    <h2 id="usecases-heading">典型使用场景</h2>
-    <p>只要需要「实时、可引用、结构化」的网页事实，SearchPipe 就能替掉你自己维护的检索链路。</p>
+    <h2 id="usecases-heading">Typical use cases</h2>
+    <p>Whenever you need real-time, citable, structured web facts, SearchPipe replaces the retrieval stack you'd otherwise maintain yourself.</p>
   </div>
   <div class="feature-grid">
     <div class="feature">
       <div class="f-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4h16v12H5.2L4 17.2z"/></svg></div>
-      <h3>编码 Agent 查最新文档</h3>
-      <p>框架版本刚升级、文档刚改版时，让 Claude Code / Cursor 直接检索并读取正文，而不是靠训练数据里的旧记忆。</p>
+      <h3>Coding agents, fresh docs</h3>
+      <p>When a framework just shipped a new version or the docs were redesigned, let Claude Code / Cursor search and read the actual pages instead of relying on stale training data.</p>
     </div>
     <div class="feature">
       <div class="f-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3v18h18"/><path d="M7 15v3M12 10v8M17 6v12"/></svg></div>
-      <h3>行业情报与竞品监控</h3>
-      <p>定时跑一组查询，把带评分的正文落地到自有库，用于日报、舆情与价格监控——同 query 命中缓存，成本可控。</p>
+      <h3>Industry intel &amp; competitor monitoring</h3>
+      <p>Run a fixed set of queries on a schedule and land scored article bodies in your own store for digests, sentiment and price tracking — cached hits on repeated queries keep costs predictable.</p>
     </div>
     <div class="feature">
       <div class="f-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div>
-      <h3>客服/问答机器人补事实</h3>
-      <p>用 <code>include_answer</code> 拿到带引用编号的摘要，把「无法回答的时效性问题」变成有出处的答案。</p>
+      <h3>Fact-grounded support bots</h3>
+      <p>Use <code>include_answer</code> to get a cited summary and turn "I can't answer time-sensitive questions" into sourced answers.</p>
     </div>
     <div class="feature">
       <div class="f-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
-      <h3>研究工作流自动化</h3>
-      <p>批量 query 并行检索抓取，省掉自建爬虫与反爬维护；失败自动退款，重跑安全幂等。</p>
+      <h3>Automated research workflows</h3>
+      <p>Batch queries in parallel with automatic extraction — no crawler or anti-bot maintenance on your side; failures are auto-refunded, retries are safe and idempotent.</p>
     </div>
   </div>
 </section>
 
 <section class="section" id="pricing" aria-labelledby="pricing-heading">
   <div class="section-head">
-    <h2 id="pricing-heading">简单透明的积分制</h2>
-    <p>¥0.03 = 1 积分，1 积分 = 1 次请求。注册即送免费额度，先让 Agent 跑通再付费。</p>
+    <h2 id="pricing-heading">Simple, transparent credit pricing</h2>
+    <p>$0.005 = 1 credit, 1 credit = 1 request. Free credits on signup — get your agent running before you pay.</p>
   </div>
   <div class="pricing-grid">
     <div class="price-card">
-      <h3>免费额度</h3>
-      <div class="price">¥0</div>
+      <h3>Free tier</h3>
+      <div class="price">$0</div>
       <ul>
-        <li>注册即送内测积分</li>
-        <li>完整 API 与 MCP 能力</li>
-        <li>适合接入验证</li>
+        <li>1,000 free credits on signup</li>
+        <li>Full API &amp; MCP capabilities</li>
+        <li>Great for integration testing</li>
       </ul>
-      <a href="/dashboard/register" class="btn btn-ghost btn-block">立即注册</a>
+      <a href="/dashboard/register" class="btn btn-ghost btn-block">Sign up now</a>
     </div>
     <div class="price-card featured">
-      <h3>按需充值</h3>
-      <div class="price">积分制</div>
+      <h3>Pay as you go</h3>
+      <div class="price">Credit-based</div>
       <ul>
-        <li>固定档位：¥10=350 / ¥20=700 / ¥50=1800 / ¥100=5000 积分</li>
-        <li>自定义金额（≤¥100）按 ¥0.03=1 积分兑换</li>
-        <li>充值积分永久有效，失败自动退款</li>
+        <li>Fixed tiers: $5 → 1,000 / $10 → 2,100 / $20 → 4,400 credits</li>
+        <li>Custom amount (up to $500) at $0.005 = 1 credit</li>
+        <li>Recharge credits never expire; auto-refund on failure</li>
       </ul>
-      <a href="/dashboard/login" class="btn btn-block">开始充值</a>
+      <a href="/dashboard/login" class="btn btn-block">Recharge now</a>
     </div>
   </div>
 
   <div class="section-head" style="margin-top:48px">
-    <h2>包月订阅 <span class="tag tag-err">限时 5 折</span></h2>
-    <p>订阅积分自到账起 30 天有效；支持手动续订与升级，不支持自动续订与降级。</p>
+    <h2>Monthly plans</h2>
+    <p>Subscription credits are valid for 30 days from grant. Subscriptions are managed by the platform and renew automatically; upgrades are supported anytime.</p>
   </div>
   <div class="pricing-grid">
     <div class="price-card">
-      <h3>包月·基础</h3>
-      <div class="price">¥9.99 <span style="font-size:14px;color:var(--faint);text-decoration:line-through">¥19.99</span></div>
+      <h3>Starter</h3>
+      <div class="price">$4.99<span style="font-size:14px;color:var(--faint)">/mo</span></div>
       <ul>
-        <li>1000 积分 / 30 天</li>
-        <li>到期未用完自动清零</li>
+        <li>1,000 credits / month</li>
+        <li>Unused credits expire at period end</li>
       </ul>
-      <a href="/dashboard/login" class="btn btn-ghost btn-block">订阅</a>
+      <a href="/dashboard/login" class="btn btn-ghost btn-block">Subscribe</a>
     </div>
     <div class="price-card featured">
-      <h3>包月·进阶</h3>
-      <div class="price">¥24.99 <span style="font-size:14px;color:var(--faint);text-decoration:line-through">¥49.99</span></div>
+      <h3>Pro</h3>
+      <div class="price">$9.99<span style="font-size:14px;color:var(--faint)">/mo</span></div>
       <ul>
-        <li>3000 积分 / 30 天</li>
-        <li>到期未用完自动清零</li>
+        <li>3,000 credits / month</li>
+        <li>Unused credits expire at period end</li>
       </ul>
-      <a href="/dashboard/login" class="btn btn-block">订阅</a>
+      <a href="/dashboard/login" class="btn btn-block">Subscribe</a>
     </div>
     <div class="price-card">
-      <h3>包月·旗舰</h3>
-      <div class="price">¥49.99 <span style="font-size:14px;color:var(--faint);text-decoration:line-through">¥99.99</span></div>
+      <h3>Max</h3>
+      <div class="price">$19.99<span style="font-size:14px;color:var(--faint)">/mo</span></div>
       <ul>
-        <li>10000 积分 / 30 天</li>
-        <li>到期未用完自动清零</li>
+        <li>10,000 credits / month</li>
+        <li>Unused credits expire at period end</li>
       </ul>
-      <a href="/dashboard/login" class="btn btn-ghost btn-block">订阅</a>
+      <a href="/dashboard/login" class="btn btn-ghost btn-block">Subscribe</a>
     </div>
   </div>
   <p class="card-sub" style="text-align:center;margin-top:18px">
-    订阅规则：续订积分从下一周期开始生效（不累积到当前周期）；升级需付新档位当前售价全额，
-    新档积分即刻到账并起算 30 天，原档位未用完积分延期至与新档同期；不支持降级与自动续订；
-    积分有效期与售后规则以 <a href="/terms">服务条款</a> 为准。完整价格与规则见 <a href="/pricing">定价页</a>。
+    Subscription rules: renewed credits take effect from the next billing period (they don't stack into the current one);
+    upgrading charges the full current price of the new plan — new-plan credits land immediately with a fresh 30-day window,
+    and unused credits from the old plan are extended to the new period end; downgrades are not supported.
+    Credit validity and refund policies follow the <a href="/terms">Terms of Service</a>. Full pricing and rules: <a href="/pricing">Pricing</a>.
   </p>
 </section>
 
 <section class="section" id="faq" aria-labelledby="faq-heading">
   <div class="section-head">
-    <h2 id="faq-heading">常见问题</h2>
-    <p>接入、计费与结果使用的高频疑问；更完整的问题清单见 <a href="/faq">常见问题页</a>。</p>
+    <h2 id="faq-heading">FAQ</h2>
+    <p>Frequent questions on integration, billing and result usage; the full list lives on the <a href="/faq">FAQ page</a>.</p>
   </div>
   <div class="faq-list" style="max-width:760px;margin:0 auto">
     {% for q, a in faq_items %}
@@ -239,11 +240,11 @@ claude mcp add --transport http searchpipe \
 
 <section class="section">
   <div class="cta-band">
-    <h2>现在就把实时网络接进你的 Agent</h2>
-    <p>注册即送免费额度，一条命令完成 MCP 配置，无需改一行代码。</p>
+    <h2>Put the live web inside your agent, today</h2>
+    <p>Free credits on signup, one command for MCP setup — no code changes required.</p>
     <div class="cta-row" style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
-      <a href="/dashboard/register" class="btn btn-lg">免费开始</a>
-      <a href="/docs" class="btn btn-ghost btn-lg">查看开发文档</a>
+      <a href="/dashboard/register" class="btn btn-lg">Start for free</a>
+      <a href="/docs" class="btn btn-ghost btn-lg">Read the docs</a>
     </div>
   </div>
 </section>
@@ -251,8 +252,9 @@ claude mcp add --transport http searchpipe \
 {% endblock %}
 {% block script %}
 <script>
-// 落地页 hero：「复制一句话配置」——提示词里已带用户的 API Key 与 MCP 链接，
-// 内容不渲染到页面（匿名访客拿不到 Key，按钮降级为跳登录）。
+// Landing hero "Copy one-line setup": the prompt already embeds the user's API key
+// and MCP link. It is never rendered into the page (anonymous visitors have no key;
+// the button falls back to redirecting to the login page).
 (function(){
   const btn=document.getElementById('hero-oneliner-copy');
   if(!btn) return;
@@ -262,10 +264,10 @@ claude mcp add --transport http searchpipe \
       const d=await AIS.api('/api-keys/reveal');
       AIS.copy(d.agent_prompt, btn);
     }catch(e){
-      // 凭据失效（401，AIS.api 已引导去登录页）→ 让用户落到能修的地方：
-      // 登录页回跳 API Keys；其它失败（如老 Key 无密文 409）也同样引导过去，别只弹句话
-      if(e && e.message && !/401|未提供认证凭据/.test(e.message)) alert(e.message);
-      // 已登录直接去控制台换 Key；未登录先过登录页（带回跳）
+      // Credentials invalid (401 — AIS.api already redirects to login) → land the
+      // user somewhere they can fix it: login page bouncing back to API Keys.
+      // Other failures (e.g. legacy key without ciphertext, 409) get the same treatment.
+      if(e && e.message && !/401|credentials/i.test(e.message)) alert(e.message);
       window.location.href='{% if logged_in %}/dashboard/api-keys{% else %}/dashboard/login?next=%2Fdashboard%2Fapi-keys{% endif %}';
     }finally{ btn.disabled=false; }
   };

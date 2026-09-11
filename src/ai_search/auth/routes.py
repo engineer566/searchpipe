@@ -8,8 +8,8 @@
   - POST /auth/reset-password  一次性 token + 新密码 → 重置
   - GET  /auth/oauth/github    跳转 GitHub 授权
   - GET  /auth/oauth/github/callback   GitHub 回调 → 建/绑 OAuthAccount → 签发 JWT
-  - GET  /auth/oauth/wechat    微信扫码（stub，501）
-  - GET  /auth/oauth/wechat/callback   微信回调（stub，501）
+  - GET  /auth/oauth/google    跳转 Google 授权
+  - GET  /auth/oauth/google/callback   Google 回调 → 建/绑 OAuthAccount → 签发 JWT
 """
 
 import logging
@@ -28,7 +28,7 @@ from ..db.models import OAuthAccount, User, UserRole, UserStatus
 from ..db.session import get_db
 from .dependencies import get_current_user
 from .jwt_handler import create_access_token, create_refresh_token, decode_token
-from .oauth import GitHubOAuth, WeChatOAuth
+from .oauth import GitHubOAuth, GoogleOAuth
 from .email_verification import (
     consume_verification_token,
     send_verification_email,
@@ -106,7 +106,7 @@ async def _grant_free_credits(db: AsyncSession, user: User) -> None:
         user_id=user.id,
         amount=settings.free_tier_credits,
         tx_type="grant",
-        remark="内测免费额度",
+        remark="Free tier credits",
     )
 
 
@@ -163,7 +163,7 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)) -> 
         await db.execute(select(User).where(User.email == email))
     ).scalar_one_or_none()
     if existing:
-        raise HTTPException(status.HTTP_409_CONFLICT, "该邮箱已注册")
+        raise HTTPException(status.HTTP_409_CONFLICT, "This email is already registered")
 
     user = User(
         email=email,
@@ -181,7 +181,7 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)) -> 
     except IntegrityError as e:
         # 并发重复注册竞态：唯一索引兜底
         await db.rollback()
-        raise HTTPException(status.HTTP_409_CONFLICT, "该邮箱已注册") from e
+        raise HTTPException(status.HTTP_409_CONFLICT, "This email is already registered") from e
 
     # 发送验证邮件（异步，不阻塞响应；失败不影响注册）
     await send_verification_email(db, email)
@@ -196,9 +196,9 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)) -> TokenR
         await db.execute(select(User).where(User.email == _normalize_email(req.email)))
     ).scalar_one_or_none()
     if not user or not verify_password(req.password, user.password_hash):
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "邮箱或密码错误")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
     if user.status != UserStatus.ACTIVE.value:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "账号已被停用")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "This account has been disabled")
     await _touch_login(db, user)
     await db.commit()
     return _issue_tokens(user)
@@ -209,10 +209,10 @@ async def refresh(req: RefreshRequest, db: AsyncSession = Depends(get_db)) -> To
     """refresh token → 新 access + refresh。"""
     payload = decode_token(req.refresh_token)
     if not payload or payload.get("type") != "refresh":
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "refresh token 无效或已过期")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired refresh token")
     user = await db.get(User, payload["sub"])
     if not user or user.status != UserStatus.ACTIVE.value:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "用户不存在或已停用")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User not found or disabled")
     return _issue_tokens(user)
 
 
@@ -225,7 +225,7 @@ async def forgot_password(
 ) -> dict:
     """忘记密码：存在则发重置邮件。无论邮箱是否注册都返回同一话术（防枚举）。"""
     await request_password_reset(db, req.email)
-    return {"detail": "如该邮箱已注册，重置邮件已发送，请查收（1 小时内有效）"}
+    return {"detail": "If this email is registered, a reset link has been sent (valid for 1 hour)"}
 
 
 @router.post("/reset-password")
@@ -235,16 +235,50 @@ async def reset_password(
     """一次性 token + 新密码 → 重置。token 无效/过期/复用均 400。"""
     user_id = await consume_reset_token(req.token)
     if not user_id:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "重置链接无效或已过期，请重新发起")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Reset link is invalid or expired; please request a new one")
     user = await db.get(User, user_id)
     if not user:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "重置链接无效或已过期，请重新发起")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Reset link is invalid or expired; please request a new one")
     user.password_hash = hash_password(req.new_password)
     await db.commit()
-    return {"detail": "密码已重置，请使用新密码登录"}
+    return {"detail": "Password has been reset; please log in with your new password"}
 
 
-# ---------- GitHub OAuth ----------
+# ---------- OAuth（GitHub / Google）----------
+
+
+async def _oauth_callback(
+    provider: str,
+    oauth: GitHubOAuth | GoogleOAuth,
+    code: str,
+    state: str,
+    db: AsyncSession,
+) -> RedirectResponse:
+    """OAuth 回调通用流程：验 state → 换用户信息 → 建/绑账号 → 签发 JWT → 302 回 dashboard。"""
+    from ..utils.cache import get_cache
+
+    cache = get_cache()
+    if not await cache.exists(f"oauth:state:{provider}:{state}"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid OAuth state")
+    await cache.delete(f"oauth:state:{provider}:{state}")
+
+    try:
+        oauth_user = await oauth.fetch_user(code)
+    except Exception as e:  # noqa: BLE001
+        logger.error("%s OAuth 换取用户信息失败: %s", provider, e)
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY, f"{provider.capitalize()} authorization failed"
+        ) from e
+
+    user = await _get_or_create_user_by_oauth(
+        db, provider, oauth_user.provider_uid, oauth_user.email, oauth_user.name
+    )
+    await _touch_login(db, user)
+    await db.commit()
+
+    token = create_access_token(str(user.id))
+    redirect_base = get_settings().oauth_redirect_base.rstrip("/")
+    return RedirectResponse(url=f"{redirect_base}/dashboard/auth?token={token}")
 
 
 @router.get("/oauth/github")
@@ -252,7 +286,7 @@ async def oauth_github() -> RedirectResponse:
     """跳转到 GitHub 授权页。state 防 CSRF，存 Redis。"""
     gh = GitHubOAuth()
     if not gh.enabled:
-        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "GitHub OAuth 未配置")
+        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "GitHub OAuth is not configured")
     state = secrets.token_urlsafe(16)
     # state 暂存 Redis 供回调校验（TTL 10min）
     from ..utils.cache import get_cache
@@ -268,44 +302,30 @@ async def oauth_github_callback(
     db: AsyncSession = Depends(get_db),
 ) -> RedirectResponse:
     """GitHub 回调 → 换 token → 建/绑账号 → 签发 JWT → 302 带 token 回 dashboard。"""
+    return await _oauth_callback("github", GitHubOAuth(), code, state, db)
+
+
+@router.get("/oauth/google")
+async def oauth_google() -> RedirectResponse:
+    """跳转到 Google 授权页。state 防 CSRF，存 Redis。"""
+    gg = GoogleOAuth()
+    if not gg.enabled:
+        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "Google OAuth is not configured")
+    state = secrets.token_urlsafe(16)
     from ..utils.cache import get_cache
 
-    cache = get_cache()
-    if not await cache.exists(f"oauth:state:github:{state}"):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "state 校验失败")
-    await cache.delete(f"oauth:state:github:{state}")
-
-    gh = GitHubOAuth()
-    try:
-        oauth_user = await gh.fetch_user(code)
-    except Exception as e:  # noqa: BLE001
-        logger.error("GitHub OAuth 换取用户信息失败: %s", e)
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "GitHub 授权失败") from e
-
-    user = await _get_or_create_user_by_oauth(
-        db, "github", oauth_user.provider_uid, oauth_user.email, oauth_user.name
-    )
-    await _touch_login(db, user)
-    await db.commit()
-
-    token = create_access_token(str(user.id))
-    redirect_base = get_settings().oauth_redirect_base.rstrip("/")
-    return RedirectResponse(url=f"{redirect_base}/dashboard/auth?token={token}")
+    await get_cache().set(f"oauth:state:google:{state}", "1", ttl=600)
+    return RedirectResponse(url=gg.authorize_url(state))
 
 
-# ---------- 微信 OAuth（stub）----------
-
-
-@router.get("/oauth/wechat")
-async def oauth_wechat() -> dict:
-    """微信扫码登录 —— 待个体工商户后接微信开放平台。"""
-    raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "微信登录待个体工商户后接入微信开放平台")
-
-
-@router.get("/oauth/wechat/callback")
-async def oauth_wechat_callback() -> dict:
-    """微信回调 —— stub。"""
-    raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "微信登录待个体工商户后接入微信开放平台")
+@router.get("/oauth/google/callback")
+async def oauth_google_callback(
+    code: str = Query(...),
+    state: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+) -> RedirectResponse:
+    """Google 回调 → 换 token → 建/绑账号 → 签发 JWT → 302 带 token 回 dashboard。"""
+    return await _oauth_callback("google", GoogleOAuth(), code, state, db)
 
 
 # ---------- 邮箱验证 ----------
@@ -363,13 +383,13 @@ async def resend_verification(
     from .email_verification import resend_verification_email
 
     if user.email_verified:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "邮箱已验证")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Email is already verified")
 
     sent = await resend_verification_email(db, str(user.id))
     if not sent:
-        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "发送过于频繁，请稍后再试")
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Sending too frequently; please try again later")
 
-    return {"detail": "验证邮件已重新发送，请查收"}
+    return {"detail": "Verification email resent; please check your inbox"}
 
 
 # ---------- 当前用户 ----------

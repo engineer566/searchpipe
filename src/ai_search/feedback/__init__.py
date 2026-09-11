@@ -38,7 +38,7 @@ class CreateFeedbackRequest(BaseModel):
     def _check_category(cls, v: str) -> str:
         allowed = {e.value for e in TicketCategory}
         if v not in allowed:
-            raise ValueError(f"非法 category，可选: {', '.join(sorted(allowed))}")
+            raise ValueError(f"Invalid category, allowed values: {', '.join(sorted(allowed))}")
         return v
 
     @field_validator("subject")
@@ -46,9 +46,9 @@ class CreateFeedbackRequest(BaseModel):
     def _check_subject(cls, v: str) -> str:
         v = v.strip()
         if not v:
-            raise ValueError("subject 不能为空")
+            raise ValueError("subject must not be empty")
         if len(v) > 255:
-            raise ValueError("subject 最长 255 字符")
+            raise ValueError("subject must be at most 255 characters")
         return v
 
     @field_validator("content")
@@ -56,9 +56,9 @@ class CreateFeedbackRequest(BaseModel):
     def _check_content(cls, v: str) -> str:
         v = v.strip()
         if not v:
-            raise ValueError("content 不能为空")
+            raise ValueError("content must not be empty")
         if len(v) > 5000:
-            raise ValueError("content 最长 5000 字符")
+            raise ValueError("content must be at most 5000 characters")
         return v
 
 
@@ -90,7 +90,7 @@ async def _check_feedback_rate_limit(user_id: uuid.UUID) -> None:
     if exists:
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,
-            f"提交过于频繁，请 {_FEEDBACK_COOLDOWN_SEC} 秒后再试",
+            f"Too many submissions, please try again in {_FEEDBACK_COOLDOWN_SEC} seconds",
         )
     await cache.set(key, "1", ttl=_FEEDBACK_COOLDOWN_SEC)
 
@@ -117,7 +117,7 @@ async def create_feedback(
     )
     db.add(ticket)
     await db.commit()
-    return {"id": str(ticket.id), "msg": "工单已提交"}
+    return {"id": str(ticket.id), "msg": "Ticket submitted"}
 
 
 @router.get("", response_model=FeedbackListResponse)

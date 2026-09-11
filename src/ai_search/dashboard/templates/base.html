@@ -1,15 +1,15 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{% block title %}SearchPipe 控制台{% endblock %}</title>
-<meta name="description" content="{% block description %}SearchPipe — 为 AI Agent 而生的联网搜索 API 与远程 MCP Server，一次调用完成检索、抓取、重排与摘要。{% endblock %}">
-<!-- 控制台页面全部属于「需登录」区域：不进索引（X-Robots-Tag 由服务端中间件兜底） -->
+<title>{% block title %}SearchPipe Console{% endblock %}</title>
+<meta name="description" content="{% block description %}SearchPipe — a web search API and remote MCP Server built for AI agents: retrieval, extraction, reranking and summarization in a single call.{% endblock %}">
+<!-- All console pages require login and are excluded from indexing (X-Robots-Tag is enforced by server middleware) -->
 <meta name="robots" content="{% block robots %}noindex, nofollow{% endblock %}">
 <link rel="canonical" href="{% block canonical %}{{ base_url }}{{ request.url.path }}{% endblock %}">
 <meta property="og:site_name" content="SearchPipe">
-<meta property="og:locale" content="zh_CN">
+<meta property="og:locale" content="en_US">
 <meta property="og:title" content="{% block og_title %}{{ self.title() }}{% endblock %}">
 <meta property="og:description" content="{% block og_description %}{{ self.description() }}{% endblock %}">
 <meta property="og:type" content="{% block og_type %}website{% endblock %}">
@@ -28,7 +28,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="theme-color" content="#4f46e5">
 <script>
-// 防主题闪烁：渲染前决定主题
+// Prevent theme flash: pick theme before first paint
 (function(){try{var t=localStorage.getItem('searchpipe-theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
 </script>
 <link rel="stylesheet" href="/static/app.css?v=20260914">
@@ -41,45 +41,45 @@
     <nav class="side-nav">
       <a href="/dashboard" class="{% if active=='home' %}active{% endif %}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/></svg>
-        概览</a>
+        Overview</a>
       <a href="/dashboard/api-keys" class="{% if active=='keys' %}active{% endif %}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="m11 12 9-9"/><path d="m16 5 3 3"/></svg>
         API Keys</a>
       <a href="/dashboard/usage" class="{% if active=='usage' %}active{% endif %}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15v3M12 10v8M17 6v12"/></svg>
-        用量</a>
+        Usage</a>
       <a href="/dashboard/billing" class="{% if active=='billing' %}active{% endif %}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
-        充值</a>
+        Billing</a>
       <a href="/docs" class="{% if active=='docs' %}active{% endif %}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-        文档</a>
+        Docs</a>
       <a href="/dashboard/feedback" class="{% if active=='feedback' %}active{% endif %}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        反馈</a>
+        Feedback</a>
       <a href="/dashboard/messages" class="{% if active=='messages' %}active{% endif %}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path d="m22 6-10 7L2 6"/></svg>
-        消息<span class="tag tag-warn" id="nav-msg-badge" style="display:none;margin-left:4px"></span></a>
+        Messages<span class="tag tag-warn" id="nav-msg-badge" style="display:none;margin-left:4px"></span></a>
     </nav>
     <div class="side-foot">
       <button class="theme-toggle" type="button"><span class="tt-icon"></span><span class="tt-label"></span></button>
       <div class="side-user" title="{{ user.email or user.phone }}">{{ user.email or user.phone }}</div>
-      <a href="/dashboard/logout" class="muted" style="padding:0 12px;font-size:13px">退出登录</a>
+      <a href="/dashboard/logout" class="muted" style="padding:0 12px;font-size:13px">Sign out</a>
     </div>
   </aside>
 
   <div class="topbar">
     <span class="brand"><svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M2.5 12h8.5" stroke-width="4.4"/><path d="M4.5 9.7v4.6M7.5 9.7v4.6" stroke-width="1.6"/><circle cx="15.8" cy="12" r="5.6"/></svg>SearchPipe</span>
-    <a href="/dashboard" class="{% if active=='home' %}active{% endif %}">概览</a>
+    <a href="/dashboard" class="{% if active=='home' %}active{% endif %}">Overview</a>
     <a href="/dashboard/api-keys" class="{% if active=='keys' %}active{% endif %}">Keys</a>
-    <a href="/dashboard/usage" class="{% if active=='usage' %}active{% endif %}">用量</a>
-    <a href="/dashboard/billing" class="{% if active=='billing' %}active{% endif %}">充值</a>
-    <a href="/docs" class="{% if active=='docs' %}active{% endif %}">文档</a>
-    <a href="/dashboard/feedback" class="{% if active=='feedback' %}active{% endif %}">反馈</a>
-    <a href="/dashboard/messages" class="{% if active=='messages' %}active{% endif %}">消息<span class="tag tag-warn" id="nav-msg-badge-top" style="display:none;margin-left:2px"></span></a>
+    <a href="/dashboard/usage" class="{% if active=='usage' %}active{% endif %}">Usage</a>
+    <a href="/dashboard/billing" class="{% if active=='billing' %}active{% endif %}">Billing</a>
+    <a href="/docs" class="{% if active=='docs' %}active{% endif %}">Docs</a>
+    <a href="/dashboard/feedback" class="{% if active=='feedback' %}active{% endif %}">Feedback</a>
+    <a href="/dashboard/messages" class="{% if active=='messages' %}active{% endif %}">Messages<span class="tag tag-warn" id="nav-msg-badge-top" style="display:none;margin-left:2px"></span></a>
     <span style="flex:1"></span>
     <button class="theme-toggle" type="button" style="width:auto;padding:5px 10px"><span class="tt-icon"></span></button>
-    <a href="/dashboard/logout">退出</a>
+    <a href="/dashboard/logout">Sign out</a>
   </div>
 
   <main class="main">
@@ -90,7 +90,7 @@
 </div>
 <script src="/static/app.js?v=20260913" defer></script>
 <script>
-// 站内信未读角标（轻量拉取，失败静默；页面加载与消息页标记已读后刷新）
+// Unread site-message badge (lightweight poll; silent on failure; refreshed after marking read)
 (function(){
   function setBadges(n){
     ['nav-msg-badge','nav-msg-badge-top'].forEach(function(id){

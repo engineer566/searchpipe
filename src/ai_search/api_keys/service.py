@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 KEY_PREFIX = "sp-"
 KEY_RANDOM_LEN = 32
 PREFIX_DISPLAY_LEN = 8  # 明文展示前 8 位（含 sp-）
-DEFAULT_KEY_NAME = "默认 Key"  # 邮箱验证后自动生成的 Key 名称
+DEFAULT_KEY_NAME = "Default Key"  # 邮箱验证后自动生成的 Key 名称
 
 
 def _generate_raw_key() -> str:

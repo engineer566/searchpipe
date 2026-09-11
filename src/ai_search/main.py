@@ -245,7 +245,7 @@ async def search(
             await db.rollback()
             raise HTTPException(
                 status.HTTP_402_PAYMENT_REQUIRED,
-                f"积分不足：余额 {e.balance}，本次需要 {e.required}",
+                f"Insufficient credits: balance {e.balance}, this call requires {e.required}",
             ) from e
         except Exception:
             await db.rollback()
@@ -260,7 +260,7 @@ async def search(
         async with async_session_factory() as db:
             await refund_search(request, db)
             await db.commit()
-        raise HTTPException(status_code=502, detail=f"检索源失败: {e}") from e
+        raise HTTPException(status_code=502, detail=f"Search backend failure: {e}") from e
 
     # 5. 输出审核 + AI 标识（深度合成规定第16-17条）
     if resp.answer:
@@ -272,7 +272,7 @@ async def search(
                 await refund_search(request, db)
                 await db.commit()
             raise HTTPException(
-                status.HTTP_400_BAD_REQUEST, f"输出内容违规: {e.labels}"
+                status.HTTP_400_BAD_REQUEST, f"Output content violation: {e.labels}"
             ) from e
         resp.ai_generated = True
 

@@ -8,6 +8,8 @@
 - GET /mcp-server  MCP Server 接入指南（Claude Code / Cursor / 通用客户端 + 排障）
 - GET /pricing     定价（免费额度 / 充值 / 包月订阅）
 - GET /faq         常见问题
+- GET /terms       Terms of Service
+- GET /privacy     Privacy Policy
 
 页面模板统一 extends `base_public.html`（公开站点壳：顶部导航 + 页脚内链 + 完整 SEO 元信息），
 并且在服务端渲染前注入 canonical / og / JSON-LD，保证爬虫拿到的是首屏就有内容的 HTML。

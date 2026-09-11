@@ -25,23 +25,25 @@ _STATIC_DIR = Path(__file__).parent / "static"
 # ---------- 站点常量 ----------
 
 SITE_NAME = "SearchPipe"
-SITE_TAGLINE = "让你的 AI Agent 联网"
-SITE_ONE_LINER = "面向 AI Agent 的联网搜索 API 与远程 MCP Server"
+SITE_TAGLINE = "AI search API for agents that can read the Chinese web"
+SITE_ONE_LINER = "AI search API and remote MCP server for AI agents"
 SITE_DESCRIPTION = (
-    "SearchPipe 是为 AI Agent 而生的联网搜索 API 与远程 MCP Server："
-    "一条命令接入 Claude Code、Cursor 等 Agent，一次调用完成多引擎检索、正文抓取、"
-    "LLM 重排与摘要，返回带相关性评分的结构化结果。"
+    "SearchPipe is an AI search API and remote MCP server built for AI agents: "
+    "one call runs multi-engine retrieval, full-text fetching, LLM reranking and "
+    "optional summarization, returning structured results with relevance scores. "
+    "A Tavily alternative that can search the Chinese web."
 )
 SITE_KEYWORDS = (
-    "AI搜索API,MCP Server,Claude Code 联网搜索,Cursor MCP 配置,"
-    "AI Agent 联网,联网搜索 API,大模型联网,搜索 API,实时搜索"
+    "AI search API,Tavily alternative,MCP search server,search API for agents,"
+    "web search API,Chinese web search,AI agent search,real-time search API,"
+    "search MCP server,Claude Code search"
 )
 OG_IMAGE_PATH = "/static/og-image.png"
 OG_IMAGE_WIDTH = 1200
 OG_IMAGE_HEIGHT = 630
 
 # 内容最后更新日（改公开页文案时同步 bump，用于 sitemap lastmod）
-SITE_LAST_MODIFIED = "2026-09-13"
+SITE_LAST_MODIFIED = "2026-09-14"
 
 # 可索引公开页：(路径, sitemap 权重, 更新频率)
 PUBLIC_PAGES: tuple[tuple[str, str, str], ...] = (
@@ -51,6 +53,7 @@ PUBLIC_PAGES: tuple[tuple[str, str, str], ...] = (
     ("/pricing", "0.8", "weekly"),
     ("/faq", "0.7", "monthly"),
     ("/terms", "0.3", "yearly"),
+    ("/privacy", "0.3", "yearly"),
 )
 
 # robots.txt / X-Robots-Tag 共用：需屏蔽的私有路径前缀
@@ -86,13 +89,15 @@ def is_private_path(path: str) -> bool:
     return False
 
 # 定价（与 landing.html / pricing.html 展示价保持一致，测试会交叉校验）
-RECHARGE_TIERS = (("¥10", "350 积分"), ("¥20", "700 积分"), ("¥50", "1800 积分"), ("¥100", "5000 积分"))
+# 出海定价（USD）：充值 $5→1,000 / $10→2,100 / $20→4,400 credits；
+# 订阅 Starter $4.99→1,000/月、Pro $9.99→3,000/月、Max $19.99→10,000/月；$0.005 = 1 credit。
+RECHARGE_TIERS = (("$5", "1,000 credits"), ("$10", "2,100 credits"), ("$20", "4,400 credits"))
 SUBSCRIPTION_PLANS = (
-    ("包月·基础", "9.99", "19.99", "1000 积分 / 30 天"),
-    ("包月·进阶", "24.99", "49.99", "3000 积分 / 30 天"),
-    ("包月·旗舰", "49.99", "99.99", "10000 积分 / 30 天"),
+    ("Starter", "4.99", "4.99", "1,000 credits / month"),
+    ("Pro", "9.99", "9.99", "3,000 credits / month"),
+    ("Max", "19.99", "19.99", "10,000 credits / month"),
 )
-RECHARGE_RATE = "0.03"  # ¥0.03 = 1 积分
+RECHARGE_RATE = "0.005"  # $0.005 = 1 credit
 
 
 # ---------- URL 工具 ----------
@@ -134,7 +139,7 @@ def _organization_node(base: str) -> dict:
             "height": 512,
         },
         "description": SITE_DESCRIPTION,
-        "areaServed": "CN",
+        "areaServed": "Worldwide",
     }
 
 
@@ -143,9 +148,9 @@ def _website_node(base: str) -> dict:
         "@type": "WebSite",
         "@id": f"{base}/#website",
         "name": SITE_NAME,
-        "alternateName": "SearchPipe 联网搜索 API",
+        "alternateName": "SearchPipe AI Search API",
         "url": f"{base}/",
-        "inLanguage": "zh-CN",
+        "inLanguage": "en",
         "publisher": {"@id": f"{base}/#organization"},
     }
 
@@ -160,18 +165,19 @@ def _software_node(base: str) -> dict:
         "description": SITE_DESCRIPTION,
         "url": f"{base}/",
         "featureList": [
-            "多引擎聚合检索（SearXNG）",
-            "网页正文抓取与清洗",
-            "LLM 相关性重排（0–1 评分）",
-            "带引用标注的 AI 摘要",
-            "远程 MCP Server（streamable-http）",
-            "REST API（POST /search）",
+            "Multi-engine aggregated search (SearXNG)",
+            "Web page full-text fetching and cleaning",
+            "LLM relevance reranking (0–1 score)",
+            "AI summaries with citation markers",
+            "Remote MCP Server (streamable-http)",
+            "REST API (POST /search)",
+            "Chinese web coverage",
         ],
         "offers": {
             "@type": "Offer",
             "price": "0",
-            "priceCurrency": "CNY",
-            "description": "注册即送免费额度，含完整 API 与 MCP 能力",
+            "priceCurrency": "USD",
+            "description": "Free tier: 1,000 credits per month on sign-up, full API and MCP access",
             "url": f"{base}/pricing",
         },
         "provider": {"@id": f"{base}/#organization"},
@@ -219,16 +225,16 @@ def docs_ld() -> str:
             {
                 "@context": "https://schema.org",
                 "@type": "TechArticle",
-                "headline": "SearchPipe 开发文档：联网搜索 API 与 MCP 接入",
-                "description": "SearchPipe 的 REST API（POST /search）参数、响应结构与 MCP Server 接入方式，含 curl / Python / JavaScript 调用示例与错误码。",
-                "inLanguage": "zh-CN",
+                "headline": "SearchPipe Docs: AI Search API and MCP Integration",
+                "description": "Full reference for the SearchPipe REST API (POST /search): parameters, response schema, curl / Python / JavaScript examples, error codes, and how to connect the remote MCP server.",
+                "inLanguage": "en",
                 "dateModified": SITE_LAST_MODIFIED,
                 "mainEntityOfPage": canonical_url("/docs"),
                 "author": {"@id": f"{base}/#organization"},
                 "publisher": {"@id": f"{base}/#organization"},
                 "about": {"@id": f"{base}/#software"},
             },
-            breadcrumb_ld([("首页", "/"), ("开发文档", "/docs")]),
+            breadcrumb_ld([("Home", "/"), ("Docs", "/docs")]),
         ]
     )
 
@@ -237,19 +243,19 @@ def mcp_page_ld() -> str:
     """MCP 接入指南：HowTo（步骤）+ 面包屑。"""
     base = get_base_url()
     steps = [
-        ("注册并获取 API Key", "注册 SearchPipe 账号，在控制台「API Keys」页创建一个 sp- 开头的密钥。"),
-        ("拼接 MCP 链接", "把 API Key 内嵌进 MCP 地址：https://searchpipe.tech/mcp?api_key=sp-你的密钥。"),
-        ("写入客户端配置", "Claude Code 执行 claude mcp add --transport http searchpipe \"<MCP 链接>\"；Cursor 等在 mcp.json 的 mcpServers 中添加该 URL。"),
-        ("让 Agent 验证", "在对话中要求 Agent 使用 ai_search_search 工具检索一个实时问题，确认返回带链接的结果。"),
+        ("Sign up and create an API key", "Register a SearchPipe account and create an sp- prefixed key on the API Keys page of the dashboard."),
+        ("Build your MCP URL", "Embed the API key into the MCP endpoint: https://searchpipe.tech/mcp?api_key=sp-your-key."),
+        ("Add it to your client", "For Claude Code run claude mcp add --transport http searchpipe \"<MCP URL>\"; for Cursor etc., add the URL under mcpServers in mcp.json."),
+        ("Verify with your agent", "Ask your agent to run a live search with the ai_search_search tool and confirm it returns results with source links."),
     ]
     return jsonld_script(
         [
             {
                 "@context": "https://schema.org",
                 "@type": "HowTo",
-                "name": "如何给 Claude Code / Cursor 接入远程 MCP 搜索服务",
-                "description": "四步把 SearchPipe 远程 MCP Server 接入任意兼容 MCP 的 AI 客户端，获得实时联网搜索能力。",
-                "inLanguage": "zh-CN",
+                "name": "How to connect SearchPipe MCP search to Claude Code / Cursor",
+                "description": "Four steps to add the SearchPipe remote MCP server to any MCP-compatible AI client and get real-time web search.",
+                "inLanguage": "en",
                 "totalTime": "PT3M",
                 "mainEntityOfPage": canonical_url("/mcp-server"),
                 "step": [
@@ -264,7 +270,7 @@ def mcp_page_ld() -> str:
                 ],
                 "publisher": {"@id": f"{base}/#organization"},
             },
-            breadcrumb_ld([("首页", "/"), ("MCP 接入指南", "/mcp-server")]),
+            breadcrumb_ld([("Home", "/"), ("MCP Integration", "/mcp-server")]),
         ]
     )
 
@@ -276,10 +282,10 @@ def faq_page_ld() -> str:
             {
                 "@context": "https://schema.org",
                 **_faq_node(FAQ_ITEMS),
-                "inLanguage": "zh-CN",
+                "inLanguage": "en",
                 "mainEntityOfPage": canonical_url("/faq"),
             },
-            breadcrumb_ld([("首页", "/"), ("常见问题", "/faq")]),
+            breadcrumb_ld([("Home", "/"), ("FAQ", "/faq")]),
         ]
     )
 
@@ -290,9 +296,9 @@ def pricing_page_ld() -> str:
     offers = [
         {
             "@type": "Offer",
-            "name": f"{name}（30 天有效期）",
+            "name": f"{name} (monthly subscription, credits valid 30 days)",
             "price": price,
-            "priceCurrency": "CNY",
+            "priceCurrency": "USD",
             "url": canonical_url("/pricing"),
             "availability": "https://schema.org/InStock",
         }
@@ -301,9 +307,9 @@ def pricing_page_ld() -> str:
     offers.append(
         {
             "@type": "Offer",
-            "name": "积分充值（自定义金额，¥0.03 = 1 积分）",
-            "price": "10",
-            "priceCurrency": "CNY",
+            "name": "Credit recharge (from $5, $0.005 = 1 credit, never expires)",
+            "price": "5",
+            "priceCurrency": "USD",
             "url": canonical_url("/pricing"),
             "availability": "https://schema.org/InStock",
         }
@@ -313,8 +319,8 @@ def pricing_page_ld() -> str:
             {
                 "@context": "https://schema.org",
                 "@type": "Product",
-                "name": f"{SITE_NAME} 联网搜索 API / MCP Server",
-                "description": "面向 AI Agent 的联网搜索服务：按次计费积分制，支持积分充值（永久有效）与包月订阅（30 天有效期），注册即送免费额度。",
+                "name": f"{SITE_NAME} AI Search API / MCP Server",
+                "description": "AI search API for agents: pay-as-you-go credits at $0.005 per credit. Recharged credits never expire; subscription credits are valid for 30 days. Free tier includes 1,000 credits per month.",
                 "brand": {"@type": "Brand", "name": SITE_NAME},
                 "category": "DeveloperApplication",
                 "url": canonical_url("/pricing"),
@@ -324,12 +330,12 @@ def pricing_page_ld() -> str:
             {
                 "@context": "https://schema.org",
                 "@type": "WebPage",
-                "name": "SearchPipe 定价：积分充值与包月订阅",
+                "name": "SearchPipe Pricing: credit recharges and monthly subscriptions",
                 "url": canonical_url("/pricing"),
-                "inLanguage": "zh-CN",
+                "inLanguage": "en",
                 "isPartOf": {"@id": f"{base}/#website"},
             },
-            breadcrumb_ld([("首页", "/"), ("定价", "/pricing")]),
+            breadcrumb_ld([("Home", "/"), ("Pricing", "/pricing")]),
         ]
     )
 
@@ -340,19 +346,35 @@ def terms_ld() -> str:
             {
                 "@context": "https://schema.org",
                 "@type": "WebPage",
-                "name": "SearchPipe 服务条款",
+                "name": "SearchPipe Terms of Service",
                 "url": canonical_url("/terms"),
-                "inLanguage": "zh-CN",
+                "inLanguage": "en",
                 "dateModified": SITE_LAST_MODIFIED,
             },
-            breadcrumb_ld([("首页", "/"), ("服务条款", "/terms")]),
+            breadcrumb_ld([("Home", "/"), ("Terms of Service", "/terms")]),
+        ]
+    )
+
+
+def privacy_ld() -> str:
+    return jsonld_script(
+        [
+            {
+                "@context": "https://schema.org",
+                "@type": "WebPage",
+                "name": "SearchPipe Privacy Policy",
+                "url": canonical_url("/privacy"),
+                "inLanguage": "en",
+                "dateModified": SITE_LAST_MODIFIED,
+            },
+            breadcrumb_ld([("Home", "/"), ("Privacy Policy", "/privacy")]),
         ]
     )
 
 
 def not_found_ld() -> str:
     return jsonld_script(
-        {"@context": "https://schema.org", "@type": "WebPage", "name": "页面不存在 · SearchPipe"}
+        {"@context": "https://schema.org", "@type": "WebPage", "name": "Page Not Found · SearchPipe"}
     )
 
 
@@ -360,64 +382,59 @@ def not_found_ld() -> str:
 
 LANDING_FAQ: tuple[tuple[str, str], ...] = (
     (
-        "SearchPipe 和直接用搜索引擎有什么不同？",
-        "SearchPipe 面向程序与 AI Agent：一次调用返回的是清洗过的正文、相关性评分与可选摘要，"
-        "而不是需要再解析的搜索结果页 HTML，Agent 可以直接消费。",
+        "What is SearchPipe?",
+        "SearchPipe is an AI search API and remote MCP server for AI agents: a single call runs multi-engine retrieval, full-text fetching, LLM reranking and optional summarization, returning structured results with relevance scores that agents can consume directly.",
     ),
     (
-        "支持哪些 AI 客户端？",
-        "任何兼容 MCP streamable-http 的客户端都能接入，已实测 Claude Code 与 Cursor；"
-        "自建 Agent 框架也可以直接调用 REST API 的 POST /search。",
+        "How is SearchPipe different from calling a search engine directly?",
+        "SearchPipe returns cleaned page content, relevance scores and optional answers — not raw search-result HTML that you have to parse. Agents can consume the response directly, and failed requests are automatically refunded.",
     ),
     (
-        "怎么计费？",
-        "积分制：¥0.03 = 1 积分，基础搜索每次 1 积分、高级搜索每次 2 积分，注册即送免费额度；"
-        "支持积分充值（永久有效）与包月订阅（30 天有效期）。",
+        "Which AI clients are supported?",
+        "Any MCP-compatible client with streamable-http support can connect — Claude Code and Cursor are tested. Self-built agents can call the REST API directly via POST /search.",
     ),
     (
-        "搜索结果可以商用吗？",
-        "可以。SearchPipe 提供的是聚合检索与结构化整理能力，请在使用结果时遵守来源网站的服务条款与著作权规定。",
+        "Can SearchPipe search the Chinese web?",
+        "Yes. SearchPipe aggregates multiple search engines and can retrieve and clean Chinese-language pages, making it a practical choice when your agents need coverage of both English and Chinese web content.",
     ),
     (
-        "接入需要多长时间？",
-        "注册后复制控制台给出的 MCP 链接，写进客户端配置即可，通常 1–3 分钟；"
-        "Agent 也可以直接读取 /agent-setup/SKILL.md 自动完成配置。",
+        "How does pricing work?",
+        "Credits: $0.005 = 1 credit. A basic search costs 1 credit and an advanced search costs 2 credits. New accounts get 1,000 free credits per month. Recharged credits never expire; subscription credits are valid for 30 days.",
+    ),
+    (
+        "How long does integration take?",
+        "Copy the MCP link from the dashboard into your client config — typically 1–3 minutes. Agents can also read /agent-setup/SKILL.md to configure themselves automatically.",
     ),
 )
 
 FAQ_ITEMS: tuple[tuple[str, str], ...] = LANDING_FAQ + (
     (
-        "MCP 链接里的 API Key 安全吗？",
-        "Key 内嵌在 URL 里虽然方便，但会出现在客户端配置文件中。建议为每个 Agent 客户端单独创建 Key，"
-        "发现泄露时在控制台立即吊销——吊销后该 Key 立即失效。",
+        "Is the API key embedded in the MCP URL safe?",
+        "The key lives in the client config file, so treat that file like a credential. Create a separate key for each agent client, and revoke it immediately in the dashboard if it leaks — a revoked key stops working at once.",
     ),
     (
-        "为什么有时候搜索比较慢？",
-        "冷启动查询要跑完「多引擎检索 → 正文抓取 → LLM 重排」全链路，通常数秒；"
-        "相同 query 与参数在缓存有效期（默认 300 秒）内会直接命中缓存，返回是毫秒级。",
+        "Why is a search sometimes slow?",
+        "A cold query runs the full pipeline — multi-engine retrieval, full-text fetching, LLM reranking — which usually takes a few seconds. Identical queries with identical parameters hit the cache (default TTL 300 seconds) and return in milliseconds.",
     ),
     (
-        "一次请求会返回多少条结果？",
-        "默认返回 5 条，可在请求里用 max_results 调整（1–20）。返回结果带 0–1 的相关性评分，按相关性从高到低排序。",
+        "How many results does one request return?",
+        "Five by default; adjust with max_results (1–20). Results carry 0–1 relevance scores and are sorted from most to least relevant.",
     ),
     (
-        "摘要（answer）是怎么生成的？",
-        "开启 include_answer 后，服务会基于抓取到的正文生成带引用编号的摘要，并标记 ai_generated=true，"
-        "符合生成式内容标识要求。",
+        "How is the answer summary generated?",
+        "With include_answer enabled, the service generates a summary with citation markers based on the fetched page content, flagged with ai_generated=true.",
     ),
     (
-        "搜索失败会扣费吗？",
-        "不会。检索源失败返回 502、输出内容违规返回 400 时都会自动退款（幂等）；"
-        "只有成功返回结果的请求才计费。",
+        "Do failed searches cost credits?",
+        "No. When upstream retrieval fails (502) or output moderation rejects the content (400), the charge is automatically refunded (idempotently). Only successful requests are billed.",
     ),
     (
-        "有调用频率限制吗？",
-        "有滑动窗口限流（默认每分钟 100 次、突发 20 次），超限返回 429 并带 Retry-After 头。"
-        "高频场景可以联系我们调整额度。",
+        "Is there a rate limit?",
+        "Yes: a sliding-window limiter (default 100 requests per minute, burst 20). Over-limit requests get a 429 with a Retry-After header. Contact us to raise the quota for high-volume use.",
     ),
     (
-        "积分会过期吗？",
-        "充值获得的积分永久有效；包月订阅（含续订、升级）获得的积分自到账起 30 天有效，到期未用完自动清零。",
+        "Do credits expire?",
+        "Credits from recharges never expire. Credits from monthly subscriptions (including renewals and upgrades) are valid for 30 days from the moment they land and expire automatically if unused.",
     ),
 )
 
@@ -442,14 +459,13 @@ def _faq_node(items: tuple[tuple[str, str], ...]) -> dict:
 def verification_metas() -> list[tuple[str, str]]:
     """站长平台验证 meta（只渲染配置了的，未配置则完全不出现在 HTML 里）。
 
-    支持 Google Search Console / Bing Webmaster / 百度搜索资源平台，
+    支持 Google Search Console / Bing Webmaster，
     统一通过 .env 配置，避免改模板发版。
     """
     settings = get_settings()
     metas = [
         ("google-site-verification", settings.google_site_verification),
         ("msvalidate.01", settings.bing_site_verification),
-        ("baidu-site-verification", settings.baidu_site_verification),
     ]
     return [(name, value) for name, value in metas if value]
 
@@ -468,26 +484,29 @@ def build_llms_txt() -> str:
     lines = [
         f"# {SITE_NAME}",
         "",
-        f"> {SITE_ONE_LINER}：一次调用完成多引擎检索 → 正文抓取 → LLM 重排 → 可选摘要，"
-        "返回带相关性评分的结构化结果；同时提供远程 MCP Server 与 REST API 两种接入方式。",
+        f"> {SITE_ONE_LINER}: one call runs multi-engine retrieval → full-text fetching → LLM reranking → optional summarization, "
+        "returning structured results with relevance scores. Available as a remote MCP Server and a REST API. "
+        "A Tavily alternative with Chinese web coverage.",
         "",
-        "## 关键链接",
+        "## Key pages",
         "",
-        f"- [首页]({base}/)：产品定位、能力说明与在线体验入口",
-        f"- [开发文档]({base}/docs)：POST /search 参数、响应结构、调用示例与错误码",
-        f"- [MCP 接入指南]({base}/mcp-server)：Claude Code / Cursor 等客户端配置与排障",
-        f"- [定价]({base}/pricing)：¥{RECHARGE_RATE} = 1 积分，充值永久有效、订阅 30 天有效",
-        f"- [常见问题]({base}/faq)：计费、限流、Key 安全等 12 组问答",
-        f"- [服务条款]({base}/terms)：积分、退款与使用规范",
-        f"- [Agent 自举配置说明]({base}/agent-setup/SKILL.md)：给 AI Agent 读的一页接入指南",
+        f"- [Home]({base}/): product positioning, capabilities and live demo",
+        f"- [Docs]({base}/docs): POST /search parameters, response schema, examples and error codes",
+        f"- [MCP integration]({base}/mcp-server): Claude Code / Cursor setup and troubleshooting",
+        f"- [Pricing]({base}/pricing): ${RECHARGE_RATE} = 1 credit; recharges never expire, subscription credits valid 30 days",
+        f"- [FAQ]({base}/faq): billing, rate limits, key safety and more",
+        f"- [Terms of Service]({base}/terms): credits, refunds and acceptable use",
+        f"- [Privacy Policy]({base}/privacy): data collection, processors and your rights",
+        f"- [Agent self-setup guide]({base}/agent-setup/SKILL.md): a one-page onboarding doc for AI agents",
         "",
-        "## 核心事实",
+        "## Core facts",
         "",
-        f"- 接入方式：远程 MCP Server（streamable-http，Key 可内嵌 URL）与 REST API `POST /search`",
-        f"- 计费：积分制，基础搜索 1 积分/次、高级搜索 2 积分/次，失败自动退款",
-        f"- 能力：多引擎聚合检索、网页正文抓取清洗、LLM 相关性重排（0–1 分）、带引用摘要",
-        f"- 结果缓存：相同 query 与参数默认 300 秒内命中缓存",
-        f"- 限流：滑动窗口，默认 100 次/分钟、突发 20 次",
+        f"- Access: remote MCP Server (streamable-http, key can be embedded in the URL) and REST API `POST /search`",
+        f"- Pricing: credit-based; basic search 1 credit, advanced search 2 credits; failed requests auto-refunded; free tier 1,000 credits/month",
+        f"- Capabilities: multi-engine aggregated search, full-text fetching and cleaning, LLM relevance reranking (0–1), summaries with citations",
+        f"- Chinese web coverage: can retrieve and clean Chinese-language pages",
+        f"- Result cache: identical query and parameters hit the cache for 300 seconds by default",
+        f"- Rate limit: sliding window, 100 requests/minute with burst 20 by default",
         "",
     ]
     return "\n".join(lines)
@@ -500,17 +519,23 @@ def build_robots_txt() -> str:
     """robots.txt：公开页放行、私有路径屏蔽，并声明 sitemap。"""
     lines = [
         "# SearchPipe robots.txt",
-        "# 公开可索引页面清单见 /sitemap.xml",
+        "# Public, indexable pages are listed in /sitemap.xml",
         "User-agent: *",
         "Allow: /",
         "",
-        "# 以下为需登录/内部/接口路径，不参与索引",
+        "# The following prefixes require login / are internal / are API endpoints",
     ]
     lines += [f"Disallow: {prefix}" for prefix in PRIVATE_PATH_PREFIXES]
     lines += [
         "",
-        "# 主流中文搜索引擎（Baidu 单独声明，避免继承默认 UA 规则时出现歧义）",
-        "User-agent: Baiduspider",
+        "# AI search/answer engines are explicitly allowed on public pages",
+        "User-agent: GPTBot",
+        "Allow: /",
+        "",
+        "User-agent: ClaudeBot",
+        "Allow: /",
+        "",
+        "User-agent: PerplexityBot",
         "Allow: /",
     ]
     lines += [f"Disallow: {prefix}" for prefix in PRIVATE_PATH_PREFIXES]

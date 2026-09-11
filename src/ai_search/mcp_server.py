@@ -79,8 +79,9 @@ def _resolve_raw_key(api_key: str | None) -> str:
         return raw  # 本地 dev 旁路：允许空 key（裸调 run_search）
     if not raw.startswith("sp-"):
         raise ToolError(
-            "缺少有效的 sp- API Key（MCP URL 内嵌 ?api_key=sp-xxx / Authorization 头 / "
-            "传 api_key 参数 / 设 SEARCHPIPE_API_KEY 环境变量）"
+            "Missing valid sp- API key (embed ?api_key=sp-xxx in the MCP URL / "
+            "use an Authorization header / pass the api_key parameter / "
+            "set the SEARCHPIPE_API_KEY environment variable)"
         )
     return raw
 
@@ -128,7 +129,7 @@ async def ai_search_search(
             try:
                 ctx = await resolve_api_key(raw, db)
             except AuthError as e:
-                raise ToolError(f"API Key 无效或已吊销: {e}") from e
+                raise ToolError(f"Invalid or revoked API key: {e}") from e
 
             # 邮箱验证检查（未验证用户不能使用 MCP；admin/owner 豁免）
             try:
@@ -147,7 +148,7 @@ async def ai_search_search(
             try:
                 await check_input(req.query)
             except ModerationError as e:
-                raise ToolError(f"输入内容违规: {e.labels}") from e
+                raise ToolError(f"Input content violation: {e.labels}") from e
 
             # 扣费（独立提交：搜索不持有 db 事务，镜像 /search 设计；
             #   admin 已在 charge_credits 内短路为 cost=0）
@@ -157,7 +158,7 @@ async def ai_search_search(
             except InsufficientCreditsError as e:
                 await db.rollback()
                 raise ToolError(
-                    f"积分不足：余额 {e.balance}，本次需要 {e.required}"
+                    f"Insufficient credits: balance {e.balance}, this call requires {e.required}"
                 ) from e
             except Exception:
                 await db.rollback()
@@ -174,8 +175,8 @@ async def ai_search_search(
                 await db.commit()
                 charge = None  # 已退，标记防 finally 重复记费
             status = "error"
-            error_msg = f"检索源失败: {e}"
-            raise ToolError(f"检索源失败: {e}") from e
+            error_msg = f"Search backend failure: {e}"
+            raise ToolError(f"Search backend failure: {e}") from e
 
         # 3. 输出审核 + AI 标识（深度合成规定第16-17条）
         if resp.answer:
@@ -186,7 +187,7 @@ async def ai_search_search(
                     await refund_credits_for(db, charge)
                     await db.commit()
                     charge = None
-                raise ToolError(f"输出内容违规: {e.labels}") from e
+                raise ToolError(f"Output content violation: {e.labels}") from e
             resp.ai_generated = True
 
         return resp

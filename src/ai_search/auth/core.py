@@ -29,7 +29,7 @@ class EmailNotVerifiedError(AuthError):
     """邮箱未验证异常：用于限制未验证用户使用搜索/MCP 等功能。"""
 
     def __init__(self) -> None:
-        super().__init__("请先验证邮箱才能使用此功能")
+        super().__init__("Please verify your email address to use this feature")
 
 
 class AuthContext:
@@ -63,9 +63,9 @@ async def resolve_api_key(raw: str, db: AsyncSession) -> AuthContext:
             key.last_used_at = datetime.now(timezone.utc)
             user = await db.get(User, key.user_id)
             if not user or user.status != "active":
-                raise AuthError("用户不存在或已停用")
+                raise AuthError("User not found or deactivated")
             return AuthContext(user=user, api_key=key)
-    raise AuthError("API Key 无效或已吊销")
+    raise AuthError("Invalid or revoked API key")
 
 
 async def resolve_jwt(token: str, db: AsyncSession) -> AuthContext:
@@ -75,14 +75,14 @@ async def resolve_jwt(token: str, db: AsyncSession) -> AuthContext:
     """
     payload = decode_token(token)
     if not payload or payload.get("type") != "access":
-        raise AuthError("认证凭据无效或已过期")
+        raise AuthError("Invalid or expired authentication credentials")
     try:
         user_id = uuid.UUID(payload["sub"])
     except (KeyError, ValueError):
-        raise AuthError("认证凭据无效") from None
+        raise AuthError("Invalid authentication credentials") from None
     user = await db.get(User, user_id)
     if not user or user.status != "active":
-        raise AuthError("用户不存在或已停用")
+        raise AuthError("User not found or deactivated")
     return AuthContext(user=user)
 
 

@@ -83,7 +83,7 @@ async def get_current_user(
     user = await _resolve_cookie(request, db)
     if user:
         return user
-    raise HTTPException(status.HTTP_401_UNAUTHORIZED, "未提供认证凭据")
+    raise HTTPException(status.HTTP_401_UNAUTHORIZED, "No authentication credentials provided")
 
 
 async def require_api_key(
@@ -98,7 +98,7 @@ async def require_api_key(
     elif x_api_key:
         raw = x_api_key.strip()
     if not raw or not raw.startswith(API_KEY_PREFIX):
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "未提供有效的 API Key")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "No valid API key provided")
     return await _resolve_api_key(raw, db)
 
 
@@ -129,11 +129,11 @@ async def get_current_user_or_api_key(
     user = await _resolve_cookie(request, db)
     if user:
         return AuthContext(user=user)
-    raise HTTPException(status.HTTP_401_UNAUTHORIZED, "未提供有效认证（JWT 或 API Key）")
+    raise HTTPException(status.HTTP_401_UNAUTHORIZED, "No valid authentication provided (JWT or API key)")
 
 
 async def get_current_admin(user: User = Depends(get_current_user)) -> User:
     """管理员鉴权：role ∈ {owner, admin}，否则 403。"""
     if user.role not in ("owner", "admin"):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "需要管理员权限")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Administrator privileges required")
     return user

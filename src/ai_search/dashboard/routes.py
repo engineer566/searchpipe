@@ -101,6 +101,16 @@ def _safe_next(next_url: str) -> str | None:
     return None
 
 
+def _oauth_flags() -> dict:
+    """各 OAuth provider 是否已配置（登录/注册页按此渲染第三方登录按钮）。"""
+    from ..auth.oauth import GitHubOAuth, GoogleOAuth
+
+    return {
+        "oauth_github_enabled": GitHubOAuth().enabled,
+        "oauth_google_enabled": GoogleOAuth().enabled,
+    }
+
+
 def _render_login(
     request: Request,
     error: str | None = None,
@@ -112,7 +122,7 @@ def _render_login(
     return render_with_base(
         request,
         "login.html",
-        {"error": error, "email": email, "info": info, "next": next_url},
+        {"error": error, "email": email, "info": info, "next": next_url, **_oauth_flags()},
     )
 
 
@@ -121,7 +131,9 @@ def _render_register(
 ) -> object:
     """渲染注册页（可带错误与邮箱回填，next_url 用于注册后回跳）。"""
     return render_with_base(
-        request, "register.html", {"error": error, "email": email, "next": next_url}
+        request,
+        "register.html",
+        {"error": error, "email": email, "next": next_url, **_oauth_flags()},
     )
 
 
@@ -130,18 +142,18 @@ def _validate_email(email: str) -> str | None:
     try:
         validate_email(email, check_deliverability=False)
     except EmailNotValidError:
-        return "邮箱格式不正确"
+        return "Invalid email format"
     return None
 
 
 def _validate_password(password: str, password_confirm: str | None = None) -> str | None:
     """校验密码强度（≥8 位）与确认密码一致性，返回错误文案或 None。"""
     if len(password) < 8:
-        return "密码至少 8 位"
+        return "Password must be at least 8 characters"
     if len(password) > 128:
-        return "密码最长 128 位"
+        return "Password must be at most 128 characters"
     if password_confirm is not None and password != password_confirm:
-        return "两次输入的密码不一致"
+        return "Passwords do not match"
     return None
 
 
@@ -154,10 +166,10 @@ async def auth_landing(
     """OAuth/JWT 登录落地：token（JWT access）→ 校验 → 设 session cookie → /dashboard。"""
     payload = decode_token(token)
     if not payload or payload.get("type") != "access":
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "token 无效")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid token")
     user = await db.get(User, payload["sub"])
     if not user or user.status != UserStatus.ACTIVE.value:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "用户不存在或已停用")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User not found or disabled")
     resp = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
     set_session_cookie(resp, str(user.id))
     return resp
@@ -184,15 +196,15 @@ async def login_page(
     info = None
     error = None
     if reset:
-        info = "密码已重置，请使用新密码登录"
+        info = "Password reset successful — please log in with your new password"
     elif registered:
-        info = "注册成功！验证邮件已发送，请查收邮箱并点击链接完成验证。"
+        info = "Registration successful! A verification email has been sent — please click the link in it to verify your email."
     elif verify_success:
-        info = "邮箱验证成功！现在可以登录了。"
+        info = "Email verified successfully! You can now log in."
     elif verify_already:
-        info = "邮箱已验证，无需重复操作。"
+        info = "Your email is already verified."
     elif verify_error:
-        error = "验证链接无效或已过期，请重新注册或联系管理员。"
+        error = "The verification link is invalid or expired; please register again or contact support."
     return _render_login(request, info=info, error=error, next_url=_safe_next(next_url) or "")
 
 
@@ -213,16 +225,16 @@ async def login_submit(
     email = email.strip().lower()
     next_url = _safe_next(next_url) or ""
     if agree_terms != "on":
-        return _render_login(request, error="请先阅读并同意《服务条款》", email=email, next_url=next_url)
+        return _render_login(request, error="Please read and agree to the Terms of Service", email=email, next_url=next_url)
     user = (
         await db.execute(select(User).where(User.email == email))
     ).scalar_one_or_none()
     if not user:
-        return _render_login(request, error="该邮箱未注册，请先注册", email=email, next_url=next_url)
+        return _render_login(request, error="This email is not registered; please sign up first", email=email, next_url=next_url)
     if not verify_password(password, user.password_hash):
-        return _render_login(request, error="密码错误，请重新输入", email=email, next_url=next_url)
+        return _render_login(request, error="Incorrect password, please try again", email=email, next_url=next_url)
     if user.status != UserStatus.ACTIVE.value:
-        return _render_login(request, error="账号已被停用，请联系客服", email=email, next_url=next_url)
+        return _render_login(request, error="This account has been disabled; please contact support", email=email, next_url=next_url)
     user.last_login_at = datetime.now(timezone.utc)
     await db.commit()
     resp = RedirectResponse(
@@ -254,7 +266,7 @@ async def register_submit(
     email = email.strip().lower()
     next_url = _safe_next(next_url) or ""
     if agree_terms != "on":
-        return _render_register(request, error="请先阅读并同意《服务条款》", email=email, next_url=next_url)
+        return _render_register(request, error="Please read and agree to the Terms of Service", email=email, next_url=next_url)
     if err := _validate_email(email):
         return _render_register(request, error=err, email=email, next_url=next_url)
     if err := _validate_password(password, password_confirm):
@@ -264,7 +276,7 @@ async def register_submit(
         await db.execute(select(User).where(User.email == email))
     ).scalar_one_or_none()
     if existing:
-        return _render_register(request, error="该邮箱已注册，请直接登录", email=email, next_url=next_url)
+        return _render_register(request, error="This email is already registered; please log in directly", email=email, next_url=next_url)
 
     user = User(
         email=email,
@@ -286,14 +298,14 @@ async def register_submit(
             user_id=user.id,
             amount=get_settings().free_tier_credits,
             tx_type="grant",
-            remark="内测免费额度",
+            remark="Free tier credits",
         )
         user.last_login_at = datetime.now(timezone.utc)
         await db.commit()
     except IntegrityError:
         # 并发重复注册竞态：唯一索引兜底
         await db.rollback()
-        return _render_register(request, error="该邮箱已注册，请直接登录", email=email, next_url=next_url)
+        return _render_register(request, error="This email is already registered; please log in directly", email=email, next_url=next_url)
 
     # 发送验证邮件（异步，不阻塞响应；失败不影响注册）
     from ..auth.email_verification import send_verification_email

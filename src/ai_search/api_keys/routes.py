@@ -40,7 +40,7 @@ router = APIRouter(prefix="/api-keys", tags=["api-keys"])
 
 
 class CreateKeyRequest(BaseModel):
-    name: str = Field(..., min_length=1, max_length=64, description="Key 名称，便于识别")
+    name: str = Field(..., min_length=1, max_length=64, description="Key name for identification")
 
 
 class CreateKeyResponse(BaseModel):
@@ -97,7 +97,7 @@ async def _reveal(api_key: ApiKey) -> KeySecretResponse:
     if plain is None:
         raise HTTPException(
             status.HTTP_409_CONFLICT,
-            "该 Key 创建于明文可查看上线前，无法查看明文；请吊销后重新创建一把",
+            "This key was created before plaintext viewing became available and its plaintext cannot be retrieved; please revoke it and create a new one",
         )
     return _secret_response(api_key, plain)
 
@@ -154,7 +154,7 @@ async def reveal_default(
     """
     api_key = await ensure_default_key(db, user.id)
     if api_key is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "暂无可用 API Key")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No API key available")
     await db.commit()
     return await _reveal(api_key)
 
@@ -168,7 +168,7 @@ async def reveal_one(
     """指定 Key 的明文（MCP 配置卡片里选择其它 Key 时使用）。"""
     api_key = await get_valid_key(db, user.id, key_id)
     if api_key is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "API Key 不存在或已吊销")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "API key not found or revoked")
     return await _reveal(api_key)
 
 
@@ -180,5 +180,5 @@ async def revoke(
 ) -> None:
     ok = await revoke_key(db, user.id, key_id)
     if not ok:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "API Key 不存在")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "API key not found")
     await db.commit()

@@ -124,11 +124,11 @@ async def mark_message_read(
     try:
         mid = uuid.UUID(message_id)
     except ValueError:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "消息不存在") from None
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Message not found") from None
     msg = await db.get(SiteMessage, mid)
     if not msg or msg.user_id != user.id:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "消息不存在")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Message not found")
     if msg.read_at is None:
         msg.read_at = datetime.now(timezone.utc)
         await db.commit()
-    return {"msg": "已读", "id": message_id}
+    return {"msg": "Marked as read", "id": message_id}

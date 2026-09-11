@@ -77,11 +77,12 @@ async def request_password_reset(db: AsyncSession, email: str) -> bool:
         f"/dashboard/reset-password?token={token}"
     )
     text = (
-        "你好，\n\n"
-        "我们收到了你的 SearchPipe 密码重置请求。请在 1 小时内点击以下链接设置新密码：\n\n"
+        "Hello,\n\n"
+        "We received a request to reset your SearchPipe password. Please click the link below "
+        "to set a new password within 1 hour:\n\n"
         f"{link}\n\n"
-        "如果这不是你的操作，请忽略本邮件，你的密码不会改变。\n\n"
-        "—— SearchPipe"
+        "If you did not request this, please ignore this email and your password will remain unchanged.\n\n"
+        "-- SearchPipe"
     )
-    sent = await mailer.send_mail(email, "SearchPipe 密码重置", text)
+    sent = await mailer.send_mail(email, "SearchPipe Password Reset", text)
     return sent
