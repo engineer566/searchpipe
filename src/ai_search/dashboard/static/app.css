@@ -231,6 +231,8 @@ tbody tr:hover { background: var(--surface-2); }
 }
 .site-nav .brand { font-size: 17px; font-weight: 700; color: var(--txt); }
 .site-nav .brand:hover { text-decoration: none; }
+/* 品牌图标（钥匙形 logo，随文字颜色 currentColor） */
+.brand-mark { width: 1.15em; height: 1.15em; flex: none; vertical-align: -0.2em; margin-right: .3em; }
 .site-nav .nav-links { display: flex; gap: 22px; flex: 1; }
 .site-nav .nav-links a { color: var(--muted); font-size: 14px; font-weight: 500; }
 .site-nav .nav-links a:hover { color: var(--txt); text-decoration: none; }

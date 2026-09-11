@@ -31,6 +31,8 @@
 
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/static/site.webmanifest">
 <meta name="theme-color" content="#4f46e5">
@@ -39,7 +41,7 @@
 // 防主题闪烁：渲染前决定主题
 (function(){try{var t=localStorage.getItem('searchpipe-theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
 </script>
-<link rel="stylesheet" href="/static/app.css?v=20260913">
+<link rel="stylesheet" href="/static/app.css?v=20260914">
 {% for vname, vcontent in verification_metas() %}
 <meta name="{{ vname }}" content="{{ vcontent }}">
 {% endfor %}
@@ -51,7 +53,7 @@
 <body>
 
 <nav class="site-nav" aria-label="主导航">
-  <a class="brand" href="/">🔍 {{ site_name }}</a>
+  <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M2.5 12h8.5" stroke-width="4.4"/><path d="M4.5 9.7v4.6M7.5 9.7v4.6" stroke-width="1.6"/><circle cx="15.8" cy="12" r="5.6"/></svg>{{ site_name }}</a>
   <div class="nav-links">
     <a href="/mcp-server" {% if nav_active == 'mcp' %}class="active"{% endif %}>MCP 接入</a>
     <a href="/docs" {% if nav_active == 'docs' %}class="active"{% endif %}>开发文档</a>
@@ -74,7 +76,7 @@
 <footer class="site-footer">
   <div class="footer-cols">
     <div>
-      <strong>🔍 {{ site_name }}</strong>
+      <strong><svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M2.5 12h8.5" stroke-width="4.4"/><path d="M4.5 9.7v4.6M7.5 9.7v4.6" stroke-width="1.6"/><circle cx="15.8" cy="12" r="5.6"/></svg>{{ site_name }}</strong>
       <p>{{ site_description }}</p>
     </div>
     <nav aria-label="产品">
