@@ -32,11 +32,16 @@ SearchPipe 是**远程 MCP Server**：API Key 直接内嵌在 MCP URL 的 `api_k
 
 ## API Key 与 MCP 链接获取步骤
 
-1. 访问 `{base_url}/dashboard/register` 注册账号（注册即送免费额度）。
-2. 登录后进入「API Keys」页面：`{base_url}/dashboard/api-keys`。
-3. 点击「创建」生成 `sp-` 开头的 API Key——创建成功弹窗里会直接给出完整的
-   **MCP 链接**（`{base_url}/mcp?api_key=sp-...`），复制即可。
-4. 把该 MCP 链接配置到客户端（见下方配置示例）。
+**先看用户的提示词**：如果里面已经给出 **MCP 链接**（形如 `{base_url}/mcp?api_key=sp-...`）
+或 **API Key**（`sp-` 开头），直接拿它完成配置，不要再向用户索要凭据，也不要要求用户
+手动操作控制台。只有当提示词里既没有 Key 也没有链接时，才按下面步骤引导：
+
+1. 访问 `{base_url}/dashboard/register` 注册账号（注册即送免费额度）；完成邮箱验证后
+   系统会**自动生成一把默认 API Key**，无需手动创建。
+2. 登录后进入「API Keys」页面：`{base_url}/dashboard/api-keys`——Key 平时打码隐藏，
+   点「显示」查看明文；页面「MCP 配置」卡片可切换 Key，并直接复制 MCP 链接与
+   **一句话配置**（提示词里带上 Key，可直接粘给 Agent 使用）。
+3. 把 MCP 链接配置到客户端（见下方配置示例）。
 
 ## MCP 客户端配置示例
 

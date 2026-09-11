@@ -37,8 +37,15 @@
     <button type="button" class="btn btn-sm" id="mcp-copy">复制 MCP 链接</button>
     <span class="muted" style="font-size:13px">链接内含 API Key，默认打码显示；点复制拿到的始终是完整链接。</span>
   </div>
+
+  <p class="card-sub" style="margin-top:20px">一句话配置（推荐）</p>
+  <p class="muted" style="font-size:13px;margin:0 0 10px">复制后直接粘给 AI Agent（Claude Code / Cursor / 任意支持 MCP 的客户端），它会读完 <code>/agent-setup/SKILL.md</code> 自动完成接入与验证，不用再问你要 Key。提示词默认带上当前选中的 API Key，出于安全考虑不在页面显示。</p>
+  <div class="row" style="gap:8px;flex-wrap:wrap;align-items:center">
+    <button type="button" class="btn" id="oneliner-copy">复制一句话配置</button>
+    <span class="muted" style="font-size:13px">内容含 API Key，点一下只复制到剪贴板、不展示在页面上。</span>
+  </div>
   {% else %}
-  <div class="empty">邮箱验证通过后会自动生成一把默认 Key（也可在上方手动创建），之后即可在这里生成 MCP 链接。</div>
+  <div class="empty">邮箱验证通过后会自动生成一把默认 Key（也可在上方手动创建），之后即可在这里生成 MCP 链接与一句话配置。</div>
   {% endif %}
 </div>
 
@@ -136,7 +143,8 @@ document.querySelectorAll('.key-reveal-btn').forEach(b=>{
   const urlEl=document.getElementById('mcp-url');
   const revealBtn=document.getElementById('mcp-reveal');
   const copyBtn=document.getElementById('mcp-copy');
-  const state={mcp:'',masked:''};
+  const onelinerBtn=document.getElementById('oneliner-copy');
+  const state={mcp:'',masked:'',prompt:''};
   let shown=false;
 
   function render(){
@@ -147,6 +155,7 @@ document.querySelectorAll('.key-reveal-btn').forEach(b=>{
   async function load(id){
     const d=await AIS.api(id?('/api-keys/'+id+'/reveal'):'/api-keys/reveal');
     state.mcp=d.mcp_url;
+    state.prompt=d.agent_prompt;   // 一句话配置内容：只留在内存里，不渲染到页面
     state.masked='{{ base_url }}/mcp?api_key='+d.key_prefix+'••••••••••';
     shown=false;
     render();
@@ -162,6 +171,7 @@ document.querySelectorAll('.key-reveal-btn').forEach(b=>{
 
   revealBtn.onclick=()=>{ shown=!shown; render(); };
   copyBtn.onclick=()=>{ if(state.mcp) AIS.copy(state.mcp, copyBtn); };
+  if(onelinerBtn) onelinerBtn.onclick=()=>{ if(state.prompt) AIS.copy(state.prompt, onelinerBtn); };
 
   const first=picks.filter(p=>p.checked)[0]||picks[0];
   first.checked=true;
