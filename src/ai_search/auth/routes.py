@@ -339,6 +339,13 @@ async def verify_email(
         )
 
     user.email_verified = True
+
+    # 邮箱验证通过即自动生成默认 API Key（history/20260912.txt #4）：
+    # 用户验证后无需再去控制台手动建 Key，直接复制一句话配置即可接入 MCP。
+    # 惰性导入避免 auth ↔ api_keys 模块级循环依赖。
+    from ..api_keys.service import ensure_default_key
+
+    await ensure_default_key(db, user.id)
     await db.commit()
 
     return RedirectResponse(

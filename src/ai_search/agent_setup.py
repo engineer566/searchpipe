@@ -170,3 +170,25 @@ def render_skill_md() -> str:
     settings = get_settings()
     base_url = settings.app_base_url.rstrip("/")
     return SKILL_TEMPLATE.format(base_url=base_url)
+
+
+def mcp_url(base_url: str, api_key: str) -> str:
+    """按站点基址 + API Key 拼 MCP 链接（Key 内嵌 URL，Tavily 式）。"""
+    return f"{base_url.rstrip('/')}/mcp?api_key={api_key}"
+
+
+def build_agent_prompt(base_url: str, api_key: str) -> str:
+    """生成「一句话配置」提示词：直接粘给 AI Agent 即可自动完成 MCP 配置。
+
+    需求（history/20260912.txt #5）：这句话默认带上用户的 API Key 与 MCP 链接，
+    Agent 读到即可一键配置，无需再来回索要凭据。
+    控制台只提供复制按钮、页面不展示内容（见 api_keys.html / dashboard.html），
+    故由服务端（/api-keys/reveal）按登录用户渲染，而不是抄在模板里。
+    """
+    base = base_url.rstrip("/")
+    url = mcp_url(base, api_key)
+    return (
+        f"请阅读 {base}/agent-setup/SKILL.md 并按其中说明帮我配置 SearchPipe 的 MCP 服务，"
+        f"不用再问我任何信息：MCP 链接是 {url}，我的 API Key 是 {api_key}"
+        f"（工具名 ai_search_search）。配置完成后用它搜索「FastAPI 部署最佳实践」验证一次。"
+    )
