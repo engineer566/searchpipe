@@ -175,7 +175,11 @@ document.querySelectorAll('.key-reveal-btn').forEach(b=>{
 
   const first=picks.filter(p=>p.checked)[0]||picks[0];
   first.checked=true;
-  load(first.value).catch(e=>{ urlEl.textContent='加载失败：'+e.message; });
+  // ⚠️ app.js 是 defer 加载：内联脚本执行时 AIS 尚未定义，首屏拉取必须等
+  // DOMContentLoaded（defer 脚本在它之前跑完），否则首屏 MCP 链接会「加载失败」。
+  document.addEventListener('DOMContentLoaded',()=>{
+    load(first.value).catch(e=>{ urlEl.textContent='加载失败：'+e.message; });
+  });
 })();
 
 // 吊销
