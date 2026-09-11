@@ -12,7 +12,7 @@
 | [`searchpipe-overview`](memory/searchpipe-overview.md) | project | 架构、商业化模块全景、测试与开发的硬约束 |
 | [`searchpipe-auth-design`](memory/searchpipe-auth-design.md) | project | 邮箱注册/登录/忘记密码的设计决策与已知限制 |
 | [`searchpipe-test-server`](memory/searchpipe-test-server.md) | reference | **测试服地址**、部署方法、本机 Docker 环境的坑 |
-| [`searchpipe-prod-server`](memory/searchpipe-prod-server.md) | reference | **生产服地址**、境内/境外部署差异、生产首发记录 |
+| [`searchpipe-prod-server`](memory/searchpipe-prod-server.md) | reference | **生产服地址**、境内/境外部署差异、生产首发与后续迭代部署记录 |
 | [`searchpipe-seo`](memory/searchpipe-seo.md) | project | 公开可索引页清单、SEO 不变量、robots/sitemap/canonical 约定、nginx 侧改动 |
 
 ## 按任务读取

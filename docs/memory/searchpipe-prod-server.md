@@ -46,6 +46,17 @@ ssh -i ...work.pem root@47.89.243.229 "cd /opt/searchpipe && docker build --buil
 ssh -i ...work.pem root@47.89.243.229 "cd /opt/searchpipe && docker compose -f docker-compose.prod.yml up -d"
 ```
 
+## 需求 4/5 生产部署（main 3a8199d → e7e9f9f，2026-09-12）
+
+- **背景**：history/20260912.txt 需求 4（默认 API Key 自动生成 / Key 明文可查看 / MCP 链接选 Key）与需求 5（一句话配置默认带 Key、页面只留复制按钮）。代码先合 dev → 合 main（`git merge dev`），生产按 `main` 走：rsync（work.pem）→ 服务器原生 `docker build` → `docker compose -f docker-compose.prod.yml up -d app`；entrypoint 自动 `alembic upgrade head` 到 `f0a2b7c4d9e1`（api_keys.key_cipher + is_default + 回填每个用户最新有效 Key 为默认）。**生产 `.env` 未改动**（无 `KEY_ENCRYPTION_SECRET`，主密钥回退 `SESSION_COOKIE_SECRET`；**轮换 SESSION_COOKIE_SECRET 会让存量 Key 无法再查看明文**，鉴权不受影响）。
+- **验证（Playwright 打 `https://searchpipe.tech` + SSH 内网 DB/Redis，50/50 全过）**：注册→从 Redis 取 `verify:token:*`→点验证链接→DB 确认 `email_verified` 且自动生成「默认 Key（is_default=t、有密文）」；概览页/API Keys 页各一处复制按钮、两页 HTML 均无明文 Key；Key 列打码→点「显示」出明文→再点隐藏；MCP 链接默认打码、复制拿完整链接；建第二把 Key 后勾选复选框切换→链接随新 Key 变；吊销默认 Key→剩下一把自动成为默认；匿名/带 sp- Key 调 `/api-keys/reveal` 均 401；**revealed Key 实测可用**：`/mcp/?api_key=…` initialize → notifications/initialized → `tools/call ai_search_search` 返回真实结果，`POST /search` 200；healthz 内网 + HTTPS 双通、容器日志无 error。
+- **本次浏览器实测抓到并修复的 2 个真 bug**（pytest 只断言 HTML，测不出这类问题）：
+  1. `api_keys.html` 内联脚本同步调用 `AIS`，而 `app.js` 是 `defer` → MCP 配置卡首屏 `ReferenceError: AIS is not defined`、链接区「加载失败」、复选框与复制按钮全失效 → 首屏 fetch 放进 `DOMContentLoaded`（f105020）。
+  2. 模板条件误用 `k.viewable`（`viewable` 只存在于 API 的 `KeyItem`，模板遍历的是 ORM `ApiKey`）→ Jinja2 取到 undefined、条件恒假 → **所有 Key 都渲染「不可查看」、没有「显示」按钮**（生产实测命中，测试服同样中招）→ 改用 `k.key_cipher` 判定（04f58ee），并把测试断言从类名改成断言渲染元素本身。
+- **顺手为存量用户做的体验兜底**（e7e9f9f）：老 Key（无密文）在列表显示灰色「不可查看」、MCP 配置卡按 409 给「换 Key / 新建」提示、概览页改为引导去 API Keys 新建（不再给点了会报错的复制按钮）、落地页复制失败统一引导到 `/dashboard/api-keys`。
+- **生产数据观察**（未擅自清理）：①`ferriswym@163.com` 注册于 2026-09-10 09:10（UTC）但**邮箱未验证**——受门禁限制，其 `/search` 与 MCP 调用会 403，需要重发验证邮件或人工置 `email_verified`；②`api_keys` 里有 1 条**孤儿记录**（name=`test-key`、prefix=`sp-XEFuV`，created 2026-09-10 15:10，`user_id` 已无对应用户）——`api_keys.user_id` 没有外键，删用户不会级联删 Key，建议清理（`DELETE FROM api_keys WHERE user_id NOT IN (SELECT id FROM users)`）。
+- **合并注意**：`docs/INDEX.md`、`docs/memory/searchpipe-test-server.md` 在 main 与 dev 两侧都被改过（main 侧是只提交到 main 的 SEO 文档更新），合并 dev→main 时需手工合并，本次已按「保留两侧内容」处理。
+
 ## 首发验证记录（2026-09-10）
 
 - 迁移建表 5 段全过（init→email_verified）；healthz ok（内网+经 nginx HTTPS 双路）
