@@ -20,7 +20,10 @@ session loop 的连接池，TestClient 首请求（pool_pre_ping）就跨 loop �
 TestClient 自己的 portal loop。
 """
 
+import re
 import uuid
+from contextlib import contextmanager
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -28,6 +31,27 @@ from fastapi.testclient import TestClient
 from ai_search.main import app
 
 _TEST_PASSWORD = "test-pass-1234"
+
+
+@contextmanager
+def captured_mails():
+    """临时替换 mailer.send_mail 捕获邮件文本（供夹具取邮箱验证 token）。
+
+    注册接口在请求 task 内 await mailer.send_mail，patch 模块属性即可拦截；
+    不用 monkeypatch 是因为本文件的 client/test_user_creds 是 session 级夹具，
+    拿不到函数级 monkeypatch。
+    """
+    from ai_search.utils import mailer
+
+    box: list[str] = []
+
+    async def fake_send(to: str, subject: str, text: str) -> bool:
+        box.append(text)
+        return True
+
+    with patch.object(mailer, "send_mail", fake_send):
+        yield box
+
 
 
 def _rebind_engine_sync() -> None:
@@ -65,15 +89,24 @@ def test_user_creds(client: TestClient) -> dict:
 
     全部走 ASGI app 内部 task，避免夹具直连 DB 导致 asyncpg 跨 task 绑定。
     再通过 /api-keys 创建一把 API Key。返回 dict(jwt, api_key)。
+
+    2026-09-12：/search 与 MCP 增加了「邮箱验证」门禁（未验证 403），故这里
+    注册后立即消费验证邮件里的 token 完成邮箱验证——真实用户也是这个路径。
     """
     email = f"test-{uuid.uuid4().hex[:8]}@example.com"
-    # 注册 → 拿 JWT（注册即送免费额度 free_tier_credits）
-    resp = client.post(
-        "/auth/register",
-        json={"email": email, "password": _TEST_PASSWORD},
-    )
-    assert resp.status_code == 201, resp.text
-    jwt = resp.json()["access_token"]
+    # 注册 → 发验证邮件（捕获）→ 点验证链接 → 拿 JWT（注册即送免费额度）
+    with captured_mails() as box:
+        resp = client.post(
+            "/auth/register",
+            json={"email": email, "password": _TEST_PASSWORD},
+        )
+        assert resp.status_code == 201, resp.text
+        jwt = resp.json()["access_token"]
+    assert box, "注册后未捕获到验证邮件"
+    token = re.search(r"token=([A-Za-z0-9_\-]+)", box[0])
+    assert token, f"验证邮件里没有 token：{box[0]}"
+    verify = client.get(f"/auth/verify-email?token={token.group(1)}", follow_redirects=False)
+    assert verify.status_code == 302 and "verify_success=1" in verify.headers["location"], verify.text
     headers = {"Authorization": f"Bearer {jwt}"}
 
     # 管理员补一笔大额充值，保证整轮测试余额充足（free_tier 仅 1000，搜索测试会扣）
