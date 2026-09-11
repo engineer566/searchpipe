@@ -72,3 +72,9 @@
   测试服（47.98.124.167）尚未部署本次支付改动，需要时同样补 .env 三处即可。
 - 真实微信付款回调链（虎皮椒→/payments/callback→发积分）待首笔真实收款观察日志确认。
 - 后续若在虎皮椒后台开通支付宝应用，只需补 XUNHUPAY_APPID_ALIPAY/APPSECRET_ALIPAY，无需改代码。
+
+## 品牌图标换新（2026-09-11 下午）
+- 用户提供 searchpipe-brand/ 品牌包（钥匙形 logo），替换全站 🔍 emoji 风格品牌标识。
+- favicon 全系换新（svg/ico 16+32+48/favicon-16/32.png/apple-touch-icon 压不透明底/icon-192+512），webmanifest 补 icon-192；og-image 左上角图标 PIL 重绘为新品牌（其余像素不动）。
+- 模板 base/base_public/login/register/forgot/reset 的 🔍 换内联 SVG（currentColor，css .brand-mark），app.css bump ?v=20260914。
+- dev 278108e/080b816 → main；测试服+生产(searchpipe.tech)均部署验证通过（截图+内网 curl+pytest 181 passed）。

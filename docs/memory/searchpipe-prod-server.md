@@ -95,6 +95,12 @@ ssh -i ...work.pem root@47.89.243.229 "cd /opt/searchpipe && docker compose -f d
 - **冒烟清理**：2 笔 pending 订单 + 冒烟用户的 account/lot/tx 已删（备份在生产机 `/root/smoke-user-backup-20260911.json`）；users 剩真实用户 1 个，孤儿订单 0。
 - **注意**：真实微信付款后的异步回调链（虎皮椒→`/payments/callback`→发积分）尚未走真钱验证，原理与测试一致（验签=同一 `_sign`），待首笔真实收款时观察日志确认。
 
+## 品牌图标换新部署（main 278108e → 080b816，2026-09-11）
+
+- **背景**：用户提供 `searchpipe-brand/` 品牌包（钥匙形 logo，替换原 🔍 放大镜 emoji 风格）。favicon 全系（svg/ico 16+32+48/favicon-16/32.png/apple-touch-icon/icon-192+512）、webmanifest 补 icon-192、og-image 左上角小图标按新品牌重绘（PIL 抹除旧图标+8x 超采样绘制，其余像素不动）；6 个模板（base/base_public/login/register/forgot/reset）🔍 全换内联 SVG（currentColor，css 新增 `.brand-mark`）；app.css 版本号 bump `?v=20260914` 打爆旧缓存。品牌源文件已入仓库 `searchpipe-brand/`。
+- **部署**：dev（278108e）→ main 快进 → 测试服 rsync+build+up 验证 → 生产 rsync（work.pem）→ build → `up -d app`。
+- **验证（测试服 SSH 内网 + 生产内外网 + Playwright 截图全过）**：healthz 200；favicon.ico/svg、apple-touch-icon、favicon-16/32、icon-192/512、webmanifest（含 icon-192）、og-image（1200×630 新图标）全部 200 且 content-type 正确；落地页/登录页 `brand-mark` 渲染、🔍 emoji 0 残留；app.css 含 `.brand-mark` 且 `Cache-Control: no-cache`；生产 `https://searchpipe.tech` 外网复验一致；容器日志无 error。全量 pytest 181 passed / 5 skipped。
+
 ## 坑/注意
 1. **境外引擎现实**：机房 IP 下 brave 爬搜常 429（自动 Suspended 180s 降级）、wikidata init 403、google cse 未配 key 天然失败——兜底靠 bing+wikipedia，实测召回仍够（30 候选）。要提质有两条路：配 Brave Search API key（free tier）或 Google CSE key 填进 searxng/settings.yml 对应引擎。
 2. 1.6G 内存跑全栈 + aitrendwatch：available 常年 ~450Mi，和测试服同等吃紧；OOM 先加 swapfile。
