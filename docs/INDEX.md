@@ -33,7 +33,7 @@ searchpipe/
 │   │   ├── public_pages.py   # 公开可索引页（173 行；2026-09-13 SEO 整改从 routes.py 拆出 + 新增内容页）：/ 落地页 /terms 条款 /docs 开发文档 /mcp-server MCP 接入指南 /pricing 定价 /faq 常见问题
 │   │   ├── seo.py            # SEO 基建（597 行；2026-09-13 新增）：PUBLIC_PAGES 单一事实来源 + robots.txt/sitemap.xml/llms.txt/favicon/og-image 路由 + JSON-LD 构造 + 私有路径判定 + 站长验证 meta
 │   │   ├── templates/        # base(控制台壳)/base_public(公开站点壳，含完整 SEO head)/landing/public_docs/mcp_server/pricing/faq/terms/not_found/login/register/forgot_password/reset_password/dashboard/api_keys/usage/billing/feedback/messages/admin_*（22 个模板；公开页全部 extends base_public.html）；api_keys.html = Key 打码+点击查看 + MCP 配置卡（复选框选 Key / MCP 链接 / 一句话配置只留复制按钮）；dashboard.html 概览卡同款复制按钮 + 打码 MCP 命令
-│   │   └── static/           # app.css（双主题设计系统）+ app.js + favicon.ico/svg、apple-touch-icon.png、icon-512.png、og-image.png、site.webmanifest
+│   │   └── static/           # app.css（双主题设计系统，含 .brand-mark 品牌 logo 样式）+ app.js + favicon.ico/svg、favicon-16/32.png、apple-touch-icon.png、icon-192/512.png、og-image.png、site.webmanifest（2026-09-11 品牌图标换新为 searchpipe-brand 钥匙形 logo，源文件在仓库 searchpipe-brand/）
 │   ├── db/
 │   │   ├── base.py           # engine/session 工厂 + dispose_engine（44 行）
 │   │   ├── session.py        # get_db 依赖
