@@ -84,8 +84,18 @@ ssh -i ...work.pem root@47.89.243.229 "cd /opt/searchpipe && docker compose -f d
   - dashboard.html 统计 JS 改为 DOMContentLoaded 事件触发，确保 AIS 对象就绪后执行
 - **MCP 接入限制**：mcp_server.py 中 ai_search_search tool 增加 require_email_verified 检查，未验证用户调用 MCP tool 将返回 ToolError。
 
-## 坑/注意
+## 虎皮椒支付接入生产（main 1283c40→368f279，2026-09-11）
 
+- **背景**：拿到虎皮椒真实商户（**仅微信渠道**，appid 201906187427）。代码改造见 history/20260911.txt（动态渠道 + 签名修复）。
+- **部署**：dev→main 快进合并 → rsync → 服务器原生 build → `up -d`；生产 `.env` 只补了 `XUNHUPAY_APPID_WECHAT`/`XUNHUPAY_APPSECRET_WECHAT` 两个值（`XUNHUPAY_NOTIFY_URL=https://searchpipe.tech/payments/callback` 首发时已就位）。
+- **验证（Playwright 打 https://searchpipe.tech，6/6 全过）**：注册冒烟用户 → 登录 → /dashboard/billing 页头「支持微信支付。」→ 确认弹窗仅「微信支付」单选且默认勾选 → 真实下单 ¥10 档返回虎皮椒微信收银台 URL（id=20306963140…）→ 收银台 HTTP 200。API 侧 /payments/catalog 返回 `pay_channels:["wechat"]`，/terms /pricing 文案已是微信支付。
+- **浏览器实测抓到的 2 个真 bug**（pytest 断言 HTML/JSON 测不出）：
+  1. billing.html 内联 IIFE 同步调 `AIS` 而 app.js 是 defer → 首屏套餐「加载失败」（api_keys.html 同款旧坑的遗留）→ 包进 `DOMContentLoaded`（1d050a1）。
+  2. `CreateOrderResponse` 无 `pay_channel` 字段 → 前端待支付提示 `d.pay_channel==='wechat'?…` 恒假，微信单显示成「支付宝」→ 响应补该字段（368f279）。
+- **冒烟清理**：2 笔 pending 订单 + 冒烟用户的 account/lot/tx 已删（备份在生产机 `/root/smoke-user-backup-20260911.json`）；users 剩真实用户 1 个，孤儿订单 0。
+- **注意**：真实微信付款后的异步回调链（虎皮椒→`/payments/callback`→发积分）尚未走真钱验证，原理与测试一致（验签=同一 `_sign`），待首笔真实收款时观察日志确认。
+
+## 坑/注意
 1. **境外引擎现实**：机房 IP 下 brave 爬搜常 429（自动 Suspended 180s 降级）、wikidata init 403、google cse 未配 key 天然失败——兜底靠 bing+wikipedia，实测召回仍够（30 候选）。要提质有两条路：配 Brave Search API key（free tier）或 Google CSE key 填进 searxng/settings.yml 对应引擎。
 2. 1.6G 内存跑全栈 + aitrendwatch：available 常年 ~450Mi，和测试服同等吃紧；OOM 先加 swapfile。
 3. app 绑 127.0.0.1:8001 后，**外部无法直连 8001 排障**，一律 SSH 上去 curl 127.0.0.1:8001。

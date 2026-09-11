@@ -66,6 +66,9 @@
 - tests/test_payments.py 新增单渠道商户（仅微信）4 个测试；全量 pytest 181 passed。
 
 待办：
-- 部署测试服时在测试服 .env 配置同样凭证 + XUNHUPAY_NOTIFY_URL=http://47.98.124.167:8001/payments/callback（虎皮椒回调必须公网可达，localhost 收不到）。
-- 生产同理配 searchpipe.tech 域名回调。
+- ~~部署测试服/生产服配置凭证 + 回调地址~~ 已完成：2026-09-11 直接部署生产服（main 368f279），
+  生产 .env 补 XUNHUPAY_APPID_WECHAT/APPSECRET_WECHAT，Playwright 6/6 验证通过（含 2 个真 bug 修复：
+  billing 页 DOMContentLoaded、下单响应补 pay_channel）。详见 docs/memory/searchpipe-prod-server.md。
+  测试服（47.98.124.167）尚未部署本次支付改动，需要时同样补 .env 三处即可。
+- 真实微信付款回调链（虎皮椒→/payments/callback→发积分）待首笔真实收款观察日志确认。
 - 后续若在虎皮椒后台开通支付宝应用，只需补 XUNHUPAY_APPID_ALIPAY/APPSECRET_ALIPAY，无需改代码。
