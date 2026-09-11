@@ -18,11 +18,19 @@
 - **邮件**（`utils/mailer.py`）：stdlib smtplib + `asyncio.to_thread`，零新依赖；**SMTP 未配置时降级为日志输出**，永不抛错阻断流程。配置项 `SMTP_*` + `APP_BASE_URL`（拼重置/验证链接）。
 - **免费额度发放**走 `billing.service.grant_credits` **惰性导入**（防 billing→auth 循环依赖），dashboard 与 API 两处同模式。
 
+## API Key 存储与「可查看」设计（2026-09-12 需求 #4）
+
+- **三层存储**：`key_prefix`（前 8 位，列表展示 + 鉴权粗筛）／`key_hash`（argon2，**唯一鉴权凭据**）／`key_cipher`（Fernet 密文，只为「查看明文 / 生成 MCP 链接」）。鉴权链路一行未改，密文泄露但没有主密钥也解不出明文。
+- **主密钥派生**：`settings.key_encryption_secret` → 留空回退 `session_cookie_secret`，经 sha256 → urlsafe base64 得 Fernet key。**换掉主密钥后历史 Key 无法再查看明文（鉴权仍正常）**，所以生产若要轮换 cookie 密钥，先显式配置 `KEY_ENCRYPTION_SECRET`。
+- **读取面收窄**：明文只经 `GET /api-keys/reveal`（默认 Key）与 `GET /api-keys/{id}/reveal`（指定 Key）返回，且这两个端点用 `get_current_user`——带 `sp-` Key 的请求会被当 cookie 兜底失败 → 401，即**Key 不能自举读 Key**；越权/已吊销/非法 id 统一 404；老 Key 无密文 409 提示重建。前端默认打码渲染，明文只在用户点击「显示」后进入 DOM。
+- **默认 Key**：`is_default` 标记。邮箱验证通过（`auth/routes.verify_email`）即 `ensure_default_key()`，用户不用先去控制台建 Key 就能一句话接入 MCP；`/dashboard` 与 `/dashboard/api-keys` 对已验证老用户惰性补齐；吊销默认 Key 自动把剩下最新一把提升为默认；全部吊销后再取默认会新建一把。
+- **已知取舍**：默认 Key 无独立轮换流程（吊销即换）；`is_default` 是单标记而非唯一索引，并发建首把 Key 理论上可能两把都标记默认（控制台按「最新」展示，影响面小）。
+
 ## 已知限制（后续可改）
 
 - session cookie / JWT 是无状态签名，**重置密码后旧登录态不能强制踢下线**；要做得给 User 加 token 版本号。
 - 重置成功跳转用 `/dashboard/login?reset=1` 带提示；邮件是纯文本，未做 HTML 模板。
-- **未验证邮箱的用户仍可登录和使用基本功能**，仅 dashboard 显示警告提示；如需严格限制，可在鉴权依赖中检查 `email_verified`。
+- **未验证邮箱的用户可以登录，但 /search 与 MCP 调用会被 403 拒绝**（2026-09-12 起 `auth/core.require_email_verified`，admin/owner 豁免）；dashboard 另显示警告卡片 + 重发按钮。
 
 ## 测试范式
 
