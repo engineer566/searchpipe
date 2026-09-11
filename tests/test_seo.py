@@ -336,7 +336,7 @@ def test_terms_page_meta_and_jsonld(client):
     assert 'name="keywords"' in head
     assert 'rel="canonical"' in head
     assert {"WebPage", "BreadcrumbList"} <= _jsonld_types(_jsonld_blocks(html))
-    assert "一经售出概不退款" in html
+    assert "概不退款" not in html  # 2026-09-12 需求 6：法律上无效的声明已移除
 
 
 # ---------- 私有路径：noindex 响应头 / 索引安全 ----------

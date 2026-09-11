@@ -29,7 +29,13 @@ def test_terms_page_200(client):
     resp = client.get("/terms")
     assert resp.status_code == 200
     assert "服务条款" in resp.text
-    assert "一经售出概不退款" in resp.text
+    # 2026-09-12 需求 6：法律上无效的「概不退款」类声明已全面移除
+    assert "一经售出概不退款" not in resp.text
+    assert "概不退款" not in resp.text
+    assert "不予退款" not in resp.text
+    # 关键产品规则仍保留
+    assert "不支持自动续订" in resp.text
+    assert "永久有效" in resp.text
 
 
 # ---------- 登录页勾选校验 ----------

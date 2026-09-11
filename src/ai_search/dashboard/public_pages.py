@@ -79,7 +79,7 @@ async def terms_page(request: Request) -> object:
             nav_active="terms",
             page_title="服务条款 · SearchPipe 联网搜索服务",
             page_description=(
-                "SearchPipe 服务条款：积分充值与包月订阅规则（一经售出概不退款、"
+                "SearchPipe 服务条款：积分充值与包月订阅规则（充值积分永久有效、"
                 "订阅积分 30 天有效）、账号责任、禁止用途、免责声明与争议解决。"
             ),
             page_keywords="SearchPipe 服务条款,积分退款政策,订阅规则,使用规范",
