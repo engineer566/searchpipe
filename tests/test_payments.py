@@ -199,6 +199,7 @@ def test_wechat_only_default_channel(client, wechat_only_provider):
     headers = _register(client)
     order = _create_order(client, headers, kind="recharge", plan_id=PLAN_R10)
     assert "channel=wechat" in order["pay_url"]
+    assert order["pay_channel"] == "wechat"  # 响应携带实际渠道（供前端显示）
     _pay(client, wechat_only_provider, order)
     assert _balance(client, headers)["balance"] == pytest.approx(1350.0)
 

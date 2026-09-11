@@ -51,6 +51,7 @@ class CreateOrderResponse(BaseModel):
     amount_cents: int
     credits: str  # NUMERIC(20,2) 序列化为字符串，保精度
     status: str
+    pay_channel: str  # 实际渠道（请求留空时为服务端选中的默认渠道）
 
 
 class OrderStatusResponse(BaseModel):
@@ -211,6 +212,7 @@ async def create_order_route(
         amount_cents=order.amount_cents,
         credits=str(Decimal(order.credits).quantize(Decimal("0.01"))),
         status=order.status,
+        pay_channel=order.pay_channel,
     )
 
 
