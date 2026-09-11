@@ -39,6 +39,9 @@ class FakeProvider:
     def verify_callback(self, params: dict) -> bool:
         return params.get("sign") == "ok"
 
+    def available_channels(self) -> list[str]:
+        return ["alipay", "wechat"]
+
 
 @pytest.fixture()
 def fake_provider(monkeypatch):
@@ -79,7 +82,7 @@ def _balance(client, headers: dict) -> dict:
 # ---------- 目录 ----------
 
 
-def test_catalog_public(client):
+def test_catalog_public(client, fake_provider):
     resp = client.get("/payments/catalog")
     assert resp.status_code == 200, resp.text
     data = resp.json()
@@ -166,6 +169,71 @@ def test_pay_channel_wechat(client, fake_provider):
         client, headers, kind="recharge", plan_id=PLAN_R10, pay_channel="wechat"
     )
     assert "channel=wechat" in order["pay_url"]
+
+
+# ---------- 单渠道商户（仅微信）----------
+
+
+class WechatOnlyProvider(FakeProvider):
+    """模拟只开通微信渠道的商户（如当前虎皮椒商户）。"""
+
+    def available_channels(self) -> list[str]:
+        return ["wechat"]
+
+
+@pytest.fixture()
+def wechat_only_provider(monkeypatch):
+    p = WechatOnlyProvider()
+    monkeypatch.setattr("ai_search.payments.service._provider", p)
+    return p
+
+
+def test_wechat_only_catalog(client, wechat_only_provider):
+    resp = client.get("/payments/catalog")
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["pay_channels"] == ["wechat"]
+
+
+def test_wechat_only_default_channel(client, wechat_only_provider):
+    """不传 pay_channel 时自动落到已配置的微信渠道。"""
+    headers = _register(client)
+    order = _create_order(client, headers, kind="recharge", plan_id=PLAN_R10)
+    assert "channel=wechat" in order["pay_url"]
+    _pay(client, wechat_only_provider, order)
+    assert _balance(client, headers)["balance"] == pytest.approx(1350.0)
+
+
+def test_wechat_only_rejects_alipay(client, wechat_only_provider):
+    """未开通的渠道下单返回 400，且提示可用渠道。"""
+    headers = _register(client)
+    resp = client.post(
+        "/payments/orders",
+        json={"kind": "recharge", "plan_id": PLAN_R10, "pay_channel": "alipay"},
+        headers=headers,
+    )
+    assert resp.status_code == 400
+    assert "暂未开通" in resp.json()["detail"]
+    assert "微信" in resp.json()["detail"]
+
+
+def test_xunhupay_available_channels_by_credentials(monkeypatch):
+    """虎皮椒 provider 按已配置凭证判定渠道：仅微信凭证 → ["wechat"]。"""
+    from types import SimpleNamespace
+
+    from ai_search.payments import xunhupay
+
+    fake_settings = SimpleNamespace(
+        xunhupay_notify_url="http://example.com/callback",
+        xunhupay_appid="",
+        xunhupay_appsecret="",
+        xunhupay_appid_alipay="",
+        xunhupay_appsecret_alipay="",
+        xunhupay_appid_wechat="201906187427",
+        xunhupay_appsecret_wechat="s3cret",
+    )
+    monkeypatch.setattr(xunhupay, "get_settings", lambda: fake_settings)
+    provider = xunhupay.XunHuPayProvider()
+    assert provider.available_channels() == ["wechat"]
 
 
 # ---------- 订阅 ----------

@@ -39,7 +39,7 @@ searchpipe/
 │   │   ├── session.py        # get_db 依赖
 │   │   └── models/           # user(含 OAuthAccount)/api_key(含 key_cipher 密文与 is_default 默认 Key 标记)/billing(Plan/Order 含订阅字段)/credit(含 CreditLot 批次)/subscription/usage/feedback_ticket/site_message(站内信，batch_id 聚合已读统计)
 │   ├── billing/              # 积分计费：批次化扣费/退款/赠送/过期清理（service 396 行；pipeline 89 行；subscription 订阅/续订/升级到账 142 行）
-│   ├── payments/             # 虎皮椒支付（支付宝/微信双渠道）：catalog/四类下单/回调/状态查询（routes 263 行；service 253 行）
+│   ├── payments/             # 虎皮椒支付（支付宝/微信，按已配置凭证动态开通渠道，当前仅微信）：catalog/四类下单/回调/状态查询（routes 263 行；service 266 行）
 │   ├── api_keys/             # sp- 前缀 API Key CRUD + 默认 Key + 明文可查看（crypto.py 47 行 Fernet 加解密；service 207 行；routes 180 行，含 /reveal）
 │   ├── usage/                # 用量日志中间件 + 统计/导出（middleware 75 行）
 │   ├── rate_limit/           # Redis ZSET 滑动窗口限流（service 42 行）
@@ -90,7 +90,7 @@ searchpipe/
 | `admin/routes.py` | 660 | 管理端：用户/积分/订单/统计/反馈工单（Accept: text/html 渲染管理页）/站内信（GET/POST /admin/messages，定向+广播）/运营监控 SSR 页（含注册用户列表） |
 | `billing/service.py` | 396 | 积分账户：批次化 grant/deduct/refund/sweep_expired（行锁；限时批次优先消耗；退款按 lot_usage 还原原批次） |
 | `billing/subscription.py` | 142 | 包月订阅：订阅/续订/升级到账（30 天有效期、续订下周期生效、升级延期累积） |
-| `payments/xunhupay.py` | 102 | 虎皮椒签名/下单/回调验签（支付宝/微信双渠道凭证，回调两套 secret 各验一次） |
+| `payments/xunhupay.py` | 106 | 虎皮椒签名（key 排序后原始值拼接、**不做 URL 编码** + appsecret → MD5）/下单/回调验签（按渠道配置凭证，回调各 secret 各验一次；`available_channels()` 按已配凭证返回渠道） |
 | `usage/middleware.py` | 75 | BaseHTTPMiddleware 用量日志（注意 task group 约束） |
 | `rate_limit/service.py` | 42 | Redis ZSET 滑动窗口 |
 | `utils/cache.py` | 97 | RedisCache 懒连接单例（测试 rebind 见 conftest） |

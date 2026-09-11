@@ -81,11 +81,24 @@ async def create_order(
     kind: str,
     plan_id: uuid.UUID | None = None,
     amount_cents: int | None = None,
-    pay_channel: str = PayChannel.ALIPAY.value,
+    pay_channel: str | None = None,
 ) -> tuple[Order, str]:
-    """统一下单入口。按 kind 校验规则并生成订单。返回 (Order, 支付链接)。"""
-    if pay_channel not in (PayChannel.ALIPAY.value, PayChannel.WECHAT.value):
+    """统一下单入口。按 kind 校验规则并生成订单。返回 (Order, 支付链接)。
+
+    pay_channel 留空时用支付方首个已配置渠道（单渠道商户自动选中）。
+    """
+    provider = get_provider()
+    channels = provider.available_channels()
+    if pay_channel is None:
+        if not channels:
+            raise ValueError("支付暂未开通，请联系管理员")
+        pay_channel = channels[0]
+    elif pay_channel not in (PayChannel.ALIPAY.value, PayChannel.WECHAT.value):
         raise ValueError("支付渠道不支持，请选择支付宝或微信支付")
+    elif channels and pay_channel not in channels:
+        names = {"alipay": "支付宝", "wechat": "微信支付"}
+        avail = "、".join(names.get(c, c) for c in channels)
+        raise ValueError(f"该支付渠道暂未开通，请选择{avail}")
 
     plan: Plan | None = None
     subject = ""
@@ -160,7 +173,7 @@ async def create_order(
     db.add(order)
     await db.flush()
 
-    pay_url = await get_provider().create_order(
+    pay_url = await provider.create_order(
         order_no=order_no,
         amount_cents=price_cents,
         subject=subject,

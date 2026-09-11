@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-head">
   <h1>充值与订阅</h1>
-  <p>¥0.03 = 1 积分，1 积分 = 1 次请求。充值积分永久有效，订阅积分 30 天有效。支持支付宝、微信支付。</p>
+  <p>¥0.03 = 1 积分，1 积分 = 1 次请求。充值积分永久有效，订阅积分 30 天有效。<span id="pay-channel-text">支持支付宝、微信支付。</span></p>
 </div>
 
 <div class="grid2 mb" style="align-items:start">
@@ -87,10 +87,7 @@
     <div class="msg msg-warn" style="margin:10px 0;font-size:13px;line-height:1.7;text-align:left" id="cf-notice"></div>
     <div style="margin:14px 0">
       <div class="stat-label" style="margin-bottom:8px">支付渠道</div>
-      <div class="row">
-        <label class="row" style="gap:6px;cursor:pointer"><input type="radio" name="pay-channel" value="alipay" checked> 支付宝</label>
-        <label class="row" style="gap:6px;cursor:pointer"><input type="radio" name="pay-channel" value="wechat"> 微信支付</label>
-      </div>
+      <div class="row" id="pay-channels"></div>
     </div>
     <div class="row" style="justify-content:flex-end">
       <button class="btn btn-ghost" onclick="closeConfirm()">取消</button>
@@ -103,6 +100,7 @@
 <script>
 var CATALOG=null, PENDING=null;
 var RATE=0.03, MAX_YUAN=100;
+var CHANNEL_NAMES={alipay:'支付宝',wechat:'微信支付'};
 
 // 重要信息提示（下单前二次确认）
 var NOTICES={
@@ -112,11 +110,23 @@ var NOTICES={
   upgrade:'<strong>请确认：</strong><br>· 升级需支付新档位当前售价全额（不抵扣旧档剩余价值）<br>· 新档位积分即刻到账，自升级时刻起 30 天有效<br>· 原档位未用完的积分将延期至与新档位同期到期<br>· 不支持降级<br>· <strong>一经售出，概不退款</strong>'
 };
 
+// 支付渠道按 catalog 动态渲染（商户可能只开通单渠道）
+function renderPayChannels(){
+  var chans=(CATALOG&&CATALOG.pay_channels)||[];
+  document.getElementById('pay-channel-text').textContent=chans.length
+    ?'支持'+chans.map(function(c){return CHANNEL_NAMES[c]||c;}).join('、')+'。'
+    :'支付暂未开通，请联系管理员。';
+  document.getElementById('pay-channels').innerHTML=chans.map(function(c,i){
+    return '<label class="row" style="gap:6px;cursor:pointer"><input type="radio" name="pay-channel" value="'+c+'"'+(i===0?' checked':'')+'> '+(CHANNEL_NAMES[c]||c)+'</label>';
+  }).join('')||'<span class="muted">暂无可用支付渠道</span>';
+}
+
 (async()=>{
   try{
     CATALOG=await AIS.api('/payments/catalog');
     RATE=parseFloat(CATALOG.credit_yuan_rate);
     MAX_YUAN=CATALOG.max_recharge_yuan;
+    renderPayChannels();
     renderSubPlans();
     renderRechargePlans();
   }catch(e){
@@ -203,7 +213,9 @@ async function confirmOrder(){
   if(!PENDING) return;
   var btn=document.getElementById('cf-ok');
   btn.disabled=true;
-  var channel=document.querySelector('input[name="pay-channel"]:checked').value;
+  var radio=document.querySelector('input[name="pay-channel"]:checked');
+  if(!radio){ alert('暂无可用支付渠道，请联系管理员'); btn.disabled=false; return; }
+  var channel=radio.value;
   try{
     var body={kind:PENDING.kind,pay_channel:channel};
     if(PENDING.plan_id) body.plan_id=PENDING.plan_id;

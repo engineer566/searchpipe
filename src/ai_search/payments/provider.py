@@ -3,6 +3,7 @@
 PaymentProvider：
 - create_order(order_no, amount_cents, subject) → 支付链接/二维码 URL
 - verify_callback(params) → bool（验签）
+- available_channels() → 已配置可用的支付渠道（默认双渠道，子类按凭证覆盖）
 """
 
 import logging
@@ -29,3 +30,7 @@ class PaymentProvider(ABC):
     def verify_callback(self, params: dict) -> bool:
         """校验异步回调签名。"""
         ...
+
+    def available_channels(self) -> list[str]:
+        """已配置可用的支付渠道（alipay/wechat）。默认双渠道，子类按凭证覆盖。"""
+        return ["alipay", "wechat"]

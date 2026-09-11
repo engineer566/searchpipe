@@ -15,7 +15,6 @@ B2B 受阻、存在跑路/冻卡风险。个体工商户注册后应尽快换微
 
 import hashlib
 import logging
-from urllib.parse import urlencode
 
 import httpx
 
@@ -49,12 +48,17 @@ class XunHuPayProvider(PaymentProvider):
     def name(self) -> str:
         return "xunhupay"
 
+    def available_channels(self) -> list[str]:
+        """已配置凭证的渠道（虎皮椒按渠道各建应用，可能只开通其一）。"""
+        return [ch for ch, (appid, secret) in self._creds.items() if appid and secret]
+
     @staticmethod
     def _sign(params: dict, appsecret: str) -> str:
-        """虎皮椒签名：参数按 key 排序 → key1=val1&key2=val2 → 追加 appsecret → MD5 小写。"""
+        """虎皮椒签名：参数按 key 字典序排序 → 原始值拼接 key1=val1&key2=val2
+        （不做 URL 编码）→ 末尾直接追加 appsecret → MD5 小写。"""
         # 过滤空值与 hash 本身
-        items = sorted((k, v) for k, v in params.items() if v not in (None, "") and k != "hash")
-        raw = urlencode(items) + appsecret
+        items = sorted((k, str(v)) for k, v in params.items() if v not in (None, "") and k != "hash")
+        raw = "&".join(f"{k}={v}" for k, v in items) + appsecret
         return hashlib.md5(raw.encode("utf-8")).hexdigest()
 
     async def create_order(

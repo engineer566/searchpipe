@@ -51,3 +51,21 @@
 - [ ] 在测试环境运行全量 pytest
 - [ ] 部署到测试服验证
 - [ ] 提交到 dev 并 push origin
+
+## 虎皮椒支付接入（微信单渠道，真实商户凭证）
+
+需求：用户提供虎皮椒商户（仅开通微信支付），appid 201906187427，网关 https://api.xunhupay.com/payment/do.html。
+
+改动：
+- payments/provider.py 新增 available_channels()（默认双渠道）；xunhupay.py 按已配置凭证覆盖返回。
+- payments/service.py 下单 pay_channel 可留空 → 自动落到首个已配置渠道；未开通渠道下单 400 并提示可用渠道。
+- payments/routes.py /payments/catalog 的 pay_channels 改为动态（按 provider 已配置凭证）。
+- 关键 bug 修复：虎皮椒签名不做 URL 编码（key 排序后原始值 key1=val1&... 直接拼 appsecret 再 MD5）。原实现 urlencode 导致中文 title 被百分号编码，网关报「错误的签名」。已用 1 分钱真实下单冒烟通过（网关返回微信收银台 URL）。
+- billing.html 渠道单选/页头文案按 catalog 动态渲染；terms.html/pricing.html 支付文案改为「微信支付（以结算页实际可用渠道为准）」。
+- .env 写入 XUNHUPAY_APPID_WECHAT/APPSECRET_WECHAT/NOTIFY_URL（本机 notify_url 为 localhost，仅联调占位）。
+- tests/test_payments.py 新增单渠道商户（仅微信）4 个测试；全量 pytest 181 passed。
+
+待办：
+- 部署测试服时在测试服 .env 配置同样凭证 + XUNHUPAY_NOTIFY_URL=http://47.98.124.167:8001/payments/callback（虎皮椒回调必须公网可达，localhost 收不到）。
+- 生产同理配 searchpipe.tech 域名回调。
+- 后续若在虎皮椒后台开通支付宝应用，只需补 XUNHUPAY_APPID_ALIPAY/APPSECRET_ALIPAY，无需改代码。

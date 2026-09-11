@@ -25,7 +25,7 @@ from ..billing.subscription import get_active_subscription
 from ..config import get_settings
 from ..db.models import Order, OrderKind, Plan, PlanKind, User
 from ..db.session import get_db
-from .service import create_order, get_order, handle_callback
+from .service import create_order, get_order, get_provider, handle_callback
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/payments", tags=["payments"])
@@ -42,7 +42,7 @@ class CreateOrderRequest(BaseModel):
     kind: str = OrderKind.RECHARGE.value  # recharge/subscribe/renew/upgrade
     plan_id: str | None = None
     amount_cents: int | None = None       # 自定义充值金额（分）
-    pay_channel: str = "alipay"           # alipay/wechat
+    pay_channel: str | None = None        # alipay/wechat；留空用支付方首个已配置渠道
 
 
 class CreateOrderResponse(BaseModel):
@@ -89,7 +89,7 @@ class CatalogResponse(BaseModel):
     subscription_plans: list[PlanInfo]
     credit_yuan_rate: str        # ¥0.03 = 1 积分
     max_recharge_yuan: int       # 自定义充值上限
-    pay_channels: list[str]      # ["alipay", "wechat"]
+    pay_channels: list[str]      # 已配置渠道，如 ["wechat"] 或 ["alipay", "wechat"]
     subscription: SubscriptionInfo | None  # 当前有效订阅（未登录/无订阅为 None）
 
 
@@ -160,7 +160,7 @@ async def catalog(
         subscription_plans=subs,
         credit_yuan_rate=s.credit_yuan_rate,
         max_recharge_yuan=s.max_recharge_yuan,
-        pay_channels=["alipay", "wechat"],
+        pay_channels=get_provider().available_channels(),
         subscription=subscription,
     )
 
