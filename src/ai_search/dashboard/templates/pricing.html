@@ -36,7 +36,7 @@
         <thead><tr><th>Plan</th><th>Price</th><th>Credits / period</th></tr></thead>
         <tbody>
           {% for name, price, original, credits in subscription_plans %}
-          <tr><td><strong>{{ name }}</strong></td><td>${{ price }}/mo</td><td>{{ credits }}</td></tr>
+          <tr><td><strong>{{ name }}</strong></td><td>${{ price }}/mo{% if original != price %} <span style="color:var(--faint);text-decoration:line-through;font-size:13px">${{ original }}</span>{% endif %}</td><td>{{ credits }}</td></tr>
           {% endfor %}
         </tbody>
       </table>
