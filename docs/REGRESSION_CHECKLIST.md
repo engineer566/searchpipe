@@ -60,7 +60,7 @@ docker logs ai-search-app --tail 200 | grep -i reset
 - [ ] 落地页首屏 → 含 MCP 接入命令（`claude mcp add` 代码块）；匿名访客的副按钮为「登录后一键配置 Agent」（已登录时为「复制一句话配置」，且页面 HTML 不含明文 Key）
 - [ ] 落地页定价区 → 含订阅三档（包月·基础/进阶/旗舰）
 - [ ] 落地页首屏「在线体验」搜索框：未登录提交 → 302 到 `/dashboard/login?next=/dashboard?q=...`，登录后自动回跳并预填触发搜索；已登录提交 → 302 进 `/dashboard?q=...` 自动开始搜索
-- [ ] `curl -s 127.0.0.1:8001/terms` → 200，含「概不退款」「不支持自动续订」条款
+- [ ] `curl -s 127.0.0.1:8001/terms` → 200，含「不支持自动续订」条款，且不含「概不退款」类无效声明（2026-09-12 需求 6）
 - [ ] `curl -s 127.0.0.1:8001/agent-setup/SKILL.md` → 200，text 内容含 MCP 配置（`{APP_BASE_URL}/mcp?api_key=sp-…`）
 
 ### 1.1 SEO / 收录面（2026-09-13 整改，随迭代必跑）
