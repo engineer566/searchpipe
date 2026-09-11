@@ -4,10 +4,11 @@
   订阅档用 level（1/2/3）做升级比较；original_price_cents 为标价（划线价），
   price_cents 为当前实际售价（限时折扣期=折扣价）。
 - Order：订单，kind 区分 recharge/subscribe/renew/upgrade 四种业务；
-  pay_channel 记录支付渠道（alipay/wechat）；自定义充值单 plan_id 为 NULL。
+  pay_channel 记录支付渠道（card/paypal 等，托管收银台实际渠道由平台决定）；
+  自定义充值单 plan_id 为 NULL。
   status 流转 pending → paid → (failed/refunded)。
-  provider_order_id 存支付方订单号用于回调对账；幂等靠 status 判定。
-- credits 为 NUMERIC(20,2)：自定义充值按 ¥0.03=1 积分换算可产生 2 位小数积分。
+  provider_order_id 存支付方订单号/事件 id 用于回调对账；幂等靠 status 判定。
+- credits 为 NUMERIC(20,2)：自定义充值按 $0.005=1 积分换算可产生 2 位小数积分。
 """
 
 import enum
@@ -16,6 +17,7 @@ from decimal import Decimal
 from datetime import datetime
 
 from sqlalchemy import BigInteger, DateTime, ForeignKey, Numeric, String
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..base import Base
@@ -42,8 +44,8 @@ class OrderKind(str, enum.Enum):
 
 
 class PayChannel(str, enum.Enum):
-    ALIPAY = "alipay"
-    WECHAT = "wechat"
+    CARD = "card"
+    PAYPAL = "paypal"
 
 
 class Plan(Base, PkMixin, TimestampMixin):
@@ -60,6 +62,10 @@ class Plan(Base, PkMixin, TimestampMixin):
     original_price_cents: Mapped[int | None] = mapped_column(BigInteger)  # 标价（划线价）
     period: Mapped[str | None] = mapped_column(String(16))  # month=包月；None=一次性
     is_active: Mapped[bool] = mapped_column(default=True, server_default="true")
+    # 套餐 ↔ MoR 平台 product 映射：{"creem": "prod_...", "dodo": "prod_..."}
+    provider_products: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default="{}"
+    )
 
 
 class Order(Base, PkMixin, TimestampMixin):

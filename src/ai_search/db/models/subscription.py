@@ -20,6 +20,8 @@ from ._mixins import PkMixin, TimestampMixin
 
 class SubscriptionStatus(str, enum.Enum):
     ACTIVE = "active"
+    CANCELED = "canceled"   # 平台侧已取消（当期积分到期自然失效，不回收）
+    PAST_DUE = "past_due"   # 平台侧扣款失败宽限期
     EXPIRED = "expired"
 
 
@@ -40,3 +42,6 @@ class Subscription(Base, PkMixin, TimestampMixin):
     current_period_end: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
+    # 原生自动续订：平台托管扣款，webhook 按这两个字段定位本地订阅
+    provider: Mapped[str | None] = mapped_column(String(16))
+    provider_subscription_id: Mapped[str | None] = mapped_column(String(128))
