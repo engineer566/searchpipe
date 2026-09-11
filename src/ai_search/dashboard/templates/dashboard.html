@@ -78,7 +78,7 @@
 <div class="card">
   <h2>接入你的 Agent</h2>
   <p class="card-sub">MCP 接入（推荐）默认使用你的<strong>默认 API Key</strong>{% if default_key %}（<code>{{ default_key.key_prefix }}…</code>）{% endif %}；换 Key 或查看明文见「<a href="/dashboard/api-keys">API Keys</a>」页，详细参数见<a href="/docs">开发文档</a>。</p>
-  {% if default_key %}
+  {% if default_key and default_key_viewable %}
   <p class="card-sub">一句话配置（最省事）：提示词里已带上你的默认 API Key 与 MCP 链接，复制后直接粘给 AI Agent，它会自己读完接入说明并配置好。</p>
   <div class="row mb" style="gap:10px;flex-wrap:wrap;align-items:center">
     <button type="button" class="btn" id="home-oneliner-copy">复制一句话配置</button>
@@ -91,6 +91,8 @@
     <button type="button" class="btn btn-sm" id="home-mcp-copy">复制完整接入命令（含 Key）</button>
     <span class="muted" style="font-size:13px">页面只显示打码链接，复制到的是完整命令。</span>
   </div>
+  {% elif default_key %}
+  <div class="empty">你当前的默认 API Key（<code>{{ default_key.key_prefix }}…</code>）创建于「查看明文」功能上线前，系统只保存了它的哈希、无法再拼出带 Key 的链接。<br>请到「<a href="/dashboard/api-keys">API Keys</a>」页新建一把 Key（新 Key 可随时查看明文并直接生成 MCP 链接与一句话配置）；旧 Key 仍可继续用于调用。</div>
   {% else %}
   <div class="empty">完成邮箱验证后系统会自动生成一把默认 API Key（也可在「<a href="/dashboard/api-keys">API Keys</a>」页手动创建），之后这里会给出可直接复制的接入命令与一句话配置。</div>
   {% endif %}

@@ -445,6 +445,9 @@ async def dashboard_home(
             "resend_success": resend_success,
             "resend_cooldown": resend_cooldown,
             "default_key": default_key,
+            # 老 Key（上线前创建、无 key_cipher 密文）拿不到明文：概览卡改为引导新建 Key，
+            # 而不是给一个点了会弹 409 的复制按钮
+            "default_key_viewable": bool(default_key and default_key.key_cipher),
         },
     )
 

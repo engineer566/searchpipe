@@ -262,9 +262,11 @@ claude mcp add --transport http searchpipe \
       const d=await AIS.api('/api-keys/reveal');
       AIS.copy(d.agent_prompt, btn);
     }catch(e){
-      // 未登录/凭据失效：AIS.api 已引导去登录页；其它错误退回控制台自行复制
+      // 凭据失效（401，AIS.api 已引导去登录页）→ 让用户落到能修的地方：
+      // 登录页回跳 API Keys；其它失败（如老 Key 无密文 409）也同样引导过去，别只弹句话
       if(e && e.message && !/401|未提供认证凭据/.test(e.message)) alert(e.message);
-      else window.location.href='/dashboard/login?next=%2Fdashboard%2Fapi-keys';
+      // 已登录直接去控制台换 Key；未登录先过登录页（带回跳）
+      window.location.href='{% if logged_in %}/dashboard/api-keys{% else %}/dashboard/login?next=%2Fdashboard%2Fapi-keys{% endif %}';
     }finally{ btn.disabled=false; }
   };
 })();

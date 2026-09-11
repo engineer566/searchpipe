@@ -161,3 +161,38 @@ def test_public_docs_mentions_oneliner_flow(client):
     assert page.status_code == 200
     assert "一句话配置" in page.text
     assert "/dashboard/api-keys" in page.text
+
+
+def test_dashboard_home_legacy_default_key_guides_to_new_key(client, sent_mails, monkeypatch):
+    """默认 Key 是老 Key（无密文）→ 概览卡不给复制按钮，改为引导去 API Keys 新建。
+
+    直接给复制按钮的话，点击会因 /api-keys/reveal 返回 409 而弹错误提示，对老用户不友好。
+    """
+    import uuid as _uuid
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+
+    from ai_search.api_keys import service as keys_service
+
+    _verified_dashboard_user(client, sent_mails)
+    legacy = SimpleNamespace(
+        id=_uuid.uuid4(),
+        name="默认 Key",
+        key_prefix="sp-LEGACY",
+        is_default=True,
+        key_cipher=None,          # 关键：没有密文
+        last_used_at=None,
+        revoked_at=None,
+        created_at=datetime.now(timezone.utc),
+    )
+
+    async def _fake_ensure(db, user_id):
+        return legacy
+
+    monkeypatch.setattr(keys_service, "ensure_default_key", _fake_ensure)
+    page = client.get("/dashboard")
+    assert page.status_code == 200
+    text = page.text
+    assert "查看明文" in text and "新建一把 Key" in text
+    assert 'id="home-oneliner-copy"' not in text
+    assert 'id="home-mcp-copy"' not in text
