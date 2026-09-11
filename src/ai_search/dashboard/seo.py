@@ -90,10 +90,10 @@ def is_private_path(path: str) -> bool:
 
 # 定价（与 landing.html / pricing.html 展示价保持一致，测试会交叉校验）
 # 出海定价（USD）：充值 $5→1,000 / $10→2,100 / $20→4,400 credits；
-# 订阅 Starter $4.99→1,000/月、Pro $9.99→3,000/月、Max $19.99→10,000/月；$0.005 = 1 credit。
+# 订阅 Starter $4.99→1,200/月、Pro $9.99→3,000/月、Max $19.99→10,000/月；$0.005 = 1 credit。
 RECHARGE_TIERS = (("$5", "1,000 credits"), ("$10", "2,100 credits"), ("$20", "4,400 credits"))
 SUBSCRIPTION_PLANS = (
-    ("Starter", "4.99", "9.99", "1,000 credits / month"),
+    ("Starter", "4.99", "9.99", "1,200 credits / month"),
     ("Pro", "9.99", "19.99", "3,000 credits / month"),
     ("Max", "19.99", "39.99", "10,000 credits / month"),
 )

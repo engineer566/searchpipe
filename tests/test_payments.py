@@ -7,7 +7,7 @@
 
 种子套餐（迁移 g1a2b3c4d5e6 固定 UUID）：
 - 充值：…0001=$5/1000 …0002=$10/2100 …0003=$20/4400
-- 订阅：…0001=Starter $4.99/1000 …0002=Pro $9.99/3000 …0003=Max $19.99/10000
+- 订阅：…0001=Starter $4.99/1200 …0002=Pro $9.99/3000 …0003=Max $19.99/10000
 """
 
 import json
@@ -21,7 +21,7 @@ from ai_search.payments.provider import PaymentEvent, WebhookVerificationError
 _PW = "test-pass-1234"
 
 PLAN_R5 = "33333333-0000-0000-0000-000000000001"   # $5 = 1000
-PLAN_SUB1 = "44444444-0000-0000-0000-000000000001"  # Starter $4.99 = 1000
+PLAN_SUB1 = "44444444-0000-0000-0000-000000000001"  # Starter $4.99 = 1200
 PLAN_SUB2 = "44444444-0000-0000-0000-000000000002"  # Pro $9.99 = 3000
 
 
@@ -291,13 +291,13 @@ def test_subscribe_flow(client, fake_provider, sent_mails):
         client, headers, kind="subscribe", plan_id=PLAN_SUB1, pay_channel="card"
     )
     assert order["amount_cents"] == 499  # 限时折扣价
-    assert order["credits"] == "1000.00"
+    assert order["credits"] == "1200.00"
     _activate_subscription(client, order)
 
     bal = _balance(client, headers)
-    assert bal["balance"] == pytest.approx(2000.0)   # 1000 永久 + 1000 限时
+    assert bal["balance"] == pytest.approx(2200.0)   # 1000 永久 + 1200 限时
     assert bal["permanent"] == pytest.approx(1000.0)
-    assert bal["expiring"] == pytest.approx(1000.0)
+    assert bal["expiring"] == pytest.approx(1200.0)
     assert bal["next_expiry"] is not None
 
     # catalog 显示当前订阅（登录态）
@@ -330,10 +330,10 @@ def test_renewal_via_webhook(client, fake_provider, sent_mails):
     _webhook(client, "fakepay", event)
 
     bal = _balance(client, headers)
-    assert bal["balance"] == pytest.approx(3000.0)
-    # 续期积分下一周期才生效：expiring 不变，upcoming +1000
-    assert bal["expiring"] == pytest.approx(1000.0)
-    assert bal["upcoming"] == pytest.approx(1000.0)
+    assert bal["balance"] == pytest.approx(3200.0)
+    # 续期积分下一周期才生效：expiring 不变，upcoming +1200
+    assert bal["expiring"] == pytest.approx(1200.0)
+    assert bal["upcoming"] == pytest.approx(1200.0)
 
     # 周期顺延 30 天
     from datetime import datetime
@@ -345,7 +345,7 @@ def test_renewal_via_webhook(client, fake_provider, sent_mails):
 
     # 事件幂等：同一 event_id 重放不重复发积分
     _webhook(client, "fakepay", event)
-    assert _balance(client, headers)["balance"] == pytest.approx(3000.0)
+    assert _balance(client, headers)["balance"] == pytest.approx(3200.0)
 
 
 def test_upgrade_flow(client, fake_provider, sent_mails):
@@ -360,8 +360,8 @@ def test_upgrade_flow(client, fake_provider, sent_mails):
     _pay(client, fake_provider, up)
 
     bal = _balance(client, headers)
-    # 原档 1000 未用完积分延期至与新档（3000）同期 → 限时余额 4000
-    assert bal["expiring"] == pytest.approx(4000.0)
+    # 原档 1200 未用完积分延期至与新档（3000）同期 → 限时余额 4200
+    assert bal["expiring"] == pytest.approx(4200.0)
     sub = client.get("/payments/catalog", headers=headers).json()["subscription"]
     assert sub["level"] == 2
 
@@ -433,7 +433,7 @@ def test_creem_style_subscribe_flow(client, fake_provider, sent_mails):
         "type": "subscription_paid", "event_id": f"evt-{uuid.uuid4().hex[:8]}",
         "provider_subscription_id": sub_id,
     })
-    assert _balance(client, headers)["balance"] == pytest.approx(2000.0)
+    assert _balance(client, headers)["balance"] == pytest.approx(2200.0)
 
     # 下一周期续期
     _webhook(client, "fakepay", {
@@ -441,8 +441,8 @@ def test_creem_style_subscribe_flow(client, fake_provider, sent_mails):
         "provider_subscription_id": sub_id,
     })
     bal = _balance(client, headers)
-    assert bal["balance"] == pytest.approx(3000.0)
-    assert bal["upcoming"] == pytest.approx(1000.0)
+    assert bal["balance"] == pytest.approx(3200.0)
+    assert bal["upcoming"] == pytest.approx(1200.0)
 
 
 def test_webhook_bad_signature_rejected(client, fake_provider, sent_mails):
