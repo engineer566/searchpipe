@@ -54,7 +54,8 @@ ssh -i ...work.pem root@47.89.243.229 "cd /opt/searchpipe && docker compose -f d
   1. `api_keys.html` 内联脚本同步调用 `AIS`，而 `app.js` 是 `defer` → MCP 配置卡首屏 `ReferenceError: AIS is not defined`、链接区「加载失败」、复选框与复制按钮全失效 → 首屏 fetch 放进 `DOMContentLoaded`（f105020）。
   2. 模板条件误用 `k.viewable`（`viewable` 只存在于 API 的 `KeyItem`，模板遍历的是 ORM `ApiKey`）→ Jinja2 取到 undefined、条件恒假 → **所有 Key 都渲染「不可查看」、没有「显示」按钮**（生产实测命中，测试服同样中招）→ 改用 `k.key_cipher` 判定（04f58ee），并把测试断言从类名改成断言渲染元素本身。
 - **顺手为存量用户做的体验兜底**（e7e9f9f）：老 Key（无密文）在列表显示灰色「不可查看」、MCP 配置卡按 409 给「换 Key / 新建」提示、概览页改为引导去 API Keys 新建（不再给点了会报错的复制按钮）、落地页复制失败统一引导到 `/dashboard/api-keys`。
-- **生产数据观察**（未擅自清理）：①`ferriswym@163.com` 注册于 2026-09-10 09:10（UTC）但**邮箱未验证**——受门禁限制，其 `/search` 与 MCP 调用会 403，需要重发验证邮件或人工置 `email_verified`；②`api_keys` 里有 1 条**孤儿记录**（name=`test-key`、prefix=`sp-XEFuV`，created 2026-09-10 15:10，`user_id` 已无对应用户）——`api_keys.user_id` 没有外键，删用户不会级联删 Key，建议清理（`DELETE FROM api_keys WHERE user_id NOT IN (SELECT id FROM users)`）。
+- **生产数据观察与清理**：①`ferriswym@163.com` 注册于 2026-09-10 09:10（UTC）但**邮箱未验证**——受门禁限制，其 `/search` 与 MCP 调用会 403（由项目负责人自行处理，本次未动）；②**孤儿记录已清理**：两个已删除冒烟用户（`018b3ad3-…`、`cc022fe9-…`）留下的 `api_keys` 1 条（`test-key`/`sp-XEFuV`）、`credit_lots` 1 条、`credit_transactions` 7 条、`usage_logs` 1 条，清理前导出备份到生产机 `/root/orphan-rows-backup-20260911.json`，清理后各表孤儿计数均为 0；真实用户的 1 个账户/1 个批次/3 条流水/2 条用量日志原样保留（已核对 `user_id` 全部属于 `57307365-…`）。
+- **坑**：`api_keys`／`credit_*`／`usage_logs` 的 `user_id` **没有外键约束**，删用户不会级联删这些行——删测试用户时要顺手清干净（先备份）：`DELETE FROM usage_logs|credit_transactions|credit_lots|credit_accounts|api_keys WHERE user_id NOT IN (SELECT id FROM users);`
 - **合并注意**：`docs/INDEX.md`、`docs/memory/searchpipe-test-server.md` 在 main 与 dev 两侧都被改过（main 侧是只提交到 main 的 SEO 文档更新），合并 dev→main 时需手工合并，本次已按「保留两侧内容」处理。
 
 ## 首发验证记录（2026-09-10）
