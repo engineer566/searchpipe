@@ -115,3 +115,10 @@ ssh -i ...work.pem root@47.89.243.229 "cd /opt/searchpipe && docker compose -f d
 3. app 绑 127.0.0.1:8001 后，**外部无法直连 8001 排障**，一律 SSH 上去 curl 127.0.0.1:8001。
 4. ~~www.searchpipe.tech 证书已含但 nginx 只做 https 跳转不做归一~~ **2026-09-13 已修**：www 独立 server 块 301 归一到主域（证书是同一张，含 www SAN）。
 5. 支付回调/邮件链接全部依赖 APP_BASE_URL，换域名只改 .env 三处（APP_BASE_URL/OAUTH_REDIRECT_BASE/XUNHUPAY_NOTIFY_URL）。
+
+## 出海版生产部署（main 9e67790 → 74040b0，2026-09-14）
+
+- **背景**：Creem 商家申请需提交网站审核 → 出海版直接上生产。`overseas` 合入 `main`（fast-forward）后按本文件部署流程执行。
+- **步骤**：rsync → 迁移前 pg_dump 备份（`/opt/searchpipe/backup-pre-overseas-20260911-184357.sql`）→ 生产 `.env` 改 `PAYMENT_PROVIDER=creem`（密钥待 Creem 审核后补；`XUNHUPAY_*` 残留项已被 config `extra="ignore"` 忽略）→ 服务器原生 `docker build` → `docker compose -f docker-compose.prod.yml up -d`；entrypoint 自动迁移到 `g1a2b3c4d5e6`（旧 7 个 CNY 档 `is_active=false`，新 USD 档种子生效）。
+- **验证**：healthz 200；外网 7 个公开页（/ /pricing /docs /mcp-server /faq /terms /privacy）全 200 且零中文；catalog 返回 USD 新套餐 + `pay_channels=["card","paypal"]`（Creem 空密钥下 provider 仍可构造）；/sitemap.xml、/llms.txt 含 /privacy；/search 未认证 401；容器日志无 error。
+- **注意**：`OAUTH_GITHUB_CLIENT_ID` 在生产 .env 里为空 → 登录/注册页不显示 OAuth 按钮（预期行为）；要开 GitHub/Google 登录需先建 OAuth App（回调 `https://searchpipe.tech/auth/oauth/{github|google}/callback`）再填 .env。Creem 凭证到位前下单会 502（catalog 优雅降级不挂页）。

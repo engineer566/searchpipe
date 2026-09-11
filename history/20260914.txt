@@ -22,3 +22,5 @@
 - **`docs/PROJECT_MEMORY.md`**：登记新条目（6 条），按任务读取表加一行。
 - **`README.md`**：面向海外用户重写为英文（简介/架构/quickstart/响应结构/MCP 接入/配置项表），底部附一行中文说明；不引用 .env 真实值。
 - **测试**：`.venv/bin/python -m pytest tests/ -q` 文档改动后复跑确认仍全绿。
+
+【出海版生产部署】应用户要求（Creem 申请需提交网站审核），overseas 合入 main 并部署生产：rsync → DB 备份 → .env 切 PAYMENT_PROVIDER=creem → 构建 → 起栈（自动迁移 g1a2b3c4d5e6）。外网验证：公开页全英文 200、catalog USD、日志干净。详见 docs/memory/searchpipe-prod-server.md。
