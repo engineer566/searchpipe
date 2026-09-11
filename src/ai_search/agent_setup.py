@@ -11,7 +11,7 @@ from .config import get_settings
 SKILL_TEMPLATE = """\
 ---
 name: searchpipe-search
-description: Web search, online search, real-time search, internet search, search the web, lookup online, find information, research, 查询, 搜索, 联网搜索, 实时搜索, 网络查询, 资料查找, 信息检索. SearchPipe real-time web search API built for AI agents via MCP.
+description: Web search, online search, real-time search, internet search, search the web, lookup online, find information, research, Chinese web search. SearchPipe real-time web search API built for AI agents via MCP.
 ---
 
 # SearchPipe Search Skill (MCP-based)

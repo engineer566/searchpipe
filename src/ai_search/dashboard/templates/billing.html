@@ -1,83 +1,83 @@
 {% extends "base.html" %}
-{% block title %}充值 · SearchPipe{% endblock %}
+{% block title %}Billing · SearchPipe{% endblock %}
 {% block content %}
 {% if not user.email_verified %}
 <div class="card" style="border-left:3px solid var(--warn);margin-bottom:24px">
   <div class="row" style="align-items:center;gap:12px">
     <span style="font-size:20px">⚠️</span>
     <div class="grow">
-      <strong>充值前请先完成邮箱验证</strong>
-      <p class="muted" style="margin:4px 0 0;font-size:13px">为避免财务纠纷，充值与订阅需验证邮箱后才能下单。请查收注册邮件中的验证链接。</p>
+      <strong>Verify your email before recharging or subscribing</strong>
+      <p class="muted" style="margin:4px 0 0;font-size:13px">To protect against billing disputes, recharge and subscription orders require a verified email. Please check your inbox for the verification link from registration.</p>
     </div>
     <form action="/dashboard/resend-verification" method="post" style="margin:0">
-      <button type="submit" class="btn btn-sm">重发验证邮件</button>
+      <button type="submit" class="btn btn-sm">Re-send verification email</button>
     </form>
   </div>
 </div>
 {% endif %}
 <div class="page-head">
-  <h1>充值与订阅</h1>
-  <p>¥0.03 = 1 积分，1 积分 = 1 次请求。充值积分永久有效，订阅积分 30 天有效。<span id="pay-channel-text">支持支付宝、微信支付。</span></p>
+  <h1>Billing &amp; subscription</h1>
+  <p>$0.005 = 1 credit, 1 credit = 1 request. Recharged credits never expire; subscription credits are valid for 30 days. <span id="pay-channel-text">Cards and other payment methods are shown at checkout.</span></p>
 </div>
 
 <div class="grid2 mb" style="align-items:start">
   <div class="stat-card" style="padding:26px 28px">
-    <div class="stat-label">当前余额</div>
+    <div class="stat-label">Current balance</div>
     <div class="stat-value text-ok" style="font-size:38px">{{ '%.2f'|format(balance) }}</div>
     <div class="stat-hint">
-      永久积分 {{ '%.2f'|format(permanent) }} · 限时积分 {{ '%.2f'|format(expiring) }}
-      {% if upcoming and upcoming > 0 %}<br>续订待生效 {{ '%.2f'|format(upcoming) }}（下一周期起可用）{% endif %}
-      {% if next_expiry %}<br>最近到期：{{ next_expiry.strftime('%Y-%m-%d %H:%M') }}（到期未用完自动清零）{% endif %}
+      Permanent credits {{ '%.2f'|format(permanent) }} · Time-limited credits {{ '%.2f'|format(expiring) }}
+      {% if upcoming and upcoming > 0 %}<br>Renewal pending {{ '%.2f'|format(upcoming) }} (available from the next period){% endif %}
+      {% if next_expiry %}<br>Next expiry: {{ next_expiry.strftime('%Y-%m-%d %H:%M') }} (unused credits expire at period end){% endif %}
     </div>
   </div>
   <div class="card" id="sub-status" style="display:none;margin:0"></div>
   <div class="card" id="pending-card" style="display:none;margin:0">
-    <h2>待支付订单</h2>
+    <h2>Pending order</h2>
     <div id="pending-order"></div>
   </div>
 </div>
 
 <div class="card">
-  <h2>包月订阅 <span class="tag tag-err">限时 5 折</span></h2>
-  <p class="card-sub">订阅积分自到账起 30 天有效，到期未用完自动清零；支持手动续订与升级，不支持自动续订与降级。</p>
+  <h2>Monthly plans</h2>
+  <p class="card-sub">Subscription credits are valid for 30 days from grant and expire at period end if unused. Plans are platform-managed and renew automatically; upgrades are supported anytime, downgrades are not.</p>
   <div class="pricing-grid" id="sub-plans" style="max-width:none;grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">
-    <div class="empty" style="grid-column:1/-1">加载中…</div>
+    <div class="empty" style="grid-column:1/-1">Loading…</div>
   </div>
 </div>
 
 <div class="card">
-  <h2>积分充值</h2>
-  <p class="card-sub">固定档位更优惠；也可自定义金额（单笔不超过 ¥100），严格按 ¥0.03 = 1 积分兑换。充值积分永久有效。</p>
+  <h2>Credit recharge</h2>
+  <p class="card-sub">Fixed tiers give you bonus credits; or enter a custom amount (up to $500 per transaction), converted strictly at $0.005 = 1 credit. Recharged credits never expire.</p>
   <div class="pricing-grid" id="plans" style="max-width:none;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">
-    <div class="empty" style="grid-column:1/-1">加载中…</div>
+    <div class="empty" style="grid-column:1/-1">Loading…</div>
   </div>
   <div class="row mt" style="align-items:flex-end;flex-wrap:wrap">
     <div>
-      <label class="stat-label" for="custom-amount">自定义金额（元）</label><br>
-      <input id="custom-amount" type="number" min="0.01" max="100" step="0.01" placeholder="1.00 ~ 100.00"
+      <label class="stat-label" for="custom-amount">Custom amount (USD)</label><br>
+      <input id="custom-amount" type="number" min="0.01" max="500" step="0.01" placeholder="0.01 ~ 500.00"
              style="padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--txt);width:180px">
     </div>
-    <div class="muted" id="custom-preview" style="padding-bottom:10px">输入金额后实时显示可兑换积分</div>
-    <button class="btn" id="custom-buy" onclick="buyCustom()" disabled>充值</button>
+    <div class="muted" id="custom-preview" style="padding-bottom:10px">Enter an amount to see the credits you'll get</div>
+    <button class="btn" id="custom-buy" onclick="buyCustom()" disabled>Recharge</button>
   </div>
 </div>
 
 <div class="card">
-  <h2>交易流水</h2>
+  <h2>Transactions</h2>
   {% if transactions %}
   <div class="table-wrap mt">
     <table>
-      <thead><tr><th>时间</th><th>类型</th><th>变动</th><th>余额</th><th>备注</th></tr></thead>
+      <thead><tr><th>Time</th><th>Type</th><th>Change</th><th>Balance</th><th>Note</th></tr></thead>
       <tbody>
       {% for t in transactions %}
         <tr>
           <td class="muted" style="white-space:nowrap">{{ t.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
           <td>
-            {% if t.type=='recharge' %}<span class="tag tag-ok">充值</span>
-            {% elif t.type=='consume' %}<span class="tag tag-warn">消费</span>
-            {% elif t.type=='grant' %}<span class="tag tag-ok">赠送</span>
-            {% elif t.type=='refund' %}<span class="tag tag-ok">退款</span>
-            {% elif t.type=='expire' %}<span class="tag tag-err">到期</span>
+            {% if t.type=='recharge' %}<span class="tag tag-ok">Recharge</span>
+            {% elif t.type=='consume' %}<span class="tag tag-warn">Consume</span>
+            {% elif t.type=='grant' %}<span class="tag tag-ok">Grant</span>
+            {% elif t.type=='refund' %}<span class="tag tag-ok">Refund</span>
+            {% elif t.type=='expire' %}<span class="tag tag-err">Expire</span>
             {% else %}<span class="tag tag-neutral">{{ t.type }}</span>{% endif %}
           </td>
           <td style="font-weight:600;font-variant-numeric:tabular-nums" class="{% if t.delta>0 %}text-ok{% else %}text-err{% endif %}">{{ '%+.2f'|format(t.delta) }}</td>
@@ -89,23 +89,23 @@
     </table>
   </div>
   {% else %}
-  <div class="empty">暂无交易记录。</div>
+  <div class="empty">No transactions yet.</div>
   {% endif %}
 </div>
 
-<!-- 下单前二次确认弹窗 -->
+<!-- Pre-checkout confirmation modal -->
 <div class="modal-mask" id="confirm-modal">
   <div class="modal">
-    <h3 id="cf-title">确认订单</h3>
+    <h3 id="cf-title">Confirm order</h3>
     <div id="cf-summary" style="margin:10px 0;font-size:15px"></div>
     <div class="msg msg-warn" style="margin:10px 0;font-size:13px;line-height:1.7;text-align:left" id="cf-notice"></div>
     <div style="margin:14px 0">
-      <div class="stat-label" style="margin-bottom:8px">支付渠道</div>
+      <div class="stat-label" style="margin-bottom:8px">Payment method</div>
       <div class="row" id="pay-channels"></div>
     </div>
     <div class="row" style="justify-content:flex-end">
-      <button class="btn btn-ghost" onclick="closeConfirm()">取消</button>
-      <button class="btn" id="cf-ok" onclick="confirmOrder()">确认支付</button>
+      <button class="btn btn-ghost" onclick="closeConfirm()">Cancel</button>
+      <button class="btn" id="cf-ok" onclick="confirmOrder()">Proceed to payment</button>
     </div>
   </div>
 </div>
@@ -113,49 +113,51 @@
 {% block script %}
 <script>
 var CATALOG=null, PENDING=null;
-var RATE=0.03, MAX_YUAN=100;
-var CHANNEL_NAMES={alipay:'支付宝',wechat:'微信支付'};
+var RATE=0.005, MAX_AMOUNT=500, CURRENCY='$';
+var CHANNEL_NAMES={card:'Card',alipay:'Alipay',wechat:'WeChat Pay'};
 
-// 重要信息提示（下单前二次确认）
+// Important notices shown in the pre-checkout confirmation modal
 var NOTICES={
-  recharge:'<strong>请确认：</strong><br>· 充值积分永久有效，1 积分 = 1 次请求<br>· 积分不可转让、不可提现、不可兑换现金<br>· 售后与争议处理以 <a href="/terms" target="_blank" rel="noopener">服务条款</a> 为准',
-  subscribe:'<strong>请确认：</strong><br>· 订阅积分自到账起 30 天有效，到期未用完自动清零<br>· 不支持自动续订，到期需手动续订<br>· 积分不可转让、不可提现<br>· 售后与争议处理以 <a href="/terms" target="_blank" rel="noopener">服务条款</a> 为准',
-  renew:'<strong>请确认：</strong><br>· 续订积分从下一周期开始生效，不累积到当前周期<br>· 有效期为下一周期起 30 天，到期未用完自动清零<br>· 售后与争议处理以 <a href="/terms" target="_blank" rel="noopener">服务条款</a> 为准',
-  upgrade:'<strong>请确认：</strong><br>· 升级需支付新档位当前售价全额（不抵扣旧档剩余价值）<br>· 新档位积分即刻到账，自升级时刻起 30 天有效<br>· 原档位未用完的积分将延期至与新档位同期到期<br>· 不支持降级<br>· 售后与争议处理以 <a href="/terms" target="_blank" rel="noopener">服务条款</a> 为准'
+  recharge:'<strong>Please confirm:</strong><br>· Recharged credits never expire; 1 credit = 1 request<br>· Credits are non-transferable, non-refundable for cash, and cannot be withdrawn<br>· Refunds and dispute handling follow the <a href="/terms" target="_blank" rel="noopener">Terms of Service</a>',
+  subscribe:'<strong>Please confirm:</strong><br>· Subscription credits are valid for 30 days from grant and expire at period end if unused<br>· Subscriptions renew automatically; manage or cancel anytime from the billing portal<br>· Credits are non-transferable and cannot be withdrawn for cash<br>· Refunds and dispute handling follow the <a href="/terms" target="_blank" rel="noopener">Terms of Service</a>',
+  upgrade:'<strong>Please confirm:</strong><br>· Upgrading charges the full current price of the new plan (no credit for the old plan\'s remaining value)<br>· New-plan credits land immediately and are valid for 30 days from the upgrade moment<br>· Unused credits from the old plan are extended to the new plan\'s period end<br>· Downgrades are not supported<br>· Refunds and dispute handling follow the <a href="/terms" target="_blank" rel="noopener">Terms of Service</a>'
 };
 
-// 支付渠道按 catalog 动态渲染（商户可能只开通单渠道）
+// Render payment channels dynamically from the catalog (the merchant may enable
+// only a subset).
 function renderPayChannels(){
   var chans=(CATALOG&&CATALOG.pay_channels)||[];
   document.getElementById('pay-channel-text').textContent=chans.length
-    ?'支持'+chans.map(function(c){return CHANNEL_NAMES[c]||c;}).join('、')+'。'
-    :'支付暂未开通，请联系管理员。';
+    ?'Accepted at checkout: '+chans.map(function(c){return CHANNEL_NAMES[c]||c;}).join(', ')+'.'
+    :'Payments are not enabled yet — please contact support.';
   document.getElementById('pay-channels').innerHTML=chans.map(function(c,i){
     return '<label class="row" style="gap:6px;cursor:pointer"><input type="radio" name="pay-channel" value="'+c+'"'+(i===0?' checked':'')+'> '+(CHANNEL_NAMES[c]||c)+'</label>';
-  }).join('')||'<span class="muted">暂无可用支付渠道</span>';
+  }).join('')||'<span class="muted">No payment methods available</span>';
 }
 
-// 首屏加载需等 AIS 就绪（app.js 是 defer，内联脚本先于它执行）：
-// 包进 DOMContentLoaded（defer 脚本在它之前跑完），否则首屏套餐「加载失败」。
+// First paint must wait for AIS (app.js is deferred and inline scripts run
+// before it): wrap in DOMContentLoaded (deferred scripts finish before it
+// fires), otherwise the plan grids render "Failed to load" on first paint.
 document.addEventListener('DOMContentLoaded',(async()=>{
   try{
     CATALOG=await AIS.api('/payments/catalog');
-    RATE=parseFloat(CATALOG.credit_yuan_rate);
-    MAX_YUAN=CATALOG.max_recharge_yuan;
+    RATE=parseFloat(CATALOG.credit_price_rate);
+    MAX_AMOUNT=CATALOG.max_recharge_amount;
+    CURRENCY=(CATALOG.currency==='USD')?'$':(CATALOG.currency||'$');
     renderPayChannels();
     renderSubPlans();
     renderRechargePlans();
   }catch(e){
-    document.getElementById('plans').innerHTML='<div class="empty" style="grid-column:1/-1">加载失败：'+AIS.esc(e.message)+'</div>';
+    document.getElementById('plans').innerHTML='<div class="empty" style="grid-column:1/-1">Failed to load: '+AIS.esc(e.message)+'</div>';
     document.getElementById('sub-plans').innerHTML='';
   }
 }));
 
 function priceHtml(p){
-  var s='<div class="price">¥'+p.price_yuan.toFixed(2)+'</div>';
-  if(p.original_price_yuan&&p.original_price_yuan>p.price_yuan){
-    s='<div class="price">¥'+p.price_yuan.toFixed(2)
-      +' <span style="font-size:14px;color:var(--faint);text-decoration:line-through">¥'+p.original_price_yuan.toFixed(2)+'</span></div>';
+  var s='<div class="price">'+CURRENCY+Number(p.price).toFixed(2)+'<span style="font-size:14px;color:var(--faint)">/mo</span></div>';
+  if(p.original_price&&Number(p.original_price)>Number(p.price)){
+    s='<div class="price">'+CURRENCY+Number(p.price).toFixed(2)
+      +' <span style="font-size:14px;color:var(--faint);text-decoration:line-through">'+CURRENCY+Number(p.original_price).toFixed(2)+'</span><span style="font-size:14px;color:var(--faint)">/mo</span></div>';
   }
   return s;
 }
@@ -166,60 +168,86 @@ function renderSubPlans(){
   if(sub){
     var st=document.getElementById('sub-status');
     st.style.display='block';
-    st.innerHTML='<h2>当前订阅</h2><div style="font-size:17px;font-weight:600">'+AIS.esc(sub.plan_name)+'</div>'
-      +'<div class="muted" style="font-size:13px;margin-top:4px">周期至 '+new Date(sub.period_end).toLocaleString('zh-CN')+'</div>';
+    st.innerHTML='<h2>Current plan</h2><div style="font-size:17px;font-weight:600">'+AIS.esc(sub.plan_name)+'</div>'
+      +'<div class="muted" style="font-size:13px;margin-top:4px">Period ends '+new Date(sub.period_end).toLocaleString()+'</div>'
+      +'<div class="row mt" style="gap:8px;flex-wrap:wrap">'
+      +'<button class="btn btn-sm" id="manage-sub-btn" onclick="manageSubscription()">Manage subscription</button>'
+      +'</div>';
   }
-  if(!CATALOG.subscription_plans.length){ el.innerHTML='<div class="empty" style="grid-column:1/-1">暂无订阅套餐</div>'; return; }
+  if(!CATALOG.subscription_plans.length){ el.innerHTML='<div class="empty" style="grid-column:1/-1">No plans available</div>'; return; }
   el.innerHTML=CATALOG.subscription_plans.map(function(p){
     var btn;
     if(!sub){
-      btn='<button class="btn btn-block" onclick="openConfirm(\'subscribe\',\''+p.id+'\',\''+AIS.esc(p.name)+'\','+p.price_yuan+','+p.credits+')">订阅</button>';
+      btn='<button class="btn btn-block" onclick="openConfirm(\'subscribe\',\''+p.id+'\',\''+AIS.esc(p.name)+'\','+Number(p.price)+','+p.credits+')">Subscribe</button>';
     }else if(sub.plan_id===p.id){
-      btn='<button class="btn btn-block" onclick="openConfirm(\'renew\',\''+p.id+'\',\''+AIS.esc(p.name)+'\','+p.price_yuan+','+p.credits+')">续订</button>';
+      btn='<button class="btn btn-ghost btn-block" disabled>Current plan</button>';
     }else if((p.level||0)>(sub.level||0)){
-      btn='<button class="btn btn-block" onclick="openConfirm(\'upgrade\',\''+p.id+'\',\''+AIS.esc(p.name)+'\','+p.price_yuan+','+p.credits+')">升级</button>';
+      btn='<button class="btn btn-block" onclick="openConfirm(\'upgrade\',\''+p.id+'\',\''+AIS.esc(p.name)+'\','+Number(p.price)+','+p.credits+')">Upgrade</button>';
     }else{
-      btn='<button class="btn btn-ghost btn-block" disabled>不支持降级</button>';
+      btn='<button class="btn btn-ghost btn-block" disabled>Downgrade not supported</button>';
     }
     return '<div class="price-card"><h3>'+AIS.esc(p.name)+'</h3>'+priceHtml(p)
-      +'<div class="muted" style="font-size:13px">'+p.credits+' 积分 / 30 天</div>'
-      +'<ul><li>积分 30 天有效</li><li>可手动续订/升级</li></ul>'+btn+'</div>';
+      +'<div class="muted" style="font-size:13px">'+p.credits+' credits / 30 days</div>'
+      +'<ul><li>Credits valid 30 days</li><li>Auto-renews; cancel anytime</li></ul>'+btn+'</div>';
   }).join('');
 }
 
 function renderRechargePlans(){
   var el=document.getElementById('plans');
-  if(!CATALOG.recharge_plans.length){ el.innerHTML='<div class="empty" style="grid-column:1/-1">暂无充值档位</div>'; return; }
+  if(!CATALOG.recharge_plans.length){ el.innerHTML='<div class="empty" style="grid-column:1/-1">No recharge tiers available</div>'; return; }
   el.innerHTML=CATALOG.recharge_plans.map(function(p){
-    return '<div class="price-card"><h3>'+AIS.esc(p.name)+'</h3>'+priceHtml(p)
-      +'<div class="muted" style="font-size:13px">'+p.credits+' 积分</div>'
-      +'<ul><li>积分永久有效</li><li>失败自动退款</li></ul>'
-      +'<button class="btn btn-block" onclick="openConfirm(\'recharge\',\''+p.id+'\',\''+AIS.esc(p.name)+'\','+p.price_yuan+','+p.credits+')">购买</button></div>';
+    return '<div class="price-card"><h3>'+AIS.esc(p.name)+'</h3>'
+      +'<div class="price">'+CURRENCY+Number(p.price).toFixed(2)+'</div>'
+      +'<div class="muted" style="font-size:13px">'+p.credits+' credits</div>'
+      +'<ul><li>Credits never expire</li><li>Auto-refund on failure</li></ul>'
+      +'<button class="btn btn-block" onclick="openConfirm(\'recharge\',\''+p.id+'\',\''+AIS.esc(p.name)+'\','+Number(p.price)+','+p.credits+')">Buy</button></div>';
   }).join('');
 }
 
-// 自定义金额：实时显示兑换积分（2 位小数）
+// Open the platform-managed billing portal (subscription management: payment
+// method, invoices, cancellation). Same-origin cookies are sent automatically.
+async function manageSubscription(){
+  var btn=document.getElementById('manage-sub-btn');
+  if(btn) btn.disabled=true;
+  try{
+    var r=await fetch('/payments/portal',{method:'GET',credentials:'same-origin'});
+    if(!r.ok){
+      var err=null;
+      try{ err=await r.json(); }catch(_){}
+      throw new Error((err&&err.detail)||('Request failed ('+r.status+')'));
+    }
+    var d=await r.json();
+    if(d&&d.portal_url){ window.open(d.portal_url,'_blank','noopener'); }
+    else{ alert('Failed to open the billing portal. Please try again later.'); }
+  }catch(e){
+    alert('Failed to open the billing portal: '+(e&&e.message?e.message:e));
+  }finally{
+    if(btn) btn.disabled=false;
+  }
+}
+
+// Custom amount: live preview of credits earned (2 decimal places)
 var amountInput=document.getElementById('custom-amount');
 amountInput.addEventListener('input',function(){
   var v=parseFloat(amountInput.value), preview=document.getElementById('custom-preview'), btn=document.getElementById('custom-buy');
-  if(!v||v<=0){ preview.textContent='输入金额后实时显示可兑换积分'; btn.disabled=true; return; }
-  if(v>MAX_YUAN){ preview.textContent='单笔充值金额不能超过 ¥'+MAX_YUAN; btn.disabled=true; return; }
-  preview.innerHTML='可兑换 <strong class="text-ok">'+(v/RATE).toFixed(2)+'</strong> 积分（¥'+v.toFixed(2)+' ÷ ¥'+RATE+'/积分）';
+  if(!v||v<=0){ preview.textContent='Enter an amount to see the credits you\'ll get'; btn.disabled=true; return; }
+  if(v>MAX_AMOUNT){ preview.textContent='Per-transaction limit is '+CURRENCY+MAX_AMOUNT; btn.disabled=true; return; }
+  preview.innerHTML='You\'ll get <strong class="text-ok">'+(v/RATE).toFixed(2)+'</strong> credits ('+CURRENCY+v.toFixed(2)+' ÷ '+CURRENCY+RATE+'/credit)';
   btn.disabled=false;
 });
 
 function buyCustom(){
   var v=parseFloat(amountInput.value);
-  if(!v||v<=0||v>MAX_YUAN) return;
+  if(!v||v<=0||v>MAX_AMOUNT) return;
   var credits=(v/RATE).toFixed(2);
-  openConfirm('recharge',null,'自定义充值',v,credits,Math.round(v*100));
+  openConfirm('recharge',null,'Custom recharge',v,credits,Math.round(v*100));
 }
 
-// 打开二次确认弹窗
-function openConfirm(kind,planId,name,priceYuan,credits,amountCents){
+// Open the pre-checkout confirmation modal
+function openConfirm(kind,planId,name,price,credits,amountCents){
   PENDING={kind:kind,plan_id:planId,amount_cents:amountCents||null};
-  document.getElementById('cf-title').textContent='确认订单 · '+name;
-  document.getElementById('cf-summary').innerHTML='支付金额：<strong>¥'+Number(priceYuan).toFixed(2)+'</strong>　获得积分：<strong class="text-ok">'+credits+'</strong>';
+  document.getElementById('cf-title').textContent='Confirm order · '+name;
+  document.getElementById('cf-summary').innerHTML='Amount: <strong>'+CURRENCY+Number(price).toFixed(2)+'</strong>　Credits: <strong class="text-ok">'+credits+'</strong>';
   document.getElementById('cf-notice').innerHTML=NOTICES[kind]||NOTICES.recharge;
   document.getElementById('confirm-modal').classList.add('open');
 }
@@ -230,7 +258,7 @@ async function confirmOrder(){
   var btn=document.getElementById('cf-ok');
   btn.disabled=true;
   var radio=document.querySelector('input[name="pay-channel"]:checked');
-  if(!radio){ alert('暂无可用支付渠道，请联系管理员'); btn.disabled=false; return; }
+  if(!radio){ alert('No payment method available — please contact support'); btn.disabled=false; return; }
   var channel=radio.value;
   try{
     var body={kind:PENDING.kind,pay_channel:channel};
@@ -239,7 +267,7 @@ async function confirmOrder(){
     var d=await AIS.api('/payments/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     closeConfirm();
     document.getElementById('pending-card').style.display='block';
-    document.getElementById('pending-order').innerHTML='<div class="msg msg-ok" style="margin-top:10px">订单已创建（¥'+(d.amount_cents/100).toFixed(2)+' / '+d.credits+' 积分，'+(d.pay_channel==='wechat'?'微信支付':'支付宝')+'），<a href="'+d.pay_url+'" target="_blank" rel="noopener">点击前往支付 →</a></div>';
+    document.getElementById('pending-order').innerHTML='<div class="msg msg-ok" style="margin-top:10px">Order created ('+CURRENCY+(d.amount_cents/100).toFixed(2)+' / '+d.credits+' credits, '+(CHANNEL_NAMES[d.pay_channel]||d.pay_channel)+') — <a href="'+d.pay_url+'" target="_blank" rel="noopener">proceed to payment →</a></div>';
     pollOrder(d.order_id);
   }catch(e){ alert(e.message); }
   finally{ btn.disabled=false; }
@@ -251,11 +279,11 @@ async function pollOrder(orderId){
     try{
       var d=await AIS.api('/payments/orders/'+orderId);
       if(d.status==='paid'){
-        document.getElementById('pending-order').innerHTML='<div class="msg msg-ok" style="margin-top:10px">支付成功！积分已到账，正在刷新…</div>';
+        document.getElementById('pending-order').innerHTML='<div class="msg msg-ok" style="margin-top:10px">Payment successful! Credits have been credited — refreshing…</div>';
         setTimeout(function(){location.reload();},2000);
         return;
       }
-    }catch(e){ /* 轮询失败继续 */ }
+    }catch(e){ /* polling errors are ignored; keep trying */ }
   }
 }
 </script>

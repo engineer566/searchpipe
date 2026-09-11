@@ -1,92 +1,98 @@
 {% extends "base_public.html" %}
 {% block content %}
 <div class="page-wrap narrow">
-  <nav class="breadcrumb" aria-label="面包屑">
-    <a href="/">首页</a><span aria-hidden="true">/</span><span>服务条款</span>
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a href="/">Home</a><span aria-hidden="true">/</span><span>Terms of Service</span>
   </nav>
 
   <div class="page-head">
-    <h1>服务条款</h1>
-    <p>最后更新日期：2026-09-12</p>
+    <h1>Terms of Service</h1>
+    <p>Last updated: 2026-09-14</p>
   </div>
 
   <div class="prose">
-    <h2>一、服务说明</h2>
-    <p>SearchPipe（以下简称「本服务」）是由 SearchPipe 团队提供的、面向 AI Agent 的联网搜索服务，通过聚合多引擎检索、网页正文抓取、LLM 重排与摘要，为用户提供结构化搜索结果。用户可通过 MCP Server 方式（Claude Code、Cursor 等 Agent 客户端）或 API 调用接入本服务。</p>
+    <h2>1. Service Description</h2>
+    <p>SearchPipe ("the Service") is an AI-powered web search service for AI agents provided by the SearchPipe team. The Service aggregates results from multiple search engines, fetches and cleans page content, and reranks and summarizes results with large language models, returning structured search results. You may access the Service through the MCP Server (for clients such as Claude Code and Cursor) or through direct API calls.</p>
 
-    <h2>二、积分、充值与订阅</h2>
-    <p>本服务采用预付费积分制，提供「积分充值」与「包月订阅」两种购买方式。请在购买前仔细阅读并充分理解本条款所述规则，根据自身需求理性购买。</p>
-    <p>搜索请求按次扣减积分：基础搜索（basic）每次扣 1 积分，高级搜索（advanced）每次扣 2 积分。积分不可转让、不可提现、不可兑换为现金。若因本服务端技术故障导致扣费异常，经核实后将以补发积分形式处理，不涉及现金退款。支付方式支持微信支付（以结算页实际可用渠道为准）。</p>
-    <p><strong style="color:var(--err)">请特别注意积分有效期差异：通过「积分充值」获得的积分永久有效；通过「包月订阅」（含续订、升级）获得的积分非永久有效，自到账起 30 天有效，到期未用完自动清零。</strong></p>
+    <h2>2. Accounts and API Keys</h2>
+    <p>You are responsible for all activity under your account, including API calls, credit consumption and any content produced with the Service. Keep your API keys and login credentials safe; losses caused by poor credential management are your responsibility.</p>
+    <p>Provide accurate registration information. We may suspend or terminate accounts registered with false information.</p>
 
-    <h3>（一）积分充值</h3>
+    <h2>3. Credits, Recharges and Subscriptions</h2>
+    <p>The Service uses a prepaid credit system with two purchase options: credit recharges and monthly subscriptions. Please read this section carefully and purchase according to your actual needs.</p>
+    <p>Search requests consume credits per call: a basic search costs 1 credit, and an advanced search costs 2 credits. Credits are non-transferable, cannot be withdrawn as cash, and cannot be exchanged for money. If a billing anomaly is caused by a technical failure on our side, we will resolve it by issuing additional credits rather than cash refunds.</p>
+    <p><strong style="color:var(--err)">Please note the difference in credit validity: credits obtained through recharges never expire; credits obtained through monthly subscriptions (including renewals and upgrades) are valid for 30 days from the moment they are credited and expire automatically if unused.</strong></p>
+
+    <h3>(a) Credit Recharges</h3>
     <ul>
-      <li>兑换汇率：¥0.03 = 1 积分；</li>
-      <li>固定档位：¥10 = 350 积分，¥20 = 700 积分，¥50 = 1800 积分，¥100 = 5000 积分；</li>
-      <li>自定义金额：单笔充值上限 ¥100，严格按 ¥0.03 = 1 积分兑换，积分精确到小数点后 2 位；</li>
-      <li><strong>充值获得的积分永久有效</strong>，不设有效期。</li>
+      <li>Exchange rate: $0.005 = 1 credit;</li>
+      <li>Fixed tiers: $5 = 1,000 credits, $10 = 2,100 credits, $20 = 4,400 credits;</li>
+      <li><strong>Recharged credits never expire</strong>.</li>
     </ul>
 
-    <h3>（二）包月订阅</h3>
+    <h3>(b) Monthly Subscriptions</h3>
     <ul>
-      <li>订阅档位（限时折扣价 / 标价）：¥9.99（¥19.99）= 1000 积分；¥24.99（¥49.99）= 3000 积分；¥49.99（¥99.99）= 10000 积分。限时折扣可能随时调整或结束，以购买时页面显示的实际售价为准；</li>
-      <li>订阅积分有效期为自订阅成功（到账）时刻起 <strong>30 天</strong>，到期未用完的订阅积分自动清零；</li>
-      <li>本服务<strong>不支持自动续订</strong>，到期后如需继续使用请手动续订；</li>
-      <li>续订：续订的积分自<strong>下一周期开始时刻</strong>生效，有效期 30 天，不累积到当前周期；</li>
-      <li>升级：升级需支付新档位当前售价的<strong>全额</strong>（不抵扣原档位剩余价值）。升级后新档位积分即刻到账并自升级时刻起算 30 天有效期；原档位未用完的积分延期至与新档位同期到期；</li>
-      <li>不支持降级；已订阅用户在订阅有效期内仅可使用续订与升级入口。</li>
+      <li>Plans: Starter $4.99/month = 1,000 credits per month; Pro $9.99/month = 3,000 credits per month; Max $19.99/month = 10,000 credits per month;</li>
+      <li>Subscription credits are valid for <strong>30 days</strong> from the moment they are credited; unused subscription credits expire automatically;</li>
+      <li>Subscriptions <strong>renew automatically</strong> each billing cycle until cancelled. You can cancel at any time through the customer portal (linked from the billing page), and cancellation takes effect at the end of the current billing period;</li>
+      <li>Renewal credits take effect at the start of the next billing period and are valid for 30 days; they do not accumulate into the current period;</li>
+      <li>Upgrades: upgrading requires payment of the full current price of the new plan (the remaining value of the old plan is not deducted). The new plan's credits are credited immediately and are valid for 30 days from the moment of upgrade; unused credits from the old plan are extended to expire at the same time as the new plan's credits;</li>
+      <li>Downgrades are not supported; during an active subscription you can only renew or upgrade.</li>
     </ul>
 
-    <p>扣费时优先消耗即将到期的订阅（限时）积分，永久积分最后消耗。请在购买前充分评估自身需求，合理规划积分使用。</p>
+    <p>When consuming credits, subscription credits that are closest to expiring are used first; never-expiring recharge credits are used last. Please plan your usage accordingly before purchasing.</p>
 
-    <h2>三、账号责任</h2>
-    <p>用户须对账号下的所有行为承担全部责任，包括但不限于 API 调用、积分消费、内容发布等。请妥善保管 API Key 与登录密码，因用户保管不善导致的损失由用户自行承担。</p>
-    <p>用户应提供真实、准确的注册信息。如发现虚假信息，本服务有权暂停或终止相关账号。</p>
+    <h2>4. Payments</h2>
+    <p>Payments are processed by our merchant of record (MoR), such as Creem or Dodo Payments (the exact provider is shown on the checkout page). The MoR acts as the seller of record for tax and invoicing purposes. We do not store your card number or other full payment credentials on our own servers.</p>
 
-    <h2>四、禁止用途</h2>
-    <p>用户不得将本服务用于以下用途：</p>
+    <h2>5. Refund Policy</h2>
+    <p>For unused credits from a recharge, we may, at our discretion and where required by applicable law, refund the corresponding amount proportionally (unused credits ÷ total credits purchased × amount paid). To request a refund, contact us at <a href="mailto:support@searchpipe.tech">support@searchpipe.tech</a> with your account email and order number.</p>
+    <p>Credits that have already been consumed, subscription credits that have already been credited for the current billing period, and expired credits are not refundable. Failed search requests (e.g. upstream retrieval failures or content moderation rejections) are automatically refunded in credits and do not require a separate request.</p>
+
+    <h2>6. Acceptable Use</h2>
+    <p>You must not use the Service for any of the following:</p>
     <ul>
-      <li>违反中华人民共和国法律法规的任何行为；</li>
-      <li>生成、传播或协助传播违法、侵权、虚假、欺诈、骚扰、仇恨或歧视性内容；</li>
-      <li>对本服务进行反向工程、爬虫抓取、压力测试或试图绕过用量限制；</li>
-      <li>将 API Key 转让、出租或共享给第三方使用；</li>
-      <li>任何可能损害本服务正常运行或其他用户权益的行为。</li>
+      <li>Any activity that violates applicable laws and regulations;</li>
+      <li>Generating, distributing or assisting in the distribution of illegal, infringing, false, fraudulent, harassing, hateful or discriminatory content;</li>
+      <li>Reverse engineering, crawling, stress testing the Service, or attempting to bypass usage limits;</li>
+      <li>Transferring, renting or sharing your API keys with third parties;</li>
+      <li>Any activity that may harm the normal operation of the Service or the rights of other users.</li>
     </ul>
-    <p>一经发现违规使用，本服务有权依据本条款及相关法律法规采取暂停或终止账号等措施。</p>
+    <p>If we detect a violation, we may suspend or terminate the affected account in accordance with these Terms and applicable law.</p>
 
-    <h2>五、服务变更与终止</h2>
-    <p>本服务保留随时修改、中断或终止全部或部分服务的权利，恕不另行通知。重大变更将尽可能通过站内公告或邮件方式告知用户。</p>
-    <p>用户可随时停止使用本服务。本服务亦有权依据本条款或相关法律法规，对违规账号采取限制、暂停或终止措施。</p>
-    <p>服务终止或账号注销后，未使用积分将自动清零；对已购买但尚未消费的付费服务，将按照法律法规及本条款约定处理。</p>
+    <h2>7. Service Changes and Termination</h2>
+    <p>We reserve the right to modify, suspend or discontinue all or part of the Service at any time without prior notice. We will try to notify users of material changes via on-site announcements or email.</p>
+    <p>You may stop using the Service at any time. We may also restrict, suspend or terminate accounts that violate these Terms or applicable law.</p>
+    <p>After the Service is terminated or your account is deleted, unused credits are cleared automatically. For paid services that have been purchased but not yet consumed, we will handle them in accordance with applicable law and these Terms.</p>
 
-    <h2>六、免责声明</h2>
-    <p>本服务按「现状」提供，不对搜索结果的准确性、完整性、时效性做任何明示或暗示的保证。搜索结果由第三方搜索引擎提供，本服务仅做聚合与加工处理。</p>
-    <p>因不可抗力（包括但不限于网络故障、第三方服务中断、自然灾害等）导致的服务中断或数据丢失，本服务不承担责任。</p>
+    <h2>8. Disclaimer</h2>
+    <p>The Service is provided "as is". We make no express or implied warranties about the accuracy, completeness or timeliness of search results. Search results are provided by third-party search engines, and the Service only aggregates and processes them.</p>
+    <p>We are not liable for service interruptions or data loss caused by force majeure (including but not limited to network failures, third-party service outages and natural disasters).</p>
 
-    <h2>七、知识产权</h2>
-    <p>本服务及相关软件、文档、界面的知识产权归 SearchPipe 团队所有。用户仅获得依本条款使用服务的有限权利，不得复制、修改、分发或创建衍生作品。</p>
+    <h2>9. Intellectual Property</h2>
+    <p>The intellectual property rights in the Service and its software, documentation and interface belong to the SearchPipe team. You only obtain the limited right to use the Service in accordance with these Terms, and may not copy, modify, distribute or create derivative works.</p>
 
-    <h2>八、争议解决</h2>
-    <p>本条款受中华人民共和国法律管辖。如发生争议，双方应友好协商解决；协商不成的，任何一方均可向本服务运营方所在地有管辖权的人民法院提起诉讼。</p>
+    <h2>10. Changes to These Terms</h2>
+    <p>We may update these Terms from time to time. The updated version will be posted on this page with a revised "Last updated" date. Continued use of the Service after the updated Terms take effect constitutes acceptance of the updated Terms. If you do not agree with the updated Terms, please stop using the Service.</p>
 
-    <h2>九、其他</h2>
-    <p>本条款构成双方就服务使用达成的完整协议，取代此前的任何口头或书面约定。如本条款任何部分被认定为无效或不可执行，不影响其余部分的效力。</p>
-    <p>继续使用本服务即表示您已阅读、理解并同意受本条款约束。如您不同意本条款，请立即停止使用本服务。</p>
+    <h2>11. Contact</h2>
+    <p>For questions about these Terms, contact us at <a href="mailto:support@searchpipe.tech">support@searchpipe.tech</a>.</p>
 
-    <h2>相关页面</h2>
+    <h2>Related Pages</h2>
     <ul>
-      <li><a href="/pricing">定价</a>：积分、充值与包月订阅的具体价格与规则</li>
-      <li><a href="/faq">常见问题</a>：计费、限流与结果使用</li>
-      <li><a href="/docs">开发文档</a>：接入方式与 API 参数</li>
+      <li><a href="/pricing">Pricing</a>: recharges, subscriptions and credit rules</li>
+      <li><a href="/faq">FAQ</a>: billing, rate limits and using results</li>
+      <li><a href="/docs">Docs</a>: integration and API parameters</li>
+      <li><a href="/privacy">Privacy Policy</a>: how we handle your data</li>
     </ul>
   </div>
 
   <div class="cta-band" style="margin-top:44px">
-    <h2>同意条款并开始使用</h2>
-    <p>注册即送免费额度，接入验证不需要先付费。</p>
+    <h2>Agree and Get Started</h2>
+    <p>Sign up to get free credits every month — no payment required to try the API.</p>
     <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
-      <a href="/dashboard/register" class="btn btn-lg">注册账号</a>
-      <a href="/dashboard/login" class="btn btn-ghost btn-lg">登录</a>
+      <a href="/dashboard/register" class="btn btn-lg">Create Account</a>
+      <a href="/dashboard/login" class="btn btn-ghost btn-lg">Log In</a>
     </div>
   </div>
 </div>

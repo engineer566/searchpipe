@@ -168,5 +168,6 @@ def pytest_collection_modifyitems(config, items):  # noqa: ARG001
         "tests/test_messages.py": 11,
         "tests/test_api_keys_reveal.py": 12,
         "tests/test_oneline_config.py": 13,
+        "tests/test_payment_webhooks.py": 14,  # 纯单元测试（验签），无 loop 约束
     }
     items.sort(key=lambda it: order.get(_file_key(it), 99))

@@ -64,9 +64,8 @@ def upgrade() -> None:
 
     # --- 套餐切换：下架旧 CNY 档，入库新 USD 档 ---
     op.execute(
-        sa.text("UPDATE plans SET is_active = false WHERE id IN :ids")
-        .bindparams(sa.bindparam("ids", expanding=True)),
-        {"ids": list(_OLD_PLAN_IDS)},
+        sa.text("UPDATE plans SET is_active = false WHERE id::text IN :ids")
+        .bindparams(sa.bindparam("ids", value=list(_OLD_PLAN_IDS), expanding=True))
     )
     plans = sa.table('plans',
         sa.column('id', sa.Uuid), sa.column('name', sa.String),
@@ -90,14 +89,12 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.execute(
-        sa.text("DELETE FROM plans WHERE id IN :ids")
-        .bindparams(sa.bindparam("ids", expanding=True)),
-        {"ids": list(_NEW_PLAN_IDS)},
+        sa.text("DELETE FROM plans WHERE id::text IN :ids")
+        .bindparams(sa.bindparam("ids", value=list(_NEW_PLAN_IDS), expanding=True))
     )
     op.execute(
-        sa.text("UPDATE plans SET is_active = true WHERE id IN :ids")
-        .bindparams(sa.bindparam("ids", expanding=True)),
-        {"ids": list(_OLD_PLAN_IDS)},
+        sa.text("UPDATE plans SET is_active = true WHERE id::text IN :ids")
+        .bindparams(sa.bindparam("ids", value=list(_OLD_PLAN_IDS), expanding=True))
     )
     op.drop_index('ix_subscriptions_provider_sub', table_name='subscriptions')
     op.drop_column('subscriptions', 'provider_customer_id')

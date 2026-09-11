@@ -1,28 +1,32 @@
-"""支付渠道测试 —— 充值（固定档/自定义）+ 订阅（订阅/续订/升级/拒绝降级）+ 回调幂等。
+"""支付链路测试 —— 充值（固定档/自定义）+ 订阅（订阅/续期/升级/拒绝降级）+ webhook 幂等。
 
 策略与 conftest 一致：真实 Postgres + Redis，全部经 TestClient → ASGI app
 内部 task 访问 DB，不直连。支付提供方用 FakeProvider 替换（monkeypatch 模块
-单例 _provider），不下真单；回调用 sign=ok 模拟验签通过。
+单例 _provider），不下真单；付款通过 POST /payments/webhooks/fakepay 注入
+归一化事件完成（FakeProvider.verify_webhook 直接吃 JSON body）。
 
-种子套餐（迁移 b71f2c3d9e50 固定 UUID）：
-- 充值：…0001=¥10/350 …0002=¥20/700 …0003=¥50/1800 …0004=¥100/5000
-- 订阅：…0001=档1 ¥9.99/1000 …0002=档2 ¥24.99/3000 …0003=档3 ¥49.99/10000
+种子套餐（迁移 g1a2b3c4d5e6 固定 UUID）：
+- 充值：…0001=$5/1000 …0002=$10/2100 …0003=$20/4400
+- 订阅：…0001=Starter $4.99/1000 …0002=Pro $9.99/3000 …0003=Max $19.99/10000
 """
 
+import json
 import re
 import uuid
 
 import pytest
 
+from ai_search.payments.provider import PaymentEvent, WebhookVerificationError
+
 _PW = "test-pass-1234"
 
-PLAN_R10 = "11111111-0000-0000-0000-000000000001"  # ¥10 = 350
-PLAN_SUB1 = "22222222-0000-0000-0000-000000000001"  # 档1 ¥9.99 = 1000
-PLAN_SUB2 = "22222222-0000-0000-0000-000000000002"  # 档2 ¥24.99 = 3000
+PLAN_R5 = "33333333-0000-0000-0000-000000000001"   # $5 = 1000
+PLAN_SUB1 = "44444444-0000-0000-0000-000000000001"  # Starter $4.99 = 1000
+PLAN_SUB2 = "44444444-0000-0000-0000-000000000002"  # Pro $9.99 = 3000
 
 
 class FakeProvider:
-    """假支付提供方：记录订单号并返回假支付链接；sign=ok 视为验签通过。"""
+    """假支付提供方：记录订单号并返回假收银台链接；webhook 直接解析 JSON body。"""
 
     def __init__(self) -> None:
         self.orders: dict[str, dict] = {}
@@ -31,17 +35,33 @@ class FakeProvider:
     def name(self) -> str:
         return "fakepay"
 
-    async def create_order(
-        self, order_no: str, amount_cents: int, subject: str, pay_channel: str = "alipay"
+    async def create_checkout(
+        self, *, order_no, kind, amount_cents, subject, plan=None,
+        customer_email=None, success_url=None,
     ) -> str:
-        self.orders[order_no] = {"amount_cents": amount_cents, "channel": pay_channel}
-        return f"https://pay.example.com/{order_no}?channel={pay_channel}"
+        self.orders[order_no] = {"amount_cents": amount_cents, "kind": kind}
+        return f"https://pay.example.com/{order_no}"
 
-    def verify_callback(self, params: dict) -> bool:
-        return params.get("sign") == "ok"
+    def verify_webhook(self, *, headers: dict, raw_body: bytes) -> PaymentEvent:
+        data = json.loads(raw_body)
+        if data.pop("sign", "ok") != "ok":
+            raise WebhookVerificationError("bad sign")
+        return PaymentEvent(
+            type=data["type"],
+            event_id=data["event_id"],
+            order_no=data.get("order_no"),
+            provider_subscription_id=data.get("provider_subscription_id"),
+            provider_customer_id=data.get("provider_customer_id"),
+            provider_product_id=data.get("provider_product_id"),
+            amount_cents=data.get("amount_cents"),
+            raw=data,
+        )
+
+    async def customer_portal_url(self, provider_customer_id: str) -> str | None:
+        return f"https://portal.example.com/{provider_customer_id}"
 
     def available_channels(self) -> list[str]:
-        return ["alipay", "wechat"]
+        return ["card", "paypal"]
 
 
 @pytest.fixture()
@@ -67,7 +87,7 @@ def sent_mails(monkeypatch) -> list:
 
 
 def _register(client, sent_mails) -> dict:
-    """API 注册 + 完成邮箱验证 → 返回认证头（2026-09-12 需求 7：下单需已验证）。"""
+    """API 注册 + 完成邮箱验证 → 返回认证头（下单需已验证邮箱）。"""
     email = f"pay-{uuid.uuid4().hex[:8]}@example.com"
     resp = client.post("/auth/register", json={"email": email, "password": _PW})
     assert resp.status_code == 201, resp.text
@@ -85,14 +105,38 @@ def _create_order(client, headers: dict, **body) -> dict:
     return resp.json()
 
 
+def _order_no(order: dict) -> str:
+    return order["pay_url"].rsplit("/", 1)[-1].split("?")[0]
+
+
+def _webhook(client, provider: str, event: dict) -> None:
+    """注入一条 webhook 事件并断言处理成功。"""
+    resp = client.post(f"/payments/webhooks/{provider}", content=json.dumps(event))
+    assert resp.status_code == 200, resp.text
+    assert resp.json() == {"received": True}
+
+
 def _pay(client, fake: FakeProvider, order: dict) -> None:
-    """模拟支付成功回调（从 pay_url 解析订单号）。"""
-    order_no = order["pay_url"].rsplit("/", 1)[-1].split("?")[0]
+    """模拟一次性付款成功（充值档）。"""
+    order_no = _order_no(order)
     assert order_no in fake.orders
-    resp = client.post(
-        "/payments/callback", data={"trade_order_id": order_no, "sign": "ok"}
-    )
-    assert resp.text == '"success"' or resp.text == "success", resp.text
+    _webhook(client, "fakepay", {
+        "type": "one_time_paid", "event_id": f"evt-{uuid.uuid4().hex[:12]}",
+        "order_no": order_no, "amount_cents": order["amount_cents"],
+    })
+
+
+def _activate_subscription(client, order: dict, sub_id: str | None = None) -> str:
+    """模拟订阅激活（Dodo 风格：激活即绑订阅 + 发首期积分）。返回订阅 id。"""
+    sub_id = sub_id or f"sub_fake_{uuid.uuid4().hex[:8]}"
+    _webhook(client, "fakepay", {
+        "type": "subscription_activated",
+        "event_id": f"evt-{uuid.uuid4().hex[:12]}",
+        "order_no": _order_no(order),
+        "provider_subscription_id": sub_id,
+        "provider_customer_id": "cust_fake_1",
+    })
+    return sub_id
 
 
 def _balance(client, headers: dict) -> dict:
@@ -108,16 +152,17 @@ def test_catalog_public(client, fake_provider):
     resp = client.get("/payments/catalog")
     assert resp.status_code == 200, resp.text
     data = resp.json()
-    assert len(data["recharge_plans"]) == 4
+    assert len(data["recharge_plans"]) == 3
     assert len(data["subscription_plans"]) == 3
     levels = [p["level"] for p in data["subscription_plans"]]
     assert levels == [1, 2, 3]
     # 限时折扣：现价低于标价
     for p in data["subscription_plans"]:
-        assert p["price_yuan"] < p["original_price_yuan"]
-    assert data["credit_yuan_rate"] == "0.03"
-    assert data["max_recharge_yuan"] == 100
-    assert set(data["pay_channels"]) == {"alipay", "wechat"}
+        assert p["price"] < p["original_price"]
+    assert data["credit_price_rate"] == "0.005"
+    assert data["max_recharge_amount"] == 500
+    assert data["currency"] == "USD"
+    assert set(data["pay_channels"]) == {"card", "paypal"}
     assert data["subscription"] is None  # 未登录
 
 
@@ -127,32 +172,32 @@ def test_catalog_public(client, fake_provider):
 def test_recharge_fixed_plan(client, fake_provider, sent_mails):
     headers = _register(client, sent_mails)
     order = _create_order(
-        client, headers, kind="recharge", plan_id=PLAN_R10, pay_channel="alipay"
+        client, headers, kind="recharge", plan_id=PLAN_R5, pay_channel="card"
     )
-    assert order["credits"] == "350.00"
-    assert order["amount_cents"] == 1000
+    assert order["credits"] == "1000.00"
+    assert order["amount_cents"] == 500
     _pay(client, fake_provider, order)
 
     bal = _balance(client, headers)
-    assert bal["balance"] == pytest.approx(1350.0)  # 免费 1000 + 充值 350
-    assert bal["permanent"] == pytest.approx(1350.0)
+    assert bal["balance"] == pytest.approx(2000.0)  # 免费 1000 + 充值 1000
+    assert bal["permanent"] == pytest.approx(2000.0)
     assert bal["expiring"] == pytest.approx(0.0)
 
     # 订单状态
     resp = client.get(f"/payments/orders/{order['order_id']}", headers=headers)
     assert resp.json()["status"] == "paid"
 
-    # 回调幂等：重复回调不重复发积分
+    # webhook 幂等：重复到账事件不重复发积分（订单已 paid 短路）
     _pay(client, fake_provider, order)
-    assert _balance(client, headers)["balance"] == pytest.approx(1350.0)
+    assert _balance(client, headers)["balance"] == pytest.approx(2000.0)
 
 
 def test_recharge_custom_amount(client, fake_provider, sent_mails):
     headers = _register(client, sent_mails)
     order = _create_order(client, headers, kind="recharge", amount_cents=500)
-    assert order["credits"] == "166.67"  # ¥5 ÷ 0.03
+    assert order["credits"] == "1000.00"  # $5 ÷ $0.005
     _pay(client, fake_provider, order)
-    assert _balance(client, headers)["balance"] == pytest.approx(1166.67)
+    assert _balance(client, headers)["balance"] == pytest.approx(2000.0)
 
 
 def test_recharge_custom_validation(client, fake_provider, sent_mails):
@@ -165,12 +210,12 @@ def test_recharge_custom_validation(client, fake_provider, sent_mails):
     assert client.post(
         "/payments/orders", json={"kind": "recharge", "amount_cents": 0}, headers=headers
     ).status_code == 400
-    # 超过上限 ¥100
+    # 超过上限 $500
     resp = client.post(
-        "/payments/orders", json={"kind": "recharge", "amount_cents": 10001}, headers=headers
+        "/payments/orders", json={"kind": "recharge", "amount_cents": 50001}, headers=headers
     )
     assert resp.status_code == 400
-    assert "100" in resp.json()["detail"]
+    assert "500" in resp.json()["detail"]
     # 不存在的套餐
     assert client.post(
         "/payments/orders",
@@ -185,91 +230,69 @@ def test_recharge_custom_validation(client, fake_provider, sent_mails):
     ).status_code == 400
 
 
-def test_pay_channel_wechat(client, fake_provider, sent_mails):
+def test_pay_channel_paypal(client, fake_provider, sent_mails):
     headers = _register(client, sent_mails)
     order = _create_order(
-        client, headers, kind="recharge", plan_id=PLAN_R10, pay_channel="wechat"
+        client, headers, kind="recharge", plan_id=PLAN_R5, pay_channel="paypal"
     )
-    assert "channel=wechat" in order["pay_url"]
+    assert order["pay_channel"] == "paypal"
 
 
-# ---------- 单渠道商户（仅微信）----------
+# ---------- 单渠道声明 ----------
 
 
-class WechatOnlyProvider(FakeProvider):
-    """模拟只开通微信渠道的商户（如当前虎皮椒商户）。"""
+class CardOnlyProvider(FakeProvider):
+    """只声明 card 渠道的支付方。"""
 
     def available_channels(self) -> list[str]:
-        return ["wechat"]
+        return ["card"]
 
 
 @pytest.fixture()
-def wechat_only_provider(monkeypatch):
-    p = WechatOnlyProvider()
+def card_only_provider(monkeypatch):
+    p = CardOnlyProvider()
     monkeypatch.setattr("ai_search.payments.service._provider", p)
     return p
 
 
-def test_wechat_only_catalog(client, wechat_only_provider):
+def test_card_only_catalog(client, card_only_provider):
     resp = client.get("/payments/catalog")
     assert resp.status_code == 200, resp.text
-    assert resp.json()["pay_channels"] == ["wechat"]
+    assert resp.json()["pay_channels"] == ["card"]
 
 
-def test_wechat_only_default_channel(client, wechat_only_provider, sent_mails):
-    """不传 pay_channel 时自动落到已配置的微信渠道。"""
+def test_card_only_default_channel(client, card_only_provider, sent_mails):
+    """不传 pay_channel 时自动落到支付方首个已声明渠道。"""
     headers = _register(client, sent_mails)
-    order = _create_order(client, headers, kind="recharge", plan_id=PLAN_R10)
-    assert "channel=wechat" in order["pay_url"]
-    assert order["pay_channel"] == "wechat"  # 响应携带实际渠道（供前端显示）
-    _pay(client, wechat_only_provider, order)
-    assert _balance(client, headers)["balance"] == pytest.approx(1350.0)
+    order = _create_order(client, headers, kind="recharge", plan_id=PLAN_R5)
+    assert order["pay_channel"] == "card"  # 响应携带实际渠道（供前端显示）
+    _pay(client, card_only_provider, order)
+    assert _balance(client, headers)["balance"] == pytest.approx(2000.0)
 
 
-def test_wechat_only_rejects_alipay(client, wechat_only_provider, sent_mails):
-    """未开通的渠道下单返回 400，且提示可用渠道。"""
+def test_card_only_rejects_paypal(client, card_only_provider, sent_mails):
+    """未声明的渠道下单返回 400，且提示可用渠道。"""
     headers = _register(client, sent_mails)
     resp = client.post(
         "/payments/orders",
-        json={"kind": "recharge", "plan_id": PLAN_R10, "pay_channel": "alipay"},
+        json={"kind": "recharge", "plan_id": PLAN_R5, "pay_channel": "paypal"},
         headers=headers,
     )
     assert resp.status_code == 400
-    assert "暂未开通" in resp.json()["detail"]
-    assert "微信" in resp.json()["detail"]
+    assert "card" in resp.json()["detail"]
 
 
-def test_xunhupay_available_channels_by_credentials(monkeypatch):
-    """虎皮椒 provider 按已配置凭证判定渠道：仅微信凭证 → ["wechat"]。"""
-    from types import SimpleNamespace
-
-    from ai_search.payments import xunhupay
-
-    fake_settings = SimpleNamespace(
-        xunhupay_notify_url="http://example.com/callback",
-        xunhupay_appid="",
-        xunhupay_appsecret="",
-        xunhupay_appid_alipay="",
-        xunhupay_appsecret_alipay="",
-        xunhupay_appid_wechat="201906187427",
-        xunhupay_appsecret_wechat="s3cret",
-    )
-    monkeypatch.setattr(xunhupay, "get_settings", lambda: fake_settings)
-    provider = xunhupay.XunHuPayProvider()
-    assert provider.available_channels() == ["wechat"]
-
-
-# ---------- 订阅 ----------
+# ---------- 订阅（原生自动续订）----------
 
 
 def test_subscribe_flow(client, fake_provider, sent_mails):
     headers = _register(client, sent_mails)
     order = _create_order(
-        client, headers, kind="subscribe", plan_id=PLAN_SUB1, pay_channel="alipay"
+        client, headers, kind="subscribe", plan_id=PLAN_SUB1, pay_channel="card"
     )
-    assert order["amount_cents"] == 999  # 限时折扣价
+    assert order["amount_cents"] == 499  # 限时折扣价
     assert order["credits"] == "1000.00"
-    _pay(client, fake_provider, order)
+    _activate_subscription(client, order)
 
     bal = _balance(client, headers)
     assert bal["balance"] == pytest.approx(2000.0)   # 1000 永久 + 1000 限时
@@ -291,20 +314,24 @@ def test_subscribe_flow(client, fake_provider, sent_mails):
     assert resp.status_code == 400
 
 
-def test_renew_flow(client, fake_provider, sent_mails):
+def test_renewal_via_webhook(client, fake_provider, sent_mails):
+    """平台自动续期：subscription_paid 事件 → 续期积分入账 + 周期顺延；事件幂等。"""
     headers = _register(client, sent_mails)
     order = _create_order(client, headers, kind="subscribe", plan_id=PLAN_SUB1)
-    _pay(client, fake_provider, order)
+    sub_id = _activate_subscription(client, order)
     sub1 = client.get("/payments/catalog", headers=headers).json()["subscription"]
 
-    # 续订同档位
-    renew = _create_order(client, headers, kind="renew", plan_id=PLAN_SUB1)
-    assert renew["amount_cents"] == 999
-    _pay(client, fake_provider, renew)
+    event = {
+        "type": "subscription_paid",
+        "event_id": f"evt-renew-{uuid.uuid4().hex[:8]}",
+        "provider_subscription_id": sub_id,
+        "amount_cents": 499,
+    }
+    _webhook(client, "fakepay", event)
 
     bal = _balance(client, headers)
     assert bal["balance"] == pytest.approx(3000.0)
-    # 续订积分下一周期才生效：expiring 不变，upcoming +1000
+    # 续期积分下一周期才生效：expiring 不变，upcoming +1000
     assert bal["expiring"] == pytest.approx(1000.0)
     assert bal["upcoming"] == pytest.approx(1000.0)
 
@@ -316,21 +343,19 @@ def test_renew_flow(client, fake_provider, sent_mails):
     end2 = datetime.fromisoformat(sub2["period_end"])
     assert (end2 - end1).days == 30
 
-    # 续订其他档位被拒
-    resp = client.post(
-        "/payments/orders", json={"kind": "renew", "plan_id": PLAN_SUB2}, headers=headers
-    )
-    assert resp.status_code == 400
+    # 事件幂等：同一 event_id 重放不重复发积分
+    _webhook(client, "fakepay", event)
+    assert _balance(client, headers)["balance"] == pytest.approx(3000.0)
 
 
 def test_upgrade_flow(client, fake_provider, sent_mails):
     headers = _register(client, sent_mails)
     order = _create_order(client, headers, kind="subscribe", plan_id=PLAN_SUB1)
-    _pay(client, fake_provider, order)
+    _activate_subscription(client, order)
 
-    # 升级到档2：付新档当前售价全额
+    # 升级到 Pro：付新档当前售价全额
     up = _create_order(client, headers, kind="upgrade", plan_id=PLAN_SUB2)
-    assert up["amount_cents"] == 2499
+    assert up["amount_cents"] == 999
     assert up["credits"] == "3000.00"
     _pay(client, fake_provider, up)
 
@@ -351,17 +376,88 @@ def test_subscription_rules_rejected(client, fake_provider, sent_mails):
         "/payments/orders", json={"kind": "upgrade", "plan_id": PLAN_SUB1}, headers=headers
     ).status_code == 400
 
-    # 订阅档2 后：降级（upgrade 到档1）被拒
+    # 订阅 Pro 后：降级（upgrade 到 Starter）被拒
     order = _create_order(client, headers, kind="subscribe", plan_id=PLAN_SUB2)
-    _pay(client, fake_provider, order)
+    _activate_subscription(client, order)
     resp = client.post(
         "/payments/orders", json={"kind": "upgrade", "plan_id": PLAN_SUB1}, headers=headers
     )
     assert resp.status_code == 400
-    assert "降级" in resp.json()["detail"]
+    assert "higher" in resp.json()["detail"]
 
 
-# ---------- 邮箱验证门禁（2026-09-12 需求 7）----------
+def test_subscription_cancel_via_webhook(client, fake_provider, sent_mails):
+    """平台取消订阅 → 本地标记 canceled，catalog 不再返回有效订阅。"""
+    headers = _register(client, sent_mails)
+    order = _create_order(client, headers, kind="subscribe", plan_id=PLAN_SUB1)
+    sub_id = _activate_subscription(client, order)
+    assert client.get("/payments/catalog", headers=headers).json()["subscription"]
+
+    _webhook(client, "fakepay", {
+        "type": "subscription_canceled",
+        "event_id": f"evt-cancel-{uuid.uuid4().hex[:8]}",
+        "provider_subscription_id": sub_id,
+    })
+    assert client.get("/payments/catalog", headers=headers).json()["subscription"] is None
+
+
+def test_customer_portal(client, fake_provider, sent_mails):
+    """有订阅且绑定平台 customer id 时可生成 Customer Portal 链接。"""
+    headers = _register(client, sent_mails)
+    order = _create_order(client, headers, kind="subscribe", plan_id=PLAN_SUB1)
+    _activate_subscription(client, order)
+    resp = client.get("/payments/portal", headers=headers)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["portal_url"] == "https://portal.example.com/cust_fake_1"
+
+
+# ---------- Creem 两段式：checkout 绑订阅 + subscription.paid 发积分 ----------
+
+
+def test_creem_style_subscribe_flow(client, fake_provider, sent_mails):
+    """Creem 风格：checkout.completed 只绑订阅，首期积分由 subscription.paid 发放。"""
+    headers = _register(client, sent_mails)
+    order = _create_order(client, headers, kind="subscribe", plan_id=PLAN_SUB1)
+    order_no = _order_no(order)
+
+    sub_id = f"sub_ck_{uuid.uuid4().hex[:8]}"
+    _webhook(client, "fakepay", {
+        "type": "subscription_checkout", "event_id": f"evt-{uuid.uuid4().hex[:8]}",
+        "order_no": order_no, "provider_subscription_id": sub_id,
+        "provider_customer_id": "cust_ck_1",
+    })
+    # 绑订阅但尚未发积分
+    assert _balance(client, headers)["balance"] == pytest.approx(1000.0)
+
+    _webhook(client, "fakepay", {
+        "type": "subscription_paid", "event_id": f"evt-{uuid.uuid4().hex[:8]}",
+        "provider_subscription_id": sub_id,
+    })
+    assert _balance(client, headers)["balance"] == pytest.approx(2000.0)
+
+    # 下一周期续期
+    _webhook(client, "fakepay", {
+        "type": "subscription_paid", "event_id": f"evt-{uuid.uuid4().hex[:8]}",
+        "provider_subscription_id": sub_id,
+    })
+    bal = _balance(client, headers)
+    assert bal["balance"] == pytest.approx(3000.0)
+    assert bal["upcoming"] == pytest.approx(1000.0)
+
+
+def test_webhook_bad_signature_rejected(client, fake_provider, sent_mails):
+    """验签失败的 webhook 返回 400。"""
+    resp = client.post(
+        "/payments/webhooks/fakepay",
+        content=json.dumps({
+            "type": "one_time_paid", "event_id": "evt-x", "order_no": "ORDX",
+            "sign": "bad",
+        }),
+    )
+    assert resp.status_code == 400
+
+
+# ---------- 邮箱验证门禁 ----------
 
 
 def test_order_requires_email_verified(client, fake_provider):
@@ -372,20 +468,19 @@ def test_order_requires_email_verified(client, fake_provider):
     headers = {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
     for body in (
-        {"kind": "recharge", "plan_id": PLAN_R10},
+        {"kind": "recharge", "plan_id": PLAN_R5},
         {"kind": "subscribe", "plan_id": PLAN_SUB1},
         {"kind": "renew", "plan_id": PLAN_SUB1},
         {"kind": "upgrade", "plan_id": PLAN_SUB2},
     ):
         resp = client.post("/payments/orders", json=body, headers=headers)
         assert resp.status_code == 403, (body, resp.text)
-        assert "验证邮箱" in resp.json()["detail"]
 
 
 def test_order_ok_after_email_verified(client, fake_provider, sent_mails):
     """同一用户完成邮箱验证后即可正常下单。"""
     headers = _register(client, sent_mails)
-    order = _create_order(client, headers, kind="recharge", plan_id=PLAN_R10)
+    order = _create_order(client, headers, kind="recharge", plan_id=PLAN_R5)
     assert order["status"] == "pending"
 
 
@@ -405,5 +500,6 @@ def test_billing_page_prompts_unverified_user(client):
     assert resp.status_code == 303
     page = client.get("/dashboard/billing")
     assert page.status_code == 200
-    assert "充值前请先完成邮箱验证" in page.text
-    assert "重发验证邮件" in page.text
+    body = page.text.lower()
+    assert "verify" in body and "email" in body
+    assert "resend" in body

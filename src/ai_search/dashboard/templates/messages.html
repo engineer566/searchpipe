@@ -1,14 +1,14 @@
 {% extends "base.html" %}
-{% block title %}站内信 · SearchPipe{% endblock %}
+{% block title %}Messages · SearchPipe{% endblock %}
 {% block content %}
 <div class="page-head">
-  <h1>站内信</h1>
-  <p>管理员发送的通知与工单回复会出现在这里。</p>
+  <h1>Messages</h1>
+  <p>Announcements from admins and ticket replies show up here.</p>
 </div>
 
 <div class="card">
-  <h2>我的消息 <span id="msg-unread" class="tag tag-warn" style="display:none"></span></h2>
-  <div id="message-list"><div class="empty">加载中…</div></div>
+  <h2>My messages <span id="msg-unread" class="tag tag-warn" style="display:none"></span></h2>
+  <div id="message-list"><div class="empty">Loading…</div></div>
 </div>
 {% endblock %}
 {% block script %}
@@ -18,20 +18,20 @@ async function loadMessages(){
   try{
     const d=await AIS.api('/messages?size=100');
     const badge=document.getElementById('msg-unread');
-    if(d.unread_count>0){ badge.style.display=''; badge.textContent=d.unread_count+' 条未读'; }
+    if(d.unread_count>0){ badge.style.display=''; badge.textContent=d.unread_count+' unread'; }
     else{ badge.style.display='none'; }
-    if(!d.items.length){ el.innerHTML='<div class="empty">暂无消息。</div>'; return; }
+    if(!d.items.length){ el.innerHTML='<div class="empty">No messages yet.</div>'; return; }
     el.innerHTML=d.items.map(m=>`
       <div class="card mb" id="msg-${m.id}" style="border-left:3px solid ${m.read?'var(--border)':'var(--accent)'};cursor:pointer" onclick="openMessage('${m.id}',${m.read})">
         <div class="row" style="align-items:center;gap:8px">
-          ${m.read?'':'<span class="tag tag-warn">未读</span>'}
-          ${m.kind==='broadcast'?'<span class="tag tag-neutral">广播</span>':''}
+          ${m.read?'':'<span class="tag tag-warn">Unread</span>'}
+          ${m.kind==='broadcast'?'<span class="tag tag-neutral">Broadcast</span>':''}
           <strong class="grow">${AIS.esc(m.title)}</strong>
           <span class="muted" style="font-size:12px;white-space:nowrap">${m.created_at.slice(0,16).replace('T',' ')}</span>
         </div>
         <div class="msg-body" style="display:none;margin-top:10px;white-space:pre-wrap">${AIS.esc(m.content)}</div>
       </div>`).join('');
-  }catch(e){ el.innerHTML='<div class="empty">加载失败：'+AIS.esc(e.message)+'</div>'; }
+  }catch(e){ el.innerHTML='<div class="empty">Failed to load: '+AIS.esc(e.message)+'</div>'; }
 }
 
 async function openMessage(id, read){
@@ -41,9 +41,9 @@ async function openMessage(id, read){
   if(!read){
     try{
       await AIS.api('/messages/'+id+'/read',{method:'POST'});
-      loadMessages(); // 刷新未读状态与角标
+      loadMessages(); // refresh unread state and badges
       if(window.AISRefreshUnreadBadge) AISRefreshUnreadBadge();
-    }catch(e){ /* 标记失败不阻断阅读 */ }
+    }catch(e){ /* marking read failed — don't block reading */ }
   }
 }
 loadMessages();

@@ -1,0 +1,88 @@
+{% extends "base_public.html" %}
+{% block content %}
+<div class="page-wrap narrow">
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a href="/">Home</a><span aria-hidden="true">/</span><span>Privacy Policy</span>
+  </nav>
+
+  <div class="page-head">
+    <h1>Privacy Policy</h1>
+    <p>Last updated: 2026-09-14</p>
+  </div>
+
+  <div class="prose">
+    <h2>1. Data Controller</h2>
+    <p>The data controller for the SearchPipe service ("the Service") is the SearchPipe team. For any privacy-related request, contact us at <a href="mailto:privacy@searchpipe.tech">privacy@searchpipe.tech</a>.</p>
+
+    <h2>2. Data We Collect</h2>
+    <p>We collect only the minimum data required to operate the Service:</p>
+    <ul>
+      <li><strong>Email address</strong> — used for account registration, login, billing notices and service announcements;</li>
+      <li><strong>API usage logs</strong> — including the query text of your search requests, timestamps and credit consumption, used for billing, abuse prevention and service debugging;</li>
+      <li><strong>Payment information</strong> — handled entirely by our merchant of record (see Section 3). We do not store your card number or other full payment credentials on our servers.</li>
+    </ul>
+
+    <h2>3. Payments and Merchant of Record</h2>
+    <p>Payments are processed by our merchant of record (MoR), such as Creem or Dodo Payments. The MoR collects and processes your payment details (card number, billing address, etc.) under its own privacy policy, and acts as the seller of record for tax and invoicing purposes. We only receive the transaction result and the information needed to credit your account.</p>
+
+    <h2>4. Cookies</h2>
+    <p>The Service uses only strictly necessary cookies: a single HttpOnly session cookie that keeps you signed in. We do not use tracking, analytics or advertising cookies.</p>
+
+    <h2>5. How We Use Your Data</h2>
+    <p>We use the collected data solely to:</p>
+    <ul>
+      <li>Provide, operate and maintain the Service (executing search requests and returning results);</li>
+      <li>Bill your usage accurately (credit consumption, recharges and subscriptions);</li>
+      <li>Prevent abuse, fraud and violations of the Terms of Service;</li>
+      <li>Respond to your support requests.</li>
+    </ul>
+    <p>We do not sell your personal data, and we do not use your search queries to build advertising profiles.</p>
+
+    <h2>6. Third-Party Processors</h2>
+    <p>We share the minimum necessary data with the following categories of processors, solely to operate the Service:</p>
+    <ul>
+      <li><strong>Payment processor (merchant of record)</strong> — Creem / Dodo Payments, for payment processing and invoicing;</li>
+      <li><strong>LLM API provider</strong> — DeepSeek, which processes the fetched page content and your query to generate rerankings and summaries;</li>
+      <li><strong>Email delivery (SMTP) service</strong> — for transactional emails such as verification and billing notices.</li>
+    </ul>
+    <p>Each processor handles data under its own privacy policy and data processing terms.</p>
+
+    <h2>7. Data Retention and Deletion</h2>
+    <p>We retain your account data for as long as your account is active. API usage logs are retained for a limited period for billing verification and abuse prevention, after which they are deleted or anonymized.</p>
+    <p>You may request deletion of your account and associated personal data at any time by emailing <a href="mailto:privacy@searchpipe.tech">privacy@searchpipe.tech</a>. After account deletion, unused credits are cleared and your personal data is removed from our active systems within a reasonable period, except where we are required to retain it by law (e.g. tax and accounting records).</p>
+
+    <h2>8. Your Rights (GDPR)</h2>
+    <p>If you are located in the European Economic Area or another jurisdiction with similar data protection laws, you have the right to:</p>
+    <ul>
+      <li><strong>Access</strong> — request a copy of the personal data we hold about you;</li>
+      <li><strong>Rectification</strong> — request correction of inaccurate data;</li>
+      <li><strong>Erasure</strong> — request deletion of your personal data;</li>
+      <li><strong>Data portability</strong> — request an export of your data in a structured, commonly used format;</li>
+      <li><strong>Objection and restriction</strong> — object to or restrict certain processing of your data.</li>
+    </ul>
+    <p>To exercise any of these rights, email <a href="mailto:privacy@searchpipe.tech">privacy@searchpipe.tech</a>. We will respond within the timeframe required by applicable law. You also have the right to lodge a complaint with your local data protection authority.</p>
+
+    <h2>9. Changes to This Policy</h2>
+    <p>We may update this Privacy Policy from time to time. The updated version will be posted on this page with a revised "Last updated" date. For material changes, we will notify you via email or an on-site announcement before the changes take effect.</p>
+
+    <h2>10. Contact</h2>
+    <p>For any privacy-related questions or requests, contact us at <a href="mailto:privacy@searchpipe.tech">privacy@searchpipe.tech</a>.</p>
+
+    <h2>Related Pages</h2>
+    <ul>
+      <li><a href="/terms">Terms of Service</a>: credits, refunds and acceptable use</li>
+      <li><a href="/pricing">Pricing</a>: recharges, subscriptions and credit rules</li>
+      <li><a href="/faq">FAQ</a>: billing, rate limits and using results</li>
+    </ul>
+  </div>
+
+  <div class="cta-band" style="margin-top:44px">
+    <h2>Questions About Your Data?</h2>
+    <p>Email us at <a href="mailto:privacy@searchpipe.tech">privacy@searchpipe.tech</a> — we respond to every privacy request.</p>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+      <a href="/dashboard/register" class="btn btn-lg">Create Account</a>
+      <a href="/dashboard/login" class="btn btn-ghost btn-lg">Log In</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

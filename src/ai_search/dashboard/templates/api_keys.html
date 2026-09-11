@@ -3,104 +3,104 @@
 {% block content %}
 <div class="page-head">
   <h1>API Keys</h1>
-  <p>Key 明文<strong>默认隐藏</strong>，需要时在下方列表点「显示」即可查看（不再是一次性展示）。MCP 接入（推荐）直接把 Key 编进链接（<code>{{ base_url }}/mcp?api_key=sp-…</code>），Claude Code / Cursor 填入即用；程序直接调用 <code>/search</code> 时用 <code>sp-</code> 前缀的 Key 鉴权。</p>
+  <p>Key plaintext is <strong>hidden by default</strong> — click "Show" in the list below whenever you need it (no longer a one-time reveal). For MCP setup (recommended), the key is embedded directly in the link (<code>{{ base_url }}/mcp?api_key=sp-…</code>): paste it into Claude Code / Cursor and it just works. For direct <code>/search</code> calls, authenticate with the <code>sp-</code>-prefixed key.</p>
 </div>
 
 <div class="card">
-  <h2>创建新 Key</h2>
-  <p class="card-sub">建议按环境区分命名，例如「生产环境」「本地调试」。创建后随时可在下方列表点「显示」查看明文。</p>
+  <h2>Create a new key</h2>
+  <p class="card-sub">Name keys by environment, e.g. "production" / "local dev". You can reveal the plaintext anytime from the list below.</p>
   <form id="create-form" class="row">
-    <input type="text" name="name" class="grow" placeholder="Key 名称" required>
-    <button type="submit" class="btn" id="create-btn">创建</button>
+    <input type="text" name="name" class="grow" placeholder="Key name" required>
+    <button type="submit" class="btn" id="create-btn">Create</button>
   </form>
 </div>
 
 <div class="card">
-  <h2>MCP 配置</h2>
+  <h2>MCP setup</h2>
   {% if valid_keys %}
-  <p class="card-sub">勾选要用于 MCP 接入的 API Key（默认使用<strong>默认 Key</strong>，切换勾选立刻刷新下方 MCP 链接）：</p>
+  <p class="card-sub">Pick the API key to use for MCP (defaults to your <strong>default key</strong>; switching the selection refreshes the MCP link below):</p>
   <div class="row" style="flex-wrap:wrap;gap:10px 20px">
     {% for k in valid_keys %}
     <label style="display:flex;gap:6px;align-items:center;font-weight:500">
       <input type="checkbox" class="mcp-key-pick" value="{{ k.id }}" data-prefix="{{ k.key_prefix }}" data-viewable="{{ '1' if k.key_cipher else '0' }}" style="width:auto"{% if k.is_default %} checked{% endif %}>
       {{ k.name }}
       <code class="muted">{{ k.key_prefix }}…</code>
-      {% if k.is_default %}<span class="tag tag-ok">默认</span>{% endif %}
+      {% if k.is_default %}<span class="tag tag-ok">Default</span>{% endif %}
     </label>
     {% endfor %}
   </div>
 
-  <p class="card-sub" style="margin-top:16px">MCP 链接（Claude Code / Cursor 等客户端直接填这个 URL）</p>
-  <div class="code-block" id="mcp-url-block"><pre><code id="mcp-url">加载中…</code></pre></div>
+  <p class="card-sub" style="margin-top:16px">MCP link (paste this URL into Claude Code / Cursor and similar clients)</p>
+  <div class="code-block" id="mcp-url-block"><pre><code id="mcp-url">Loading…</code></pre></div>
   <div class="row mt" style="gap:8px;flex-wrap:wrap;align-items:center">
-    <button type="button" class="btn btn-sm" id="mcp-reveal">显示完整链接</button>
-    <button type="button" class="btn btn-sm" id="mcp-copy">复制 MCP 链接</button>
-    <span class="muted" style="font-size:13px">链接内含 API Key，默认打码显示；点复制拿到的始终是完整链接。</span>
+    <button type="button" class="btn btn-sm" id="mcp-reveal">Show full link</button>
+    <button type="button" class="btn btn-sm" id="mcp-copy">Copy MCP link</button>
+    <span class="muted" style="font-size:13px">The link contains your API key and is masked by default; copying always gives you the full link.</span>
   </div>
 
-  <p class="card-sub" style="margin-top:20px">一句话配置（推荐）</p>
-  <p class="muted" style="font-size:13px;margin:0 0 10px">复制后直接粘给 AI Agent（Claude Code / Cursor / 任意支持 MCP 的客户端），它会读完 <code>/agent-setup/SKILL.md</code> 自动完成接入与验证，不用再问你要 Key。提示词默认带上当前选中的 API Key，出于安全考虑不在页面显示。</p>
+  <p class="card-sub" style="margin-top:20px">One-line setup (recommended)</p>
+  <p class="muted" style="font-size:13px;margin:0 0 10px">Copy and paste this to your AI agent (Claude Code / Cursor / any MCP-capable client). It will read <code>/agent-setup/SKILL.md</code>, finish the setup and verify the connection by itself — no need to hand over your key manually. The prompt embeds the currently selected API key and is never shown on the page.</p>
   <div class="row" style="gap:8px;flex-wrap:wrap;align-items:center">
-    <button type="button" class="btn" id="oneliner-copy">复制一句话配置</button>
-    <span class="muted" style="font-size:13px">内容含 API Key，点一下只复制到剪贴板、不展示在页面上。</span>
+    <button type="button" class="btn" id="oneliner-copy">Copy one-line setup</button>
+    <span class="muted" style="font-size:13px">Contains your API key — one click copies it to the clipboard without displaying it on the page.</span>
   </div>
   {% else %}
-  <div class="empty">邮箱验证通过后会自动生成一把默认 Key（也可在上方手动创建），之后即可在这里生成 MCP 链接与一句话配置。</div>
+  <div class="empty">A default key is generated automatically once your email is verified (you can also create one above). MCP links and one-line setup will appear here.</div>
   {% endif %}
 </div>
 
 <div class="card">
-  <h2>我的 Keys</h2>
+  <h2>My keys</h2>
   {% if keys %}
   <div class="table-wrap mt">
     <table>
-      <thead><tr><th>名称</th><th>Key</th><th>最近使用</th><th>状态</th><th>创建时间</th><th></th></tr></thead>
+      <thead><tr><th>Name</th><th>Key</th><th>Last used</th><th>Status</th><th>Created</th><th></th></tr></thead>
       <tbody>
       {% for k in keys %}
         <tr>
-          <td style="font-weight:500">{{ k.name }}{% if k.is_default and not k.revoked_at %} <span class="tag tag-ok">默认</span>{% endif %}</td>
+          <td style="font-weight:500">{{ k.name }}{% if k.is_default and not k.revoked_at %} <span class="tag tag-ok">Default</span>{% endif %}</td>
           <td>
             <code class="key-cell" data-id="{{ k.id }}" data-mask="{{ k.key_prefix }}…">{{ k.key_prefix }}…</code>
-            {# 注意：keys 是 ORM 对象（不是 API 的 KeyItem），是否可查看要看 key_cipher 字段 #}
+            {# Note: keys are ORM objects (not the API's KeyItem); revealability depends on key_cipher #}
             {% if not k.revoked_at and k.key_cipher %}
-            <button class="btn btn-sm key-reveal-btn" data-id="{{ k.id }}" style="margin-left:6px">显示</button>
+            <button class="btn btn-sm key-reveal-btn" data-id="{{ k.id }}" style="margin-left:6px">Show</button>
             {% elif not k.revoked_at %}
-            <span class="muted" style="font-size:12px;margin-left:6px" title="该 Key 创建于「查看明文」功能上线前，只有 hash 没有密文；如需查看明文请在下方新建一把">不可查看</span>
+            <span class="muted" style="font-size:12px;margin-left:6px" title="This key was created before the reveal-plaintext feature shipped; only its hash is stored. Create a new key below if you need to see the plaintext.">Not revealable</span>
             {% endif %}
           </td>
           <td class="muted">{{ k.last_used_at.strftime('%Y-%m-%d %H:%M') if k.last_used_at else '—' }}</td>
-          <td>{% if k.revoked_at %}<span class="tag tag-err">已吊销</span>{% else %}<span class="tag tag-ok">有效</span>{% endif %}</td>
+          <td>{% if k.revoked_at %}<span class="tag tag-err">Revoked</span>{% else %}<span class="tag tag-ok">Active</span>{% endif %}</td>
           <td class="muted">{{ k.created_at.strftime('%Y-%m-%d') }}</td>
-          <td style="text-align:right">{% if not k.revoked_at %}<button class="btn btn-danger btn-sm revoke-btn" data-id="{{ k.id }}">吊销</button>{% endif %}</td>
+          <td style="text-align:right">{% if not k.revoked_at %}<button class="btn btn-danger btn-sm revoke-btn" data-id="{{ k.id }}">Revoke</button>{% endif %}</td>
         </tr>
       {% endfor %}
       </tbody>
     </table>
   </div>
-  <p class="muted" style="font-size:13px;margin-top:10px">吊销默认 Key 后，我们会自动把剩下最新的一把提升为默认 Key。</p>
+  <p class="muted" style="font-size:13px;margin-top:10px">If you revoke the default key, we automatically promote the newest remaining key to default.</p>
   {% else %}
-  <div class="empty">还没有 API Key，先在上方创建一个吧。</div>
+  <div class="empty">No API keys yet — create one above.</div>
   {% endif %}
 </div>
 
-<!-- 新 Key 模态 -->
+<!-- New key modal -->
 <div class="modal-mask" id="key-modal">
   <div class="modal">
-    <h3>Key 已创建</h3>
-    <p class="muted" style="font-size:14px;margin:0 0 14px">完整 Key 也可随时在下方列表点「显示」查看；请勿泄露给他人。</p>
+    <h3>Key created</h3>
+    <p class="muted" style="font-size:14px;margin:0 0 14px">You can also reveal the full key anytime from the list below ("Show"). Keep it secret.</p>
     <div class="code-block" data-copy><pre><code id="new-key-val"></code></pre></div>
-    <h3 class="mt">MCP 链接（远程接入）</h3>
-    <p class="muted" style="font-size:14px;margin:0 0 14px">Claude Code / Cursor 等客户端直接填这个 URL 即可完成 MCP 配置：</p>
+    <h3 class="mt">MCP link (remote setup)</h3>
+    <p class="muted" style="font-size:14px;margin:0 0 14px">Paste this URL into Claude Code / Cursor and similar clients to complete MCP setup:</p>
     <div class="code-block" data-copy><pre><code id="new-mcp-url"></code></pre></div>
     <div class="row mt" style="justify-content:flex-end">
-      <button class="btn" onclick="location.reload()">我已保存</button>
+      <button class="btn" onclick="location.reload()">I've saved it</button>
     </div>
   </div>
 </div>
 {% endblock %}
 {% block script %}
 <script>
-// 创建 Key
+// Create key
 document.getElementById('create-form').onsubmit=async e=>{
   e.preventDefault();
   const btn=document.getElementById('create-btn');
@@ -117,7 +117,8 @@ document.getElementById('create-form').onsubmit=async e=>{
   finally{ btn.disabled=false; }
 };
 
-// Key 明文查看：平时打码；点「显示」按需拉取明文，「隐藏」收起
+// Reveal/hide key plaintext: masked by default; "Show" fetches the plaintext
+// on demand, "Hide" collapses it back.
 document.querySelectorAll('.key-reveal-btn').forEach(b=>{
   b.onclick=async()=>{
     const id=b.dataset.id;
@@ -125,7 +126,7 @@ document.querySelectorAll('.key-reveal-btn').forEach(b=>{
     if(cell.dataset.shown==='1'){
       cell.textContent=cell.dataset.mask;
       cell.dataset.shown='0';
-      b.textContent='显示';
+      b.textContent='Show';
       return;
     }
     b.disabled=true;
@@ -133,13 +134,14 @@ document.querySelectorAll('.key-reveal-btn').forEach(b=>{
       const d=await AIS.api('/api-keys/'+id+'/reveal');
       cell.textContent=d.key;
       cell.dataset.shown='1';
-      b.textContent='隐藏';
+      b.textContent='Hide';
     }catch(e){ alert(e.message); }
     finally{ b.disabled=false; }
   };
 });
 
-// MCP 配置：勾选 Key（单选语义）→ 刷新 MCP 链接；链接默认打码，复制拿完整链接
+// MCP setup: pick a key (single-select) → refresh MCP link; the link is masked
+// by default, copying always yields the full link.
 (function(){
   const picks=Array.prototype.slice.call(document.querySelectorAll('.mcp-key-pick'));
   if(!picks.length) return;
@@ -152,24 +154,25 @@ document.querySelectorAll('.key-reveal-btn').forEach(b=>{
 
   function render(){
     urlEl.textContent=shown?state.mcp:state.masked;
-    revealBtn.textContent=shown?'隐藏完整链接':'显示完整链接';
+    revealBtn.textContent=shown?'Hide full link':'Show full link';
   }
 
   async function load(id){
     const d=await AIS.api(id?('/api-keys/'+id+'/reveal'):'/api-keys/reveal');
     state.mcp=d.mcp_url;
-    state.prompt=d.agent_prompt;   // 一句话配置内容：只留在内存里，不渲染到页面
+    state.prompt=d.agent_prompt;   // One-line setup content: kept in memory only, never rendered into the page
     state.masked='{{ base_url }}/mcp?api_key='+d.key_prefix+'••••••••••';
     shown=false;
     render();
   }
 
-  // 拉取失败（典型：老 Key 无密文 → 409）：给出可操作提示，别显示半截状态
+  // Load failure (typical: legacy key without ciphertext → 409): show an
+  // actionable message instead of a half-broken state.
   function loadFailed(e){
     state.mcp=''; state.prompt='';
     urlEl.textContent=e.status===409
-      ? '当前选中的 Key 创建于「查看明文」功能上线前，无法生成链接——请勾选其它 Key，或在下方新建一把。'
-      : '加载失败：'+e.message;
+      ? 'The selected key was created before the reveal-plaintext feature shipped and cannot produce a link — pick another key or create a new one below.'
+      : 'Failed to load: '+e.message;
   }
 
   picks.forEach(p=>{
@@ -186,16 +189,17 @@ document.querySelectorAll('.key-reveal-btn').forEach(b=>{
 
   const first=picks.filter(p=>p.checked)[0]||picks[0];
   first.checked=true;
-  // ⚠️ app.js 是 defer 加载：内联脚本执行时 AIS 尚未定义，首屏拉取必须等
-  // DOMContentLoaded（defer 脚本在它之前跑完），否则首屏 MCP 链接会「加载失败」。
+  // ⚠️ app.js loads with defer: inline scripts run before AIS exists, so the
+  // initial fetch must wait for DOMContentLoaded (defer scripts finish before
+  // it fires) — otherwise the first MCP link render shows "Failed to load".
   document.addEventListener('DOMContentLoaded',()=>{
     load(first.value).catch(loadFailed);
   });
 })();
 
-// 吊销
+// Revoke
 document.querySelectorAll('.revoke-btn').forEach(b=>b.onclick=async()=>{
-  if(!confirm('确认吊销此 Key？吊销后立即失效且无法恢复。')) return;
+  if(!confirm('Revoke this key? It stops working immediately and cannot be restored.')) return;
   try{ await AIS.api('/api-keys/'+b.dataset.id,{method:'DELETE'}); location.reload(); }
   catch(e){ alert(e.message); }
 });

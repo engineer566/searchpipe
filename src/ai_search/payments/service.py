@@ -393,6 +393,13 @@ async def handle_webhook(
         sub = await _find_sub_by_provider(
             db, provider_name, event.provider_subscription_id or ""
         )
+        if sub is not None and sub.user_id != order.user_id:
+            # 防御：平台订阅 id 与本订单用户不一致（数据异常/测试串扰），不复用
+            logger.error(
+                "subscription_activated 订阅归属不匹配 sub=%s order_user=%s",
+                event.provider_subscription_id, order.user_id,
+            )
+            sub = None
         await fulfill_order(
             db,
             order,

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -12,7 +12,7 @@
 
 <!-- Open Graph -->
 <meta property="og:site_name" content="{{ site_name }}">
-<meta property="og:locale" content="zh_CN">
+<meta property="og:locale" content="en_US">
 <meta property="og:type" content="{% block og_type %}website{% endblock %}">
 <meta property="og:title" content="{% block og_title %}{{ self.title() }}{% endblock %}">
 <meta property="og:description" content="{% block og_description %}{{ self.description() }}{% endblock %}">
@@ -38,7 +38,7 @@
 <meta name="theme-color" content="#4f46e5">
 
 <script>
-// 防主题闪烁：渲染前决定主题
+// Set theme before first paint to avoid flash
 (function(){try{var t=localStorage.getItem('searchpipe-theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
 </script>
 <link rel="stylesheet" href="/static/app.css?v=20260914">
@@ -52,21 +52,21 @@
 </head>
 <body>
 
-<nav class="site-nav" aria-label="主导航">
+<nav class="site-nav" aria-label="Main navigation">
   <a class="brand" href="/"><svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M2.5 12h8.5" stroke-width="4.4"/><path d="M4.5 9.7v4.6M7.5 9.7v4.6" stroke-width="1.6"/><circle cx="15.8" cy="12" r="5.6"/></svg>{{ site_name }}</a>
   <div class="nav-links">
-    <a href="/mcp-server" {% if nav_active == 'mcp' %}class="active"{% endif %}>MCP 接入</a>
-    <a href="/docs" {% if nav_active == 'docs' %}class="active"{% endif %}>开发文档</a>
-    <a href="/pricing" {% if nav_active == 'pricing' %}class="active"{% endif %}>定价</a>
-    <a href="/faq" {% if nav_active == 'faq' %}class="active"{% endif %}>常见问题</a>
+    <a href="/mcp-server" {% if nav_active == 'mcp' %}class="active"{% endif %}>MCP Integration</a>
+    <a href="/docs" {% if nav_active == 'docs' %}class="active"{% endif %}>Docs</a>
+    <a href="/pricing" {% if nav_active == 'pricing' %}class="active"{% endif %}>Pricing</a>
+    <a href="/faq" {% if nav_active == 'faq' %}class="active"{% endif %}>FAQ</a>
   </div>
   <div class="nav-actions">
     <button class="theme-toggle" type="button" style="width:auto"><span class="tt-icon"></span><span class="tt-label"></span></button>
     {% if logged_in %}
-    <a href="/dashboard" class="btn btn-sm">进入控制台</a>
+    <a href="/dashboard" class="btn btn-sm">Dashboard</a>
     {% else %}
-    <a href="/dashboard/login" class="btn btn-ghost btn-sm">登录</a>
-    <a href="/dashboard/register" class="btn btn-sm">免费开始</a>
+    <a href="/dashboard/login" class="btn btn-ghost btn-sm">Log In</a>
+    <a href="/dashboard/register" class="btn btn-sm">Get Started Free</a>
     {% endif %}
   </div>
 </nav>
@@ -79,26 +79,27 @@
       <strong><svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M2.5 12h8.5" stroke-width="4.4"/><path d="M4.5 9.7v4.6M7.5 9.7v4.6" stroke-width="1.6"/><circle cx="15.8" cy="12" r="5.6"/></svg>{{ site_name }}</strong>
       <p>{{ site_description }}</p>
     </div>
-    <nav aria-label="产品">
-      <span class="footer-head">产品</span>
-      <a href="/">首页</a>
-      <a href="/mcp-server">MCP 接入指南</a>
-      <a href="/pricing">定价</a>
-      <a href="/faq">常见问题</a>
+    <nav aria-label="Product">
+      <span class="footer-head">Product</span>
+      <a href="/">Home</a>
+      <a href="/mcp-server">MCP Integration</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/faq">FAQ</a>
     </nav>
-    <nav aria-label="开发者">
-      <span class="footer-head">开发者</span>
-      <a href="/docs">开发文档</a>
-      <a href="/agent-setup/SKILL.md">Agent 自动配置</a>
-      <a href="/dashboard">开发者控制台</a>
+    <nav aria-label="Developers">
+      <span class="footer-head">Developers</span>
+      <a href="/docs">Docs</a>
+      <a href="/agent-setup/SKILL.md">Agent Self-Setup</a>
+      <a href="/dashboard">Developer Dashboard</a>
     </nav>
-    <nav aria-label="关于">
-      <span class="footer-head">关于</span>
-      <a href="/terms">服务条款</a>
-      <a href="/sitemap.xml">站点地图</a>
+    <nav aria-label="About">
+      <span class="footer-head">About</span>
+      <a href="/terms">Terms of Service</a>
+      <a href="/privacy">Privacy Policy</a>
+      <a href="/sitemap.xml">Sitemap</a>
     </nav>
   </div>
-  <p class="footer-note">{{ site_name }} · 为 AI Agent 而生的网络访问层 · 检索 → 抓取 → 重排/摘要</p>
+  <p class="footer-note">{{ site_name }} · The web access layer for AI agents · Search → Fetch → Rerank/Summarize</p>
 </footer>
 
 <script src="/static/app.js?v=20260913" defer></script>

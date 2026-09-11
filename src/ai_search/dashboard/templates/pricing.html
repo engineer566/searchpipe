@@ -1,79 +1,79 @@
 {% extends "base_public.html" %}
 {% block content %}
 <div class="page-wrap narrow">
-  <nav class="breadcrumb" aria-label="面包屑">
-    <a href="/">首页</a><span aria-hidden="true">/</span><span>定价</span>
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a href="/">Home</a><span aria-hidden="true">/</span><span>Pricing</span>
   </nav>
 
   <div class="page-head">
-    <h1>定价</h1>
-    <p>SearchPipe 采用预付费积分制：<strong>¥{{ recharge_rate }} = 1 积分</strong>，基础搜索每次 1 积分、<strong>高级搜索每次 2 积分</strong>。注册即送免费额度，失败请求自动退款不扣费。</p>
+    <h1>Pricing</h1>
+    <p>SearchPipe uses prepaid credits: <strong>${{ recharge_rate }} = 1 credit</strong> — basic search costs 1 credit per call, <strong>advanced search 2 credits</strong>. Free credits on signup; failed requests are auto-refunded, never charged.</p>
   </div>
 
   <div class="prose">
-    <h2>免费额度</h2>
-    <p>注册账号即自动获得内测免费积分，能力与付费完全一致（MCP + REST API、全部参数）。适合接入验证与跑通第一个 Agent 工作流。</p>
+    <h2>Free tier</h2>
+    <p>Signing up grants free credits automatically, with full feature parity (MCP + REST API, all parameters). Perfect for integration testing and getting your first agent workflow running.</p>
 
-    <h2>积分充值（永久有效）</h2>
-    <p>固定档位如下，充值积分<strong>永久有效</strong>、不清零：</p>
+    <h2>Credit recharge (never expires)</h2>
+    <p>Fixed tiers below; recharged credits <strong>never expire</strong> and are never zeroed out:</p>
     <div class="table-wrap mb">
       <table>
-        <thead><tr><th>充值金额</th><th>到账积分</th><th>折算</th></tr></thead>
+        <thead><tr><th>Amount</th><th>Credits granted</th><th>Effective rate</th></tr></thead>
         <tbody>
           {% for amount, credits in recharge_tiers %}
-          <tr><td><strong>{{ amount }}</strong></td><td>{{ credits }}</td><td class="muted">≈ 每次基础搜索 1 积分</td></tr>
+          <tr><td><strong>{{ amount }}</strong></td><td>{{ credits }}</td><td class="muted">≈ 1 basic search per credit</td></tr>
           {% endfor %}
-          <tr><td>自定义金额</td><td>按 ¥{{ recharge_rate }} = 1 积分换算</td><td class="muted">单笔 ≤ ¥100</td></tr>
+          <tr><td>Custom amount</td><td>Converted at ${{ recharge_rate }} = 1 credit</td><td class="muted">Up to $500 per transaction</td></tr>
         </tbody>
       </table>
     </div>
-    <p>支持微信支付（以结算页实际可用渠道为准），下单后扫码完成支付即到账；若服务端扣费异常，经核实以补发积分处理。</p>
+    <p>Payment is completed on the hosted checkout page (available channels are shown at checkout); if a server-side billing error occurs, credits are reissued after verification.</p>
 
-    <h2>包月订阅（30 天有效）</h2>
-    <p>订阅积分自到账起 30 天有效，到期未用完自动清零。目前限时 5 折：</p>
+    <h2>Monthly plans (credits valid 30 days)</h2>
+    <p>Subscription credits are valid for 30 days from grant; unused credits expire at the end of the period. Plans renew automatically via the platform's subscription management:</p>
     <div class="table-wrap mb">
       <table>
-        <thead><tr><th>套餐</th><th>现价</th><th>原价</th><th>积分 / 有效期</th></tr></thead>
+        <thead><tr><th>Plan</th><th>Price</th><th>Credits / period</th></tr></thead>
         <tbody>
           {% for name, price, original, credits in subscription_plans %}
-          <tr><td><strong>{{ name }}</strong></td><td>¥{{ price }}</td><td class="muted"><s>¥{{ original }}</s></td><td>{{ credits }}</td></tr>
+          <tr><td><strong>{{ name }}</strong></td><td>${{ price }}/mo</td><td>{{ credits }}</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
 
-    <h3>订阅规则</h3>
+    <h3>Plan rules</h3>
     <ul>
-      <li>续订：新周期积分从下一周期开始生效，不累积到当前周期。</li>
-      <li>升级：支付新档位当前售价全额，新档积分即刻到账并起算 30 天，原档位未用完积分延期至与新档同期。</li>
-      <li>不支持降级，也不支持自动续订（到期需手动续订）。</li>
-      <li>订阅积分与充值积分独立计量：扣费时优先消耗限时批次。</li>
+      <li>Renewal: renewed credits take effect from the next billing period and do not stack into the current one.</li>
+      <li>Upgrade: pays the full current price of the new plan; new-plan credits land immediately with a fresh 30-day window, and unused credits from the old plan are extended to the new period end.</li>
+      <li>Downgrades are not supported. Subscriptions are platform-managed and renew automatically — cancel anytime from the billing portal.</li>
+      <li>Subscription credits and recharged credits are tracked separately: time-limited batches are consumed first.</li>
     </ul>
 
-    <h2>计费与退款</h2>
+    <h2>Billing &amp; refunds</h2>
     <ul>
-      <li>按次计费：基础搜索（basic）1 积分、高级搜索（advanced）2 积分。</li>
-      <li><strong>失败不扣费</strong>：检索源失败（502）与输出内容违规（400）都会自动退款，重试安全。</li>
-      <li>结果缓存：相同 query 与参数在 300 秒内命中缓存，不重复计费。</li>
-      <li>积分有效期与售后规则以 <a href="/terms">服务条款</a> 为准；因平台故障导致的服务未履约，经核实后将予以返还或补偿。</li>
+      <li>Per-call billing: basic search 1 credit, advanced search 2 credits.</li>
+      <li><strong>Failures are never charged</strong>: upstream retrieval failures (502) and output content violations (400) are auto-refunded; retries are safe.</li>
+      <li>Result cache: identical query and parameters within 300s hit the cache and are not billed again.</li>
+      <li>Credit validity and refund policies follow the <a href="/terms">Terms of Service</a>; service failures on our side are compensated after verification.</li>
     </ul>
 
-    <h2>限流额度</h2>
-    <p>默认滑动窗口限流为每分钟 100 次、突发 20 次，超出返回 <code>429</code> 并带 <code>Retry-After</code>。更高并发需求可以通过 <a href="/dashboard/feedback">控制台反馈</a> 联系我们调整。</p>
+    <h2>Rate limits</h2>
+    <p>Default sliding-window limits: 100 requests per minute with a burst of 20; over-limit requests return <code>429</code> with a <code>Retry-After</code> header. Need higher concurrency? Reach out via <a href="/dashboard/feedback">console feedback</a>.</p>
 
-    <h2>常见问题</h2>
+    <h2>FAQ</h2>
     <ul>
-      <li>积分会过期吗？充值积分永久有效；订阅积分 30 天有效。详见 <a href="/faq">常见问题</a>。</li>
-      <li>怎么接入？见 <a href="/mcp-server">MCP 接入指南</a> 与 <a href="/docs">开发文档</a>。</li>
+      <li>Do credits expire? Recharged credits never expire; subscription credits are valid for 30 days. See the <a href="/faq">FAQ</a>.</li>
+      <li>How do I integrate? See the <a href="/mcp-server">MCP setup guide</a> and the <a href="/docs">API docs</a>.</li>
     </ul>
   </div>
 
   <div class="cta-band" style="margin-top:44px">
-    <h2>先用免费额度跑通</h2>
-    <p>注册即送积分，接入验证不需要先付费。</p>
+    <h2>Start on the free tier</h2>
+    <p>Free credits on signup — integration testing costs nothing.</p>
     <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
-      <a href="/dashboard/register" class="btn btn-lg">免费开始</a>
-      <a href="/dashboard/billing" class="btn btn-ghost btn-lg">充值 / 订阅</a>
+      <a href="/dashboard/register" class="btn btn-lg">Start for free</a>
+      <a href="/dashboard/billing" class="btn btn-ghost btn-lg">Recharge / Subscribe</a>
     </div>
   </div>
 </div>

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -10,7 +10,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16.png">
 <meta name="theme-color" content="#4f46e5">
-<title>注册 · SearchPipe</title>
+<title>Sign up · SearchPipe</title>
 <script>
 (function(){try{var t=localStorage.getItem('searchpipe-theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
 </script>
@@ -21,7 +21,7 @@
   <div class="auth-card">
     <div class="auth-brand">
       <div class="logo"><svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M2.5 12h8.5" stroke-width="4.4"/><path d="M4.5 9.7v4.6M7.5 9.7v4.6" stroke-width="1.6"/><circle cx="15.8" cy="12" r="5.6"/></svg>SearchPipe</div>
-      <p>为 AI Agent 而生的联网搜索 · 注册即送内测免费额度</p>
+      <p>Web search for AI agents · Free credits on signup</p>
     </div>
 
     <div class="card">
@@ -31,29 +31,29 @@
 
       <form action="/dashboard/register" method="post">
         <input type="hidden" name="next" value="{{ next or '' }}">
-        <div class="mb"><label>邮箱</label>
+        <div class="mb"><label>Email</label>
           <input type="email" name="email" placeholder="you@example.com" value="{{ email or '' }}" required>
         </div>
-        <div class="mb"><label>密码</label>
-          <input type="password" name="password" placeholder="至少 8 位" minlength="8" required>
+        <div class="mb"><label>Password</label>
+          <input type="password" name="password" placeholder="At least 8 characters" minlength="8" required>
         </div>
-        <div class="mb"><label>确认密码</label>
-          <input type="password" name="password_confirm" placeholder="再输入一次密码" minlength="8" required>
+        <div class="mb"><label>Confirm password</label>
+          <input type="password" name="password_confirm" placeholder="Repeat your password" minlength="8" required>
         </div>
         <div class="mb" style="display:flex;align-items:center;gap:8px;font-size:13px">
           <input type="checkbox" name="agree_terms" id="agree_terms" required style="width:auto;margin:0">
-          <label for="agree_terms" style="margin:0;font-weight:normal;color:var(--muted)">我已阅读并同意<a href="/terms" target="_blank">《服务条款》</a></label>
+          <label for="agree_terms" style="margin:0;font-weight:normal;color:var(--muted)">I have read and agree to the <a href="/terms" target="_blank">Terms of Service</a></label>
         </div>
-        <button type="submit" class="btn btn-block">注册</button>
+        <button type="submit" class="btn btn-block">Sign up</button>
       </form>
 
       <div class="auth-links">
-        <a href="/dashboard/login{% if next %}?next={{ next | urlencode }}{% endif %}">已有账号？去登录</a>
+        <a href="/dashboard/login{% if next %}?next={{ next | urlencode }}{% endif %}">Already have an account? Sign in</a>
       </div>
     </div>
 
     <div class="auth-foot">
-      <a href="/">返回首页</a>
+      <a href="/">Back to homepage</a>
     </div>
   </div>
 </div>

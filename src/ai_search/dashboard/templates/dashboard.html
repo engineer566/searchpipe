@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}概览 · SearchPipe{% endblock %}
+{% block title %}Overview · SearchPipe{% endblock %}
 {% block content %}
 <div class="page-head">
-  <h1>概览</h1>
-  <p>欢迎回来，{{ user.email or user.phone }}</p>
+  <h1>Overview</h1>
+  <p>Welcome back, {{ user.email or user.phone }}</p>
 </div>
 
 {% if resend_success %}
@@ -11,8 +11,8 @@
   <div class="row" style="align-items:center;gap:12px">
     <span style="font-size:20px">✅</span>
     <div class="grow">
-      <strong>验证邮件已重新发送</strong>
-      <p class="muted" style="margin:4px 0 0;font-size:13px">请查收邮箱并点击链接完成验证。</p>
+      <strong>Verification email re-sent</strong>
+      <p class="muted" style="margin:4px 0 0;font-size:13px">Please check your inbox and click the link to complete verification.</p>
     </div>
   </div>
 </div>
@@ -21,8 +21,8 @@
   <div class="row" style="align-items:center;gap:12px">
     <span style="font-size:20px">⏳</span>
     <div class="grow">
-      <strong>发送过于频繁</strong>
-      <p class="muted" style="margin:4px 0 0;font-size:13px">请等待 60 秒后再试。</p>
+      <strong>Too many requests</strong>
+      <p class="muted" style="margin:4px 0 0;font-size:13px">Please wait 60 seconds and try again.</p>
     </div>
   </div>
 </div>
@@ -33,11 +33,11 @@
   <div class="row" style="align-items:center;gap:12px">
     <span style="font-size:20px">⚠️</span>
     <div class="grow">
-      <strong>邮箱未验证</strong>
-      <p class="muted" style="margin:4px 0 0;font-size:13px">请查收验证邮件并点击链接完成验证，以确保账号安全和正常使用所有功能。</p>
+      <strong>Email not verified</strong>
+      <p class="muted" style="margin:4px 0 0;font-size:13px">Please check your inbox for the verification email and click the link — verification keeps your account secure and unlocks all features.</p>
     </div>
     <form action="/dashboard/resend-verification" method="post" style="margin:0">
-      <button type="submit" class="btn btn-sm">重发验证邮件</button>
+      <button type="submit" class="btn btn-sm">Re-send verification email</button>
     </form>
   </div>
 </div>
@@ -45,30 +45,30 @@
 
 <div class="stat-grid mb">
   <div class="stat-card">
-    <div class="stat-label">积分余额</div>
+    <div class="stat-label">Credit balance</div>
     <div class="stat-value text-ok">{{ balance }}</div>
-    <div class="stat-hint"><a href="/dashboard/billing">去充值 →</a></div>
+    <div class="stat-hint"><a href="/dashboard/billing">Recharge →</a></div>
   </div>
   <div class="stat-card">
-    <div class="stat-label">近 30 天调用</div>
+    <div class="stat-label">Calls (last 30 days)</div>
     <div class="stat-value" id="stat-calls">—</div>
-    <div class="stat-hint">次搜索请求</div>
+    <div class="stat-hint">search requests</div>
   </div>
   <div class="stat-card">
-    <div class="stat-label">近 30 天消耗</div>
+    <div class="stat-label">Credits used (last 30 days)</div>
     <div class="stat-value" id="stat-credits">—</div>
-    <div class="stat-hint">积分</div>
+    <div class="stat-hint">credits</div>
   </div>
 </div>
 
 <div class="card">
-  <h2>快速搜索</h2>
-  <p class="card-sub">在线体验 Agent 获得的完整能力：检索 → 抓取 → LLM 重排 → 摘要（消耗积分，与 API / MCP 调用同价）</p>
+  <h2>Quick search</h2>
+  <p class="card-sub">Try the full capability your agent gets: retrieval → extraction → LLM reranking → answer (consumes credits, same price as API / MCP calls)</p>
   <form id="quick-search">
     <div class="row">
-      <input type="text" id="q" class="grow" placeholder="输入你的问题，例如：FastAPI 怎么部署" required>
-      <label style="display:flex;gap:6px;align-items:center;flex-shrink:0;font-weight:500"><input type="checkbox" id="ans" checked style="width:auto"> AI 摘要</label>
-      <button type="submit" class="btn" id="qs-btn">搜索</button>
+      <input type="text" id="q" class="grow" placeholder="Type your question, e.g. how to deploy FastAPI" required>
+      <label style="display:flex;gap:6px;align-items:center;flex-shrink:0;font-weight:500"><input type="checkbox" id="ans" checked style="width:auto"> AI answer</label>
+      <button type="submit" class="btn" id="qs-btn">Search</button>
     </div>
   </form>
   <div id="qs-status" class="muted" style="margin-top:12px;font-size:13px;min-height:1.2em"></div>
@@ -76,36 +76,36 @@
 </div>
 
 <div class="card">
-  <h2>接入你的 Agent</h2>
-  <p class="card-sub">MCP 接入（推荐）默认使用你的<strong>默认 API Key</strong>{% if default_key %}（<code>{{ default_key.key_prefix }}…</code>）{% endif %}；换 Key 或查看明文见「<a href="/dashboard/api-keys">API Keys</a>」页，详细参数见<a href="/docs">开发文档</a>。</p>
+  <h2>Connect your agent</h2>
+  <p class="card-sub">MCP setup (recommended) uses your <strong>default API key</strong>{% if default_key %} (<code>{{ default_key.key_prefix }}…</code>){% endif %}; switch keys or reveal the plaintext on the <a href="/dashboard/api-keys">API Keys</a> page. Full parameter reference: <a href="/docs">API docs</a>.</p>
   {% if default_key and default_key_viewable %}
-  <p class="card-sub">一句话配置（最省事）：提示词里已带上你的默认 API Key 与 MCP 链接，复制后直接粘给 AI Agent，它会自己读完接入说明并配置好。</p>
+  <p class="card-sub">One-line setup (easiest): the prompt already embeds your default API key and MCP link — copy it and paste it to your AI agent; it will read the setup guide and finish the configuration by itself.</p>
   <div class="row mb" style="gap:10px;flex-wrap:wrap;align-items:center">
-    <button type="button" class="btn" id="home-oneliner-copy">复制一句话配置</button>
-    <span class="muted" style="font-size:13px">出于安全考虑，这句话不在页面上展示，只把完整内容复制到剪贴板（含 API Key）。</span>
+    <button type="button" class="btn" id="home-oneliner-copy">Copy one-line setup</button>
+    <span class="muted" style="font-size:13px">For security, the prompt is never shown on the page — only copied to your clipboard (includes the API key).</span>
   </div>
-  <p class="card-sub">MCP 接入命令行（想手动接就复制这条，同样含 Key）</p>
+  <p class="card-sub">MCP CLI command (copy this if you prefer manual setup — also includes the key)</p>
   <div class="code-block mb" id="home-mcp-block"><pre><code id="home-mcp-cmd">claude mcp add --transport http searchpipe \
   "{{ request.base_url }}mcp?api_key={{ default_key.key_prefix }}••••••••"</code></pre></div>
   <div class="row mb" style="gap:10px;flex-wrap:wrap;align-items:center">
-    <button type="button" class="btn btn-sm" id="home-mcp-copy">复制完整接入命令（含 Key）</button>
-    <span class="muted" style="font-size:13px">页面只显示打码链接，复制到的是完整命令。</span>
+    <button type="button" class="btn btn-sm" id="home-mcp-copy">Copy full setup command (with key)</button>
+    <span class="muted" style="font-size:13px">The page shows a masked link; the copy always contains the full command.</span>
   </div>
   {% elif default_key %}
-  <div class="empty">你当前的默认 API Key（<code>{{ default_key.key_prefix }}…</code>）创建于「查看明文」功能上线前，系统只保存了它的哈希、无法再拼出带 Key 的链接。<br>请到「<a href="/dashboard/api-keys">API Keys</a>」页新建一把 Key（新 Key 可随时查看明文并直接生成 MCP 链接与一句话配置）；旧 Key 仍可继续用于调用。</div>
+  <div class="empty">Your current default API key (<code>{{ default_key.key_prefix }}…</code>) was created before the "reveal plaintext" feature shipped, so only its hash is stored and we can no longer build a key-embedded link.<br>Please create a new key on the <a href="/dashboard/api-keys">API Keys</a> page (new keys can be revealed at any time and generate MCP links and one-line setup directly); the old key still works for API calls.</div>
   {% else %}
-  <div class="empty">完成邮箱验证后系统会自动生成一把默认 API Key（也可在「<a href="/dashboard/api-keys">API Keys</a>」页手动创建），之后这里会给出可直接复制的接入命令与一句话配置。</div>
+  <div class="empty">A default API key is generated automatically once your email is verified (you can also create one manually on the <a href="/dashboard/api-keys">API Keys</a> page). Directly copyable setup commands and one-line setup will appear here.</div>
   {% endif %}
-  <p class="card-sub">REST API（程序直接调用）</p>
+  <p class="card-sub">REST API (direct programmatic calls)</p>
   <div class="code-block" data-copy><pre><code>curl -X POST {{ request.base_url }}search \
-  -H "Authorization: Bearer sp-你的密钥" \
+  -H "Authorization: Bearer sp-YOUR_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"query":"FastAPI 教程","max_results":5,"include_answer":true}'</code></pre></div>
+  -d '{"query":"FastAPI tutorial","max_results":5,"include_answer":true}'</code></pre></div>
 </div>
 {% endblock %}
 {% block script %}
 <script>
-// 近 30 天统计（等待 AIS 对象就绪后执行）
+// Last-30-day stats (wait for the AIS object to be ready)
 document.addEventListener('DOMContentLoaded', (async()=>{
   try{
     const end=new Date(), start=new Date(end.getTime()-30*864e5);
@@ -114,24 +114,24 @@ document.addEventListener('DOMContentLoaded', (async()=>{
     const credits=d.points.reduce((s,p)=>s+p.credits,0);
     document.getElementById('stat-calls').textContent=calls;
     document.getElementById('stat-credits').textContent=credits;
-  }catch(e){ /* 静默：统计失败不影响主功能 */ }
+  }catch(e){ /* silent: stat failures must not break the page */ }
 }));
 
-// 快速搜索
+// Quick search
 document.getElementById('quick-search').onsubmit=async e=>{
   e.preventDefault();
   const q=document.getElementById('q').value.trim();
   if(!q) return;
   const btn=document.getElementById('qs-btn'),st=document.getElementById('qs-status'),out=document.getElementById('qs-out');
-  btn.disabled=true; st.innerHTML='<span class="spinner" aria-hidden="true"></span> 搜索中…'; out.innerHTML='';
+  btn.disabled=true; st.innerHTML='<span class="spinner" aria-hidden="true"></span> Searching…'; out.innerHTML='';
   try{
     const d=await AIS.api('/search',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({query:q,max_results:5,include_answer:document.getElementById('ans').checked})});
-    st.textContent='共 '+d.results.length+' 条结果';
+    st.textContent=d.results.length+' results';
     let html='';
     if(d.answer){
       html+='<div class="card" style="border-left:3px solid var(--ok);margin:16px 0">'
-        +'<div class="stat-label" style="color:var(--ok);font-weight:600">AI 摘要'+(d.ai_generated?'<span class="tag tag-neutral" style="margin-left:8px">AI 生成</span>':'')+'</div>'
+        +'<div class="stat-label" style="color:var(--ok);font-weight:600">AI answer'+(d.ai_generated?'<span class="tag tag-neutral" style="margin-left:8px">AI-generated</span>':'')+'</div>'
         +'<div style="line-height:1.7;white-space:pre-wrap;font-size:14.5px">'+AIS.esc(d.answer)+'</div></div>';
     }
     html+=d.results.map(r=>
@@ -148,7 +148,7 @@ document.getElementById('quick-search').onsubmit=async e=>{
   }finally{ btn.disabled=false; }
 };
 
-// 落地页「在线体验」入口带参进入：预填并自动触发快速搜索
+// Pre-fill and auto-run quick search when arriving from the landing "Try it live" entry
 (function(){
   const initialQ={{ initial_q | tojson }};
   if(initialQ){
@@ -157,7 +157,8 @@ document.getElementById('quick-search').onsubmit=async e=>{
   }
 })();
 
-// 复制完整 MCP 接入命令：命令里的 Key 明文走 /api-keys/reveal 现拉，页面不渲染明文
+// Copy the full MCP setup command: the plaintext key is fetched on demand via
+// /api-keys/reveal and never rendered into the page.
 (function(){
   const btn=document.getElementById('home-mcp-copy');
   if(!btn) return;
@@ -171,7 +172,8 @@ document.getElementById('quick-search').onsubmit=async e=>{
   };
 })();
 
-// 一句话配置：内容（含 Key）不渲染到页面，只按需复制到剪贴板
+// One-line setup: the prompt (with key) is never rendered into the page —
+// it is copied to the clipboard on demand only.
 (function(){
   const btn=document.getElementById('home-oneliner-copy');
   if(!btn) return;

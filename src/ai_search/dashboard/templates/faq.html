@@ -1,13 +1,13 @@
 {% extends "base_public.html" %}
 {% block content %}
 <div class="page-wrap narrow">
-  <nav class="breadcrumb" aria-label="面包屑">
-    <a href="/">首页</a><span aria-hidden="true">/</span><span>常见问题</span>
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a href="/">Home</a><span aria-hidden="true">/</span><span>FAQ</span>
   </nav>
 
   <div class="page-head">
-    <h1>常见问题</h1>
-    <p>关于接入、计费、限流与结果使用的 {{ faq_items | length }} 组高频疑问。没找到答案？可在 <a href="/dashboard/feedback">控制台提交反馈</a>。</p>
+    <h1>FAQ</h1>
+    <p>{{ faq_items | length }} frequently asked questions about integration, billing, rate limits and result usage. Can't find your answer? Submit feedback from the <a href="/dashboard/feedback">console</a>.</p>
   </div>
 
   <div class="faq-list">
@@ -20,21 +20,21 @@
   </div>
 
   <div class="prose" style="margin-top:36px">
-    <h2>延伸阅读</h2>
+    <h2>Further reading</h2>
     <ul>
-      <li><a href="/mcp-server">MCP 接入指南</a>：Claude Code / Cursor 配置与连接排障</li>
-      <li><a href="/docs">开发文档</a>：REST API 参数、返回字段与错误码</li>
-      <li><a href="/pricing">定价</a>：积分充值、包月订阅与计费规则</li>
-      <li><a href="/terms">服务条款</a>：积分有效期、退款与使用规范</li>
+      <li><a href="/mcp-server">MCP setup guide</a>: Claude Code / Cursor configuration and troubleshooting</li>
+      <li><a href="/docs">API docs</a>: REST parameters, response fields and error codes</li>
+      <li><a href="/pricing">Pricing</a>: credit recharge, monthly plans and billing rules</li>
+      <li><a href="/terms">Terms of Service</a>: credit validity, refunds and usage policies</li>
     </ul>
   </div>
 
   <div class="cta-band" style="margin-top:44px">
-    <h2>还有问题？</h2>
-    <p>注册后可在控制台提交反馈工单，或直接让 Agent 读取接入说明自助配置。</p>
+    <h2>Still have questions?</h2>
+    <p>Sign in to submit a support ticket from the console, or let your agent read the setup guide and configure itself.</p>
     <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
-      <a href="/dashboard/register" class="btn btn-lg">免费开始</a>
-      <a href="/docs" class="btn btn-ghost btn-lg">查看开发文档</a>
+      <a href="/dashboard/register" class="btn btn-lg">Start for free</a>
+      <a href="/docs" class="btn btn-ghost btn-lg">Read the docs</a>
     </div>
   </div>
 </div>
