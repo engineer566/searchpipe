@@ -1,90 +1,109 @@
-# ai-search
+# SearchPipe
 
-自建 AI 搜索 API（Tavily 风格）—— 基于自建 SearXNG + LLM 重排，面向 LLM/RAG 场景。
+Self-hosted AI search API (Tavily-style) — built on self-hosted SearXNG + LLM reranking, designed for LLM/RAG agents.
 
-## 架构
+One endpoint, `POST /search`, runs the full pipeline: multi-engine retrieval → trafilatura content extraction → LLM rerank + answer. On top of that sits a complete commercial backend: user accounts, credit-based billing (batched, 2-decimal), API keys, MoR payments (Creem / Dodo Payments — card & PayPal, hosted checkout + native subscription auto-renewal), content moderation, rate limiting, and usage logs. Plus a Jinja2 server-rendered dashboard (`/dashboard`) and an MCP server entry (`/mcp`).
+
+## Architecture
 
 ```
 POST /search
-  → 检索编排（SearXNG 多引擎聚合）
-  → 抓取清洗（trafilatura 提取正文）
-  → LLM 重排 + 摘要（DeepSeek 等 OpenAI 兼容模型）
-  → Tavily 风格结构化结果
+  → retrieval orchestration (SearXNG multi-engine aggregation)
+  → content extraction (trafilatura)
+  → LLM rerank + answer (DeepSeek or any OpenAI-compatible model)
+  → Tavily-style structured results
+
+Auth: JWT / sp- API Key / session cookie → unified AuthContext
+Billing: batched credit lots (grant/deduct/refund/expiry sweep)
+Payments: Creem or Dodo (MoR) — hosted checkout, signed webhooks,
+          normalized PaymentEvent, customer portal
 ```
 
-## 快速开始
+## Quickstart
 
-### 1. 启动 SearXNG + Redis
+### 1. Start SearXNG + Redis + Postgres
 
 ```bash
 docker compose up -d
-# 验证 SearXNG JSON API
+# verify SearXNG JSON API
 curl 'http://localhost:8080/search?q=test&format=json' | head -c 200
 ```
 
-### 2. 配置环境
+### 2. Configure environment
 
 ```bash
 cp .env.example .env
-# 编辑 .env，填入 LLM_API_KEY（DeepSeek 等）
+# edit .env: LLM_API_KEY (DeepSeek etc.), DATABASE_URL, JWT_SECRET,
+# and either Creem or Dodo credentials (PAYMENT_PROVIDER=creem|dodo)
 ```
 
-### 3. 安装依赖并启动
+### 3. Install and run
 
 ```bash
-uv sync                # 或: pip install -e ".[dev]"
+uv sync                # or: pip install -e ".[dev]"
 uv run uvicorn ai_search.main:app --reload --port 8000
 ```
 
-### 4. 测试
+### 4. Try it
 
 ```bash
-# 健康检查
+# health
 curl http://localhost:8000/healthz
 
-# 搜索
+# search (register an account first to get an API key)
 curl -X POST http://localhost:8000/search \
   -H "Content-Type: application/json" \
-  -d '{"query":"Tavily 是什么","max_results":5,"include_answer":true}'
+  -H "Authorization: Bearer sp-your-api-key" \
+  -d '{"query":"what is Tavily","max_results":5,"include_answer":true}'
 
-# 跑测试
-uv run pytest
+# run tests (real Postgres + Redis required)
+.venv/bin/python -m pytest tests/ -q
 ```
 
-## 响应结构（对齐 Tavily）
+## Response shape (Tavily-compatible)
 
 ```json
 {
-  "query": "Tavily 是什么",
-  "answer": "Tavily 是一个面向 AI agent 的搜索 API...",
+  "query": "what is Tavily",
+  "answer": "Tavily is a search API for AI agents...",
   "results": [
     {
       "url": "https://...",
       "title": "...",
-      "content": "摘要片段...",
+      "content": "snippet...",
       "score": 0.92,
-      "raw_content": "完整正文（仅 include_raw_content=true 时）"
+      "raw_content": "full text (only when include_raw_content=true)"
     }
   ]
 }
 ```
 
-## 配置项
+## MCP access
 
-见 `.env.example`。关键项：
+Any MCP client (Claude Desktop, Cursor, etc.) can connect to `{APP_BASE_URL}/mcp?api_key=sp-...`. The dashboard generates a one-line setup prompt and a copyable MCP link per API key; `GET /agent-setup/SKILL.md` returns a ready-to-paste skill file for agents.
 
-| 变量 | 说明 |
+## Configuration
+
+See `.env.example` for the full list. Key groups:
+
+| Variable | Description |
 |---|---|
-| `SEARXNG_URL` | SearXNG 实例地址 |
-| `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` | OpenAI 兼容 LLM 配置 |
-| `MAX_RESULTS` | 默认返回结果数 |
-| `FETCH_TOP_N` | 抓取正文的 URL 数 |
+| `SEARXNG_URL` | SearXNG instance address |
+| `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` | OpenAI-compatible LLM for rerank/answer |
+| `PAYMENT_PROVIDER` | `creem` or `dodo` (MoR; USD settlement) |
+| `CREEM_*` / `DODO_*` | API key, webhook secret, product ids per provider |
+| `CURRENCY` / `CREDIT_PRICE_RATE` / `MAX_RECHARGE_USD` | billing rules (default USD, $0.005 = 1 credit) |
+| `OAUTH_GITHUB_*` / `OAUTH_GOOGLE_*` | optional social login |
+| `APP_BASE_URL` | public base URL (links, canonical, sitemap) |
 
-## 后续迭代路线
+Plan ↔ provider product mapping lives in the DB (`plans.provider_products`); create products in the Creem/Dodo dashboard after deploying and fill in the ids there.
 
-- [ ] 多源兜底（公共 SearXNG 实例池 + 商业 API）
-- [ ] Redis 缓存实装
-- [ ] 住宅代理防 CAPTCHA
-- [ ] `/extract` `/crawl` `/map` 端点
-- [ ] MCP server + Claude Skill 封装
-- [ ] 商业化（鉴权 / 计费 / 限流）
+## Documentation
+
+- `docs/INDEX.md` — code index and module map (start here for development)
+- `docs/REGRESSION_CHECKLIST.md` — full regression checklist before each release
+- `docs/memory/` — project background and operational notes
+
+---
+
+*中文说明：SearchPipe 是一个面向海外用户的自建 AI 搜索 API 项目（出海版，USD 结算，Creem/Dodo 支付）；国内版已封存于 `archive/china-2026-09` tag 与 `china-archive` 分支。*

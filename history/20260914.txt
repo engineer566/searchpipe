@@ -1,0 +1,24 @@
+# 2026-09-14 出海重构文档同步
+
+## 需求
+
+项目刚完成「出海重构」（依据 `docs/overseas-migration-analysis.md`），代码已落在 `overseas` 分支（支付 MoR 化、货币 USD、Google OAuth、全站英文化、DB 迁移 g1a2b3c4d5e6、测试基线 203+5）。本次任务：同步所有项目文档，使文档与 overseas 分支代码现实一致。
+
+## 背景（代码侧已完成的重构，本次文档以此为准）
+
+1. **支付**：删除虎皮椒（`payments/xunhupay.py`、`/payments/callback`）；新增 `payments/creem.py` + `payments/dodo.py`（MoR 托管收银台）；`payments/provider.py` 重写为归一化 `PaymentEvent` 接口；webhook 路由 `POST /payments/webhooks/{provider}`（raw body + 验签 400/重试 500）；订阅原生自动续订（Creem 两段式：checkout.completed 只绑订阅、首期由 subscription.paid 发放；Dodo 首期 subscription.active、续期 subscription.renewed；event_id 幂等）；新增 `GET /payments/portal` Customer Portal。
+2. **货币 USD**：config.py 删 `XUNHUPAY_*`/`OAUTH_WECHAT_*`/`BAIDU_SITE_VERIFICATION`，新增 `payment_provider`/`creem_*`/`dodo_*`（含 credit_product_id）/`oauth_google_*`/`currency="USD"`/`credit_price_rate="0.005"`/`max_recharge_usd=500`；API 字段 `price_yuan→price` 等重命名 + 新增 `currency`；`PayChannel` 枚举 alipay/wechat → card/paypal。
+3. **DB 迁移 g1a2b3c4d5e6**：`plans.provider_products` JSONB；`subscriptions` provider 三列；旧 7 个 CNY 档下架，新 USD 档（充值 $5/1000、$10/2100、$20/4400；订阅 Starter $4.99/Pro $9.99/Max $19.99，划线价 2 倍）。
+4. **OAuth**：新增 GoogleOAuth（`/auth/oauth/google` + `/callback`），删除微信 stub；login/register 按 `oauth_github_enabled`/`oauth_google_enabled` 渲染按钮。
+5. **全站英文化**：dashboard 模板除 admin_* 外全英文；新增 `/privacy` 页（privacy.html + PUBLIC_PAGES + privacy_ld() + sitemap/llms.txt）；terms.html 英文重写；seo.py/schemas.py/llm_reranker prompt/moderation 消息英文化且 priceCurrency=USD；站长验证只剩 Google/Bing。
+6. **测试**：`tests/test_payments.py` 重写（FakeProvider 走 `/payments/webhooks/fakepay`）；新增 `tests/test_payment_webhooks.py`（真实签名验签，登记 conftest 顺序表第 14 位）；全量 203 passed, 5 skipped。
+7. **分支**：main 打 tag `archive/china-2026-09` + 建 `china-archive` 冻结分支（已推送 origin）；开发在 `overseas`。
+
+## 完成内容（本次文档同步）
+
+- **`docs/INDEX.md`**：顶部标注改为 overseas 分支 2026-09-14；「项目一句话定位」虎皮椒 → MoR 支付（Creem/Dodo）；目录树与模块速查表逐条核对更新（config/auth/oauth/dashboard/public_pages/seo/templates 23 个/payments 五文件/billing/subscription 事件驱动/agent_setup 行数等，行号按实读重数）；路由速查 `/payments/*` 行（callback → webhooks/{provider} + portal，OAuth 路由）；按任务跳转表新增「改支付 provider / webhook / 套餐映射」行。
+- **`docs/REGRESSION_CHECKLIST.md`**：支付一节重写为 Creem/Dodo 现实（3 充值档 + 自定义金额 ≤$500/$0.005 每积分 + 3 订阅档划线价 2 倍；catalog 断言新字段名与 currency=USD、pay_channels=card/paypal；真实下单节改托管收银台 + webhook + 凭证配置说明；portal 检查点）；新增 `/privacy` 检查点（200 + 进 sitemap/llms.txt）；公开页断言英文；落地页 h1/订阅档名英文化；站长验证删百度；鉴权节加 OAuth 按钮检查点；执行记录表「虎皮椒凭证未配置」→「Creem/Dodo 凭证未配置」。
+- **`docs/memory/searchpipe-overseas-migration.md`（新建，reference）**：分支/tag 封存位置；MoR 模式与事件编排约定（Creem 两段式、event_id 幂等、订阅归属校验、验签差异、Customer Portal）；套餐↔product 映射部署动作（平台后台建 product 回填 + 配 webhook 端点）；货币字段命名约定；英文化边界（admin_* 与内部注释保留中文）；测试基线 203+5。
+- **`docs/PROJECT_MEMORY.md`**：登记新条目（6 条），按任务读取表加一行。
+- **`README.md`**：面向海外用户重写为英文（简介/架构/quickstart/响应结构/MCP 接入/配置项表），底部附一行中文说明；不引用 .env 真实值。
+- **测试**：`.venv/bin/python -m pytest tests/ -q` 文档改动后复跑确认仍全绿。

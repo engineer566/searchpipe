@@ -56,18 +56,20 @@ docker logs ai-search-app --tail 200 | grep -i reset
 ## 一、基础健康与站点公开页
 
 - [ ] `curl -s 127.0.0.1:8001/healthz` → 200，`{"status":"ok"}`
-- [ ] 浏览器打开 `/`（落地页）→ 200，h1 含「让你的 AI Agent 联网」
+- [ ] 浏览器打开 `/`（落地页）→ 200，h1 含「Put your AI agent on the web」（英文）
 - [ ] 落地页首屏 → 含 MCP 接入命令（`claude mcp add` 代码块）；匿名访客的副按钮为「登录后一键配置 Agent」（已登录时为「复制一句话配置」，且页面 HTML 不含明文 Key）
-- [ ] 落地页定价区 → 含订阅三档（包月·基础/进阶/旗舰）
+- [ ] 落地页定价区 → 含订阅三档（Starter/Pro/Max）
 - [ ] 落地页首屏「在线体验」搜索框：未登录提交 → 302 到 `/dashboard/login?next=/dashboard?q=...`，登录后自动回跳并预填触发搜索；已登录提交 → 302 进 `/dashboard?q=...` 自动开始搜索
-- [ ] `curl -s 127.0.0.1:8001/terms` → 200，含「不支持自动续订」条款，且不含「概不退款」类无效声明（2026-09-12 需求 6）
+- [ ] `curl -s 127.0.0.1:8001/terms` → 200，英文 Terms of Service，含订阅/退款条款，且不含「概不退款」类无效声明
+- [ ] `curl -s 127.0.0.1:8001/privacy` → 200，英文 Privacy Policy；且该 URL 出现在 `curl -s 127.0.0.1:8001/sitemap.xml` 与 `curl -s 127.0.0.1:8001/llms.txt` 中
+- [ ] 全部公开页（`/`、`/docs`、`/mcp-server`、`/pricing`、`/faq`、`/terms`、`/privacy`）正文为英文（无中文用户可见文案；admin_* 控制台模板除外）
 - [ ] `curl -s 127.0.0.1:8001/agent-setup/SKILL.md` → 200，text 内容含 MCP 配置（`{APP_BASE_URL}/mcp?api_key=sp-…`）
 
 ### 1.1 SEO / 收录面（2026-09-13 整改，随迭代必跑）
 
 > 详细约定与不变量见 `docs/memory/searchpipe-seo.md`；自动化覆盖在 `tests/test_seo.py`（44 项）。
 
-- [ ] 6 个公开页全部 200：`/`、`/docs`、`/mcp-server`、`/pricing`、`/faq`、`/terms`
+- [ ] 7 个公开页全部 200：`/`、`/docs`、`/mcp-server`、`/pricing`、`/faq`、`/terms`、`/privacy`
 - [ ] `curl -s 127.0.0.1:8001/robots.txt` → 200 `text/plain`，含 `Disallow: /mcp/`（带尾斜杠，不能是裸 `/mcp`）与 `Sitemap:` 声明
 - [ ] `curl -si 127.0.0.1:8001/sitemap.xml | grep -i content-type` → `application/xml`（不是 `text/plain`）
 - [ ] sitemap 里每个 URL 都能 200，且**不被 robots 任何 Disallow 前缀命中**（自洽性）
@@ -81,7 +83,7 @@ docker logs ai-search-app --tail 200 | grep -i reset
 - [ ] `/dashboard/docs` → 301 到 `/docs`；`/docs` 200（公开文档页，控制台导航「文档」指向它）
 - [ ] 404 双形态：`curl -H "Accept: text/html" .../no-such-page` → 404 HTML（含「页面不存在」与站内链接）；`curl -H "Accept: application/json" .../no-such-page` → 404 JSON `{"detail":"Not Found"}`
 - [ ] 生产域名侧（仅生产）：`https://www.searchpipe.tech/xxx` 与 `http://searchpipe.tech/xxx` 均 301 到 `https://searchpipe.tech/xxx`；`curl -w '%{http_version}'` 为 `2`；`app.css`/`app.js`/`sitemap.xml` 响应带 `content-encoding: gzip`
-- [ ] 站长平台（Google/Bing/百度）验证码填进 `.env` 的 `*_SITE_VERIFICATION` 后，首页 `<head>` 出现对应 meta；未配置时**不出现**空标签
+- [ ] 站长平台（Google/Bing）验证码填进 `.env` 的 `*_SITE_VERIFICATION` 后，首页 `<head>` 出现对应 meta；未配置时**不出现**空标签
 
 ## 二、鉴权
 
@@ -97,6 +99,7 @@ docker logs ai-search-app --tail 200 | grep -i reset
 - [ ] 1 分钟内重复提交忘记密码 → 触发 60s 发信冷却提示
 - [ ] 邮箱验证门禁：新注册账号（未点验证链接）调 `POST /search` 与 MCP `tools/call ai_search_search` → 403「请先验证邮箱」；点邮件验证链接后再调 → 正常（admin/owner 豁免）
 - [ ] 邮箱验证通过后 `/api-keys` 立即出现自动生成的「默认 Key」（见第四节默认 API Key 检查点）
+- [ ] OAuth 按钮：`.env` 配置 `OAUTH_GITHUB_CLIENT_ID` / `OAUTH_GOOGLE_CLIENT_ID` 后，登录/注册页出现「Continue with GitHub / Continue with Google」按钮；未配置时不出现对应按钮；点击走通 `/auth/oauth/github|google` → 平台授权 → 回调自动建/绑账号并登录
 
 ## 三、搜索核心
 
@@ -122,20 +125,23 @@ docker logs ai-search-app --tail 200 | grep -i reset
 - [ ] 吊销默认 Key → 剩下最新一把自动升为默认（「默认」标签随之移动）；有效 Key 全部吊销后再取配置 → 自动新建一把默认 Key
 - [ ] 迁移 `f0a2b7c4d9e1`（api_keys.key_cipher / is_default）已 upgrade：老 Key 无密文时点「显示」提示「无法查看明文，请吊销后重新创建」而非 500
 - [ ] `/dashboard/usage` → 200，用量统计/日志可见刚产生的搜索记录
-- [ ] `/dashboard/billing` → 200，含充值 4 档（¥10/¥20/¥50/¥100）+ 自定义金额（≤¥100）、订阅 3 档（限时 5 折划线价）、余额与流水
+- [ ] `/dashboard/billing` → 200，含充值 3 档（$5/1000、$10/2100、$20/4400 积分）+ 自定义金额（≤$500、$0.005/积分）+ 订阅 3 档（Starter $4.99/Pro $9.99/Max $19.99，划线价为现价 2 倍）+ 余额与流水
 - [ ] 计费页点击充值/订阅 → 弹出**二次确认弹窗**，确认后才下单
 - [ ] `/dashboard/docs` → 301 跳公开文档页 `/docs`；`/docs` 200，MCP 接入/一句话配置章节在前，REST API 在后
 - [ ] `/dashboard/feedback` → 200；提交反馈工单 → 成功，列表出现该工单；短时间重复提交 → 频率限制提示
 
-## 五、支付
+## 五、支付（出海版：Creem/Dodo MoR 托管收银台，USD）
 
-- [ ] `curl -s 127.0.0.1:8001/payments/catalog -H "Authorization: Bearer <token>"` → 200，结构含：**充值 4 档**（¥10/¥20/¥50/¥100）+ **订阅 3 档**（现价/原价双价）+ 自定义充值汇率（¥0.03=1 积分）与上限 + **支付宝/微信双渠道**
-- [ ] **下单邮箱验证门禁（2026-09-12 需求 7）**：未验证邮箱的用户 POST /payments/orders → **403**（提示验证邮箱）；已完成验证的用户正常下单；/dashboard/billing 对未验证用户显示「充值前请先完成邮箱验证」横幅与重发验证邮件按钮
-- [ ] **真实下单与回调（虎皮椒）**：⚠️ 需先在测试服 `.env` 配置 `XUNHUPAY_APPID_ALIPAY/APPSECRET_ALIPAY/APPID_WECHAT/APPSECRET_WECHAT/XUNHUPAY_NOTIFY_URL` 真实凭证；**未配置时本节跳过并在执行记录中注明**。配置后：
-  - [ ] POST /payments/orders（kind=recharge）→ 返回 order_id + pay_url，订单状态 pending
-  - [ ] 真实扫码支付小额 → 回调后订单转 paid，积分按 ¥0.03=1 积分到账（2 位小数），流水有 recharge 记录
-  - [ ] 同一回调重放 → 幂等，不重复到账
-  - [ ] 订阅下单支付 → 到账 30 天有效期订阅积分批次；续订/升级规则符合「续订下周期生效、升级延期累积」
+- [ ] `curl -s 127.0.0.1:8001/payments/catalog -H "Authorization: Bearer <token>"` → 200，结构含：**充值 3 档**（$5/1000、$10/2100、$20/4400 积分）+ **订阅 3 档**（Starter/Pro/Max，price/original_price 双价，划线价 2 倍）+ 自定义充值汇率（`credit_price_rate`，$0.005=1 积分）与上限（`max_recharge_amount`=500）+ `currency`="USD" + `pay_channels`=["card","paypal"]
+- [ ] catalog 字段命名已出海化：price/original_price/credit_price_rate/max_recharge_amount/currency（旧 price_yuan 等字段已删除）
+- [ ] **下单邮箱验证门禁**：未验证邮箱的用户 POST /payments/orders → **403**（提示验证邮箱）；已完成验证的用户正常下单；/dashboard/billing 对未验证用户显示「充值前请先完成邮箱验证」横幅与重发验证邮件按钮
+- [ ] **真实下单与 webhook（Creem/Dodo）**：⚠️ 需先在测试服 `.env` 配置 `PAYMENT_PROVIDER=creem|dodo` 及对应 `CREEM_API_KEY/CREEM_WEBHOOK_SECRET/CREEM_CREDIT_PRODUCT_ID` 或 `DODO_API_KEY/DODO_WEBHOOK_SECRET/DODO_CREDIT_PRODUCT_ID` 真实凭证，并在平台后台把 webhook 端点配为 `{APP_BASE_URL}/payments/webhooks/{provider}`；**未配置时本节跳过并在执行记录中注明**。配置后：
+  - [ ] POST /payments/orders（kind=recharge）→ 返回 order_id + pay_url（托管收银台 URL），订单状态 pending
+  - [ ] 真实支付小额 → webhook 回调后订单转 paid，积分按 $0.005=1 积分到账（2 位小数），流水有 recharge 记录
+  - [ ] 同一 webhook 事件重放（相同 event_id）→ 幂等，不重复到账
+  - [ ] 验签失败 → 400；处理异常 → 500（平台重试）
+  - [ ] 订阅下单支付 → 首期积分到账（Creem 由 subscription.paid 发放、checkout.completed 只绑订阅；Dodo 由 subscription.active 发放）；续期 webhook（Creem subscription.paid / Dodo subscription.renewed）→ 以 event_id 建 renew 订单幂等发积分；订阅归属校验（他人订阅事件不串用户）
+  - [ ] GET /payments/portal → 返回 Customer Portal 链接（Creem billing-portal / Dodo customer-portal session），可管理支付方式与取消订阅
 - [ ] 积分批次：限时/订阅批次到期后读路径惰性清理 + 后台每小时 sweep → 过期积分从余额扣除
 
 ## 六、管理端（先 `UPDATE users SET role='owner'` 提权）
@@ -189,7 +195,7 @@ docker logs ai-search-app --tail 200 | grep -i reset
 | 二、鉴权 | ☐ 通过 |
 | 三、搜索核心（REST+MCP） | ☐ 通过 |
 | 四、控制台页面 | ☐ 通过 |
-| 五、支付 | ☐ 通过 / ☐ 跳过（虎皮椒凭证未配置） |
+| 五、支付 | ☐ 通过 / ☐ 跳过（Creem/Dodo 凭证未配置） |
 | 六、管理端 | ☐ 通过 |
 | 七、站内信 | ☐ 通过 / ☐ 跳过（未随本迭代上线） |
 | 八、安全与边界 | ☐ 通过 |
