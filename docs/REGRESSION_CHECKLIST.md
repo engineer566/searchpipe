@@ -142,6 +142,8 @@ docker logs ai-search-app --tail 200 | grep -i reset
   - [ ] 验签失败 → 400；处理异常 → 500（平台重试）
   - [ ] 订阅下单支付 → 首期积分到账（Creem 由 subscription.paid 发放、checkout.completed 只绑订阅；Dodo 由 subscription.active 发放）；续期 webhook（Creem subscription.paid / Dodo subscription.renewed）→ 以 event_id 建 renew 订单幂等发积分；订阅归属校验（他人订阅事件不串用户）
   - [ ] GET /payments/portal → 返回 Customer Portal 链接（Creem billing-portal / Dodo customer-portal session），可管理支付方式与取消订阅
+- [ ] **⚠️ 真浏览器走一遍付费关键路径（pytest 覆盖不到，2026-09-12 漏过真 bug）**：登录 → `/dashboard/billing` → 点订阅/充值的购买按钮 → 弹窗出现且可选支付渠道 → 点「Proceed to payment」→ **浏览器必须真的跳到托管收银台**（`www.creem.io/checkout/...` 或 Dodo 对应页），而不是只创建订单后停在本页；下单失败时须有可见错误提示。背景：曾因成功反馈卡片渲染在页面顶部（用户已滚到套餐区，卡片在视口外）+ 不做跳转，导致「点所有付费按键都没反应」，而全量 pytest 全绿。
+- [ ] **注册链路端到端**：新邮箱注册 → **真实收到验证邮件** → 点链接验证 → 通过门禁后能下单（SMTP 凭证失配会静默卡死新客户）
 - [ ] 积分批次：限时/订阅批次到期后读路径惰性清理 + 后台每小时 sweep → 过期积分从余额扣除
 
 ## 六、管理端（先 `UPDATE users SET role='owner'` 提权）

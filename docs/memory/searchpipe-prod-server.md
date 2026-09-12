@@ -133,3 +133,16 @@ ssh -i ...work.pem root@47.89.243.229 "cd /opt/searchpipe && docker compose -f d
 - **部署**：Windows 侧 `git archive` 打包（无 rsync）→ scp → `/opt/searchpipe` 解压（`.env` 未动）→ `docker build --build-arg UV_COMPILE_BYTECODE=0`（23.7s）→ `up -d app`；代码级备份 `code-backup-pre-recharge-fix-20260912-180417.tgz`。分支不含新迁移，无需 alembic 动作。
 - **验证（生产真实 HTTP）**：healthz 200；catalog `min_recharge_amount:1`；测试用户注册→Redis 取 token→验证邮箱→建单：**自定义 $3.50 → 201**（credits 700.00）、**$0.50 → 400「Minimum recharge is $1」**、自定义 $5 与固定档 Recharge $5 → 201；3 笔 pending 订单落库；测试数据定向清理（users 仅剩真实用户 `ferriswym@163.com`）。**Creem 侧复核**：`GET /v1/checkouts?checkout_id=ch_5QHPyvy41fJCyNjb8FXUo` → `custom_price: 350, units: 1, mode: prod`。
 - **同期修复的生产阻塞**：SMTP 认证失败（`526 Authentication failure`，生产与测试服同因）→ 更新两台 `SMTP_PASSWORD` 后 `LOGIN OK` + 真实发信成功。**教训：支付上线验收必须包含「注册→收到验证邮件」，否则新客卡在邮箱门禁无法下单。**
+
+## 修复「付费按键点击后没有后续」（main → db1c840，2026-09-12）
+
+- **现象**：正式环境点所有付费按键「没有后续」。日志显示其实**创建成功**（31 秒内 5 笔 pending 订单 + 前端轮询），问题在下单后的反馈。
+- **根因**：`billing.html` 的 `confirmOrder()` 下单成功后只在**页面顶部**渲染 "Pending order" 卡片（含 Creem 链接），付费按钮却在套餐区、用户已滚到下方 300+px（实测 `cardTop=-329 / cardInViewport=false / scrollY=691`），卡片在视口外且**不做任何跳转**；按钮文案却是 "Proceed to payment"。
+- **修复**：`window.location.assign(d.pay_url)` 同标签跳转收银台（await 后用 `window.open` 会被拦截）；保留 pending 卡片 + `scrollIntoView` + 轮询兜底。
+- **验证**：全量 208 passed（测试服隔离库）；真浏览器复测 → 实际跳转到 `www.creem.io/checkout/...`，标题 `Creem`、内容为 Starter $4.99/月。
+- **真浏览器验收方法（本机可用，值得复用）**：Playwright 在本沙箱因命名管道被拒（`WinError 5`），改用系统 Edge + CDP：
+  `msedge.exe --headless=new --remote-debugging-port=9222 --remote-allow-origins=* --user-data-dir=<临时目录>`
+  再用 Python `websocket-client` 连 `http://127.0.0.1:9222/json` 取 page target 的 `webSocketDebuggerUrl`，发 `Page.navigate` / `Runtime.evaluate` / `Page.captureScreenshot` 驱动。
+  ⚠️ 坑：①`--remote-allow-origins=*` 不加会 403 拒绝 WebSocket；②`$env:TEMP` 在放宽权限后会变回真实临时目录，脚本里要用绝对路径；③dashboard **登录表单必须勾选 `agree_terms`**，否则后端只重渲染登录页（`agree_terms != "on"`），会误判成「登录失败」。
+- **教训**：pytest 全绿也测不出这类问题——**「下单成功」≠「用户被带到支付页」**；点击→跳转→收银台可达属于必须真浏览器验收的关键路径。
+- **现场遗留**：负责人点击产生的 5 笔 pending 订单（10:51，均未支付、不发积分）保留未动。
