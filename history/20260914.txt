@@ -142,3 +142,22 @@ FROM (VALUES
   - **坑 1（踩实）**：本地 `main` 竟然停在更旧的 `30d5b6d`，而 checkout 在 `overseas-sync`（=`origin/main`）。第一次 `git branch -f dev main` 拿本地旧 main 当基线 → push 被拒（`pushed branch tip is behind its remote counterpart`）。**快进分支要用远程 ref（`origin/main`）而不是本地同名分支**；已把本地 `main` 同步到 `origin/main`。
   - **坑 2**：`git branch -f dev origin/main` 会把 dev 的 upstream 顺手改成 `origin/main`（`set up to track remote branch 'main'`）→ 已用 `git branch --set-upstream-to=origin/dev dev` 纠正。
   - **仍待办（A 的后半段）**：测试服当前仍跑**出海前**的旧代码 + 境内 `.env`。要不要把测试服转成「出海代码 + 境内 SearXNG 配置」的 staging 需另行确认——注意 `SEARXNG_SETTINGS_PATH=settings.cn.yml` 取决于**机房网络位置（境内用百度/必应）**而非代码版本，转出海时**必须保留**该项，只应改支付/货币相关配置。
+
+## 十、全量测试 + 生产部署完成（同日）
+
+- **全量 pytest 跑通：`208 passed, 5 skipped`（exit 0）**。本机 Windows 无 docker/.venv/WSL、Python 仅 3.10，故在**测试服**搭隔离环境跑：
+  - `git archive` 打包修复分支 → scp → 测试服解包
+  - `CREATE DATABASE ai_pytest`（**不动测试服自己的 `ai` 库**）+ redis 用 db9
+  - `docker run --entrypoint /bin/sh` ⚠️**必须覆盖镜像 ENTRYPOINT**，否则会被 `entrypoint.sh` 接管去跑 uvicorn（第一次就踩了）
+  - 挂载源码 + `PYTHONPATH=/src/src:/usr/local/lib/python3.13/site-packages`（⚠️镜像 venv **没有 pip**，`pip` 是系统 python 的，pytest 只能装到系统 site-packages 再靠 PYTHONPATH 让 venv 看见；`ai_search` 必须解析到 `/src/src/...` 才算用上待测代码）
+  - `--env-file /opt/searchpipe/.env` 复用测试服凭证 + 覆盖 `DATABASE_URL`/`REDIS_URL`/`SEARXNG_URL` → `alembic upgrade head` → `pytest tests/ -q`
+  - 跑完删库/删容器/清 redis db8+db9，测试服 `ai` 库零污染、healthz 复核 200
+- **发现 main 上既有 2 个失败**（与本次修复无关，但**让「203+5 全绿」的旧基线实际是红的**）：`test_renewal_via_webhook` / `test_creem_style_subscribe_flow` 断言续期后余额 3200，实际 3400。根因：`4b3f4d1`（Starter 1000→1200）对余额断言机械 +200，而「首期 + 续期」场景里 Starter 金额出现**两次**，应 +400（同一测试内 `upcoming == 1200` 已按新值断言，自相矛盾）。**A/B 实证**：用未改动的 main 在同样隔离环境跑 `tests/test_payments.py` → 同样 `2 failed, 17 passed`、失败信息完全一致。已提交 `1016fea` 修正 3 处断言。
+- **合并与部署**：`main` ff 合并至 `1016fea` 并推送（`4b3f4d1..1016fea`）；Windows 侧 `git archive` 打包（无 rsync）→ scp → `/opt/searchpipe` 解压（`.env` 未动）→ `docker build --build-arg UV_COMPILE_BYTECODE=0`（23.7s）→ `up -d app`；代码级备份 `code-backup-pre-recharge-fix-20260912-180417.tgz`；分支无新迁移。
+- **生产验收（真实 HTTP）**：healthz 200；catalog `min_recharge_amount:1` / `max:500` / USD；测试用户注册→Redis 取 token→验证邮箱→建单：
+  - **自定义 $3.50 → 201**（credits 700.00，收银台 `ch_5QHPyvy41fJCyNjb8FXUo`）**← bug 已修**
+  - **$0.50 → 400「Minimum recharge is $1」**（新下限生效）
+  - 自定义 $5 → 201、固定档 Recharge $5 → 201（回归 OK）
+  - 3 笔 pending 落库；测试数据定向清理（users 仅剩真实用户 `ferriswym@163.com`）
+- **Creem 侧铁证**：`GET /v1/checkouts?checkout_id=ch_5QHPyvy41fJCyNjb8FXUo` → `custom_price: 350, units: 1, mode: prod` —— 确认生产走按分计价新路径。
+- **webhook 密钥自检**：用生产 secret 自签一个 `checkout.completed`（request_id 不存在 → handler 只记 warning、不落库）POST 到 `https://searchpipe.tech/payments/webhooks/creem` → **200 `{"received":true}`**；坏签名 → **400 `Invalid creem-signature`**。→ 线上 `CREEM_WEBHOOK_SECRET` 与配置一致、验签逻辑生效。

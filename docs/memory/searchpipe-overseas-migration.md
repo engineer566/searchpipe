@@ -46,7 +46,7 @@ Creem / Dodo Payments 二选一（`PAYMENT_PROVIDER`），都是「托管收银�
 
 - DB 迁移 `g1a2b3c4d5e6`：`plans.provider_products` JSONB（`{"creem": "prod_...", "dodo": "..."}`）；`subscriptions` 加 `provider` / `provider_subscription_id` / `provider_customer_id`。
 - **部署新环境的动作**：在各平台后台手动建 product（价格、币种与种子档一致）→ 把 product id 回填进 `plans.provider_products` → 在平台后台把 webhook 端点配为 `{APP_BASE_URL}/payments/webhooks/{provider}`。代码里没有自动建 product 的逻辑。
-- 自定义金额充值用「$1×units」的按量 product：`CREEM_CREDIT_PRODUCT_ID` / `DODO_CREDIT_PRODUCT_ID`（config），units = 美元数。
+- 自定义金额充值按**分**计价：Creem 用 `custom_price`（cents，覆盖单价）+ `units=1`；Dodo 用 `product_cart[].amount`（cents，**需该 product 后台开启 Pay What You Want**，否则 Dodo 忽略该字段按固定价收款）。`CREEM_CREDIT_PRODUCT_ID` / `DODO_CREDIT_PRODUCT_ID`（config）指向一个一次性 product（Creem 侧建 $1 即可，价格只作占位）。**下限 $1**（`MIN_RECHARGE_USD`）：Creem `custom_price` 与 product price 的硬下限都是 100 分，做不出更小面额。
 - 当前 USD 种子档：充值 $5/1000、$10/2100、$20/4400；订阅 Starter $4.99/1000、Pro $9.99/3000、Max $19.99/10000（划线价 = 2 倍现价）。旧 7 个 CNY 档已下架（不在 catalog 出现）。
 
 ## 货币与字段命名约定
@@ -64,6 +64,7 @@ Creem / Dodo Payments 二选一（`PAYMENT_PROVIDER`），都是「托管收银�
 
 ## 测试基线
 
-- 全量 `.venv/bin/python -m pytest tests/ -q` = **203 passed, 5 skipped**。
+- 全量 `.venv/bin/python -m pytest tests/ -q` = **208 passed, 5 skipped**（2026-09-12 更新；此前记的 203+5 是 `4b3f4d1` 之前的基线）。
+  - 注：`4b3f4d1`（Starter 1000→1200）当时把 `tests/test_payments.py` 的余额断言机械 +200，漏改了「首期+续期」出现两次 Starter 的场景（3000 应为 3400 却改成 3200），导致 main 上 `test_renewal_via_webhook` / `test_creem_style_subscribe_flow` **持续 2 failed**。已于 `1016fea` 修正（A/B 实证见 `history/20260914.txt`）。
 - `tests/test_payments.py` 重写：FakeProvider 走 `/payments/webhooks/fakepay` 注入归一化事件。
 - `tests/test_payment_webhooks.py`（Creem/Dodo 真实签名验签单元测试）已登记进 `tests/conftest.py` 执行顺序表第 14 位——**新增测试文件必须登记该顺序表**。
