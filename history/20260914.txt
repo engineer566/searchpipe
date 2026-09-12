@@ -96,7 +96,7 @@ FROM (VALUES
 ## 六、验证状态与待办
 
 - **本次未跑全量 pytest**：当前 Windows 工作副本无 `.venv`、无 docker（三个容器起不来）、无 WSL，Python 仅 3.10（项目要求 ≥3.11）→ 全量套件必须在 Linux 开发机执行：先 `docker start ai-search-postgres ai-search-redis ai-search-searxng`，再 `.venv/bin/python -m pytest tests/ -q`。
-- 待办：① 生产 `.env` 补 `PAYMENT_PROVIDER=creem` / `CREEM_API_KEY` / `CREEM_WEBHOOK_SECRET` / `CREEM_CREDIT_PRODUCT_ID`；② 执行上面 `provider_products` 回填 SQL；③ 重启并做真实小额下单验收（充值 / 订阅首期 / 续期 / portal）；④ Creem 后台开 webhook + Abandoned Cart Recovery；⑤ `tax_mode` 目前 7 个产品统一 `inclusive`，是否改 `exclusive` 未决策；⑥ 全量 pytest 基线（文档现记 203+5）与 `docs/REGRESSION_CHECKLIST.md` 支付节需随本次新增测试与 $1 下限同步更新。
+- 待办：**①②③ 已于第七节执行并验收通过**；仍待办 ④ Creem 后台开 webhook + Abandoned Cart Recovery；⑤ `tax_mode` 目前 7 个产品统一 `inclusive`，是否改 `exclusive` 未决策；⑥ 全量 pytest 基线（文档现记 203+5）与 `docs/REGRESSION_CHECKLIST.md` 支付节需随本次新增测试与 $1 下限同步更新；⑦ 修复代码合并 main 后需部署到生产并复验「$3.50 能建单」。
 - 验证期间在 Creem 建了 4 笔 pending checkout 会话（$5 固定档 / Starter 订阅 / $3.50 分位 / $0.50 被拒），均 pending 不扣款、会自动过期；预填邮箱 `verify-check@searchpipe.tech` 仅用于会话占位。
 - **安全**：live API Key 与 webhook signing secret 在对话中明文传递过，建议配置完成后在 Creem 后台轮换；按纪律未把任何密钥值写入仓库文件。
 
@@ -130,9 +130,9 @@ FROM (VALUES
   - 两台改动前都先 `cp .env .env.bak-*` 备份
   - 教训：`SMTP_PASSWORD` 这类凭证失配会让「付费门禁」静默卡死新用户，**下次支付上线验收应把「注册→收验证邮件」纳入必测项**，而不是只看 API 层。
 
-## 九、沙箱无法推远程（分支收口需人工执行）
+## 九、分支收口（已执行）
 
-- `origin = git@github.com:engineer566/searchpipe.git`（SSH）。本机受沙箱限制：`git ls-remote` 报 `ssh.exe: fatal error - couldn't create signal pipe, Win32 error 5`（命名管道边界）→ **fetch/push 均不可用**，分支收口必须在正常终端执行。
+- `origin = git@github.com:engineer566/searchpipe.git`（SSH）。Git 自带的 MSYS ssh 在本沙箱报 `ssh.exe: fatal error - couldn't create signal pipe, Win32 error 5`（命名管道边界）→ fetch/push 失败；**改用系统 OpenSSH 即可绕过**：`git -c core.sshCommand="C:/Windows/System32/OpenSSH/ssh.exe" <cmd>`（本节后续操作均以此执行）。
 - 分支现状：`origin/dev` 落后 `origin/main` **14 个提交**，`main` 落后 `dev` **0 个** → dev 是 main 的严格祖先，**快进即可无损同步**（`git branch -f dev main && git push origin dev`）。
 - 待决策：A) 把 dev 快进到 main 恢复「dev 开发 → main 生产」，但需同时把**测试服 .env 改成出海配置**（否则测试服变成「代码出海、配置境内」的混合体）；B) 弃用 dev，改为「功能分支 → main」，并同步改 AGENTS.md / memory 的流程描述。
 - **已执行（选 A）**：
