@@ -124,10 +124,21 @@ FROM (VALUES
 - **配置（非敏感项）**：`SMTP_HOST=smtp.mxhichina.com`、`SMTP_PORT=465`、`SMTP_USE_TLS=true`、`SMTP_FROM=support@searchpipe.tech`、密码长度 22。
 - **影响**：新用户收不到验证邮件 → 卡在「邮箱未验证」门禁 → **无法下单**（`POST /payments/orders` 403）；密码重置同样不可用。**Creem 已开通但新客买不了。**
 - **起始时间无法判断**：本次 `--force-recreate` 重建容器后旧日志已丢，当前容器内 4 次失败全部来自本次验收。
-- **待办**：阿里企业邮箱后台重新生成「客户端专用密码」→ 更新**两台**服务器 `.env` 的 `SMTP_PASSWORD` → 重启 → 用真实邮箱注册实测验证。
+- **已修复（同日）**：项目负责人提供新的「客户端专用密码」→ 先在容器内验证 `LOGIN OK`（旧密码确认为失效）→ `upsert SMTP_PASSWORD` + `--force-recreate app`，**生产与测试服都改并都验证通过**：
+  - 生产：healthz 200、`LOGIN: OK`、`SEND_MAIL RESULT: True`（真实发信到 `SMTP_FROM` 自测）、近 3 分钟 `SMTPAuthenticationError` 计数 **0**
+  - 测试服：healthz 200、`LOGIN: OK`
+  - 两台改动前都先 `cp .env .env.bak-*` 备份
+  - 教训：`SMTP_PASSWORD` 这类凭证失配会让「付费门禁」静默卡死新用户，**下次支付上线验收应把「注册→收验证邮件」纳入必测项**，而不是只看 API 层。
 
 ## 九、沙箱无法推远程（分支收口需人工执行）
 
 - `origin = git@github.com:engineer566/searchpipe.git`（SSH）。本机受沙箱限制：`git ls-remote` 报 `ssh.exe: fatal error - couldn't create signal pipe, Win32 error 5`（命名管道边界）→ **fetch/push 均不可用**，分支收口必须在正常终端执行。
 - 分支现状：`origin/dev` 落后 `origin/main` **14 个提交**，`main` 落后 `dev` **0 个** → dev 是 main 的严格祖先，**快进即可无损同步**（`git branch -f dev main && git push origin dev`）。
 - 待决策：A) 把 dev 快进到 main 恢复「dev 开发 → main 生产」，但需同时把**测试服 .env 改成出海配置**（否则测试服变成「代码出海、配置境内」的混合体）；B) 弃用 dev，改为「功能分支 → main」，并同步改 AGENTS.md / memory 的流程描述。
+- **已执行（选 A）**：
+  - 沙箱变通：Git 自带的 MSYS ssh 在沙箱里开不了命名管道，改用系统 OpenSSH 即可正常 fetch/push —— `git -c core.sshCommand="C:/Windows/System32/OpenSSH/ssh.exe" <cmd>`。
+  - `git branch -f dev origin/main` → `git push origin dev`：远程 `dev` 已从 `a4394c6` 快进到 **`4b3f4d1`**（`a4394c6..4b3f4d1  dev -> dev`，快进无需 force）。现 `dev == main == 4b3f4d1`。
+  - 修复分支已推送：`fix/custom-recharge-granularity` = `94c45c9`（供 Linux 开发机拉取跑全量 pytest）。
+  - **坑 1（踩实）**：本地 `main` 竟然停在更旧的 `30d5b6d`，而 checkout 在 `overseas-sync`（=`origin/main`）。第一次 `git branch -f dev main` 拿本地旧 main 当基线 → push 被拒（`pushed branch tip is behind its remote counterpart`）。**快进分支要用远程 ref（`origin/main`）而不是本地同名分支**；已把本地 `main` 同步到 `origin/main`。
+  - **坑 2**：`git branch -f dev origin/main` 会把 dev 的 upstream 顺手改成 `origin/main`（`set up to track remote branch 'main'`）→ 已用 `git branch --set-upstream-to=origin/dev dev` 纠正。
+  - **仍待办（A 的后半段）**：测试服当前仍跑**出海前**的旧代码 + 境内 `.env`。要不要把测试服转成「出海代码 + 境内 SearXNG 配置」的 staging 需另行确认——注意 `SEARXNG_SETTINGS_PATH=settings.cn.yml` 取决于**机房网络位置（境内用百度/必应）**而非代码版本，转出海时**必须保留**该项，只应改支付/货币相关配置。
