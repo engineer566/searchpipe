@@ -38,40 +38,38 @@ claude mcp add --transport http searchpipe \
     <h2 id="mcp-heading">One-command MCP setup</h2>
     <p>SearchPipe is a remote MCP Server (streamable-http) with the API key embedded in the URL — drop it into any MCP-compatible agent client and it just works.</p>
   </div>
-  <div class="split">
-    <div class="split-col">
-      <div>
-        <p class="code-label">Claude Code</p>
-        <div class="code-block" data-copy><pre><code>claude mcp add --transport http searchpipe \
+  <div class="mcp-codes">
+    <div>
+      <p class="code-label">Claude Code</p>
+      <div class="code-block" data-copy><pre><code>claude mcp add --transport http searchpipe \
   "{{ site_url }}/mcp?api_key=sp-YOUR_API_KEY"</code></pre></div>
-      </div>
-      <div>
-        <p class="code-label">Cursor / generic MCP clients</p>
-        <div class="code-block" data-copy><pre><code>{
+    </div>
+    <div>
+      <p class="code-label">Cursor / generic MCP clients</p>
+      <div class="code-block" data-copy><pre><code>{
   "mcpServers": {
     "searchpipe": {
       "url": "{{ site_url }}/mcp?api_key=sp-YOUR_API_KEY"
     }
   }
 }</code></pre></div>
-      </div>
     </div>
-    <div class="feature-stack">
-      <div class="feature">
-        <div class="f-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg></div>
-        <h3>Key-in-URL, zero config</h3>
-        <p>The key is embedded in the MCP link (same style as Tavily), so clients without custom-header support work out of the box. Tool name: <code>ai_search_search</code>.</p>
-      </div>
-      <div class="feature">
-        <div class="f-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="m8 10-2 2 2 2m4 0 2-2-2-2"/></svg></div>
-        <h3>Self-serve for agents</h3>
-        <p>Send the link to your AI agent and it will complete the whole MCP setup by itself: <code>/agent-setup/SKILL.md</code>.</p>
-      </div>
-      <div class="feature">
-        <div class="f-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
-        <h3>Production-grade guardrails</h3>
-        <p>Input/output content moderation, per-call billing with automatic refunds on failure, and rate limiting — safe even for high-frequency agent calls.</p>
-      </div>
+  </div>
+  <div class="feature-grid mcp-features">
+    <div class="feature">
+      <div class="f-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg></div>
+      <h3>Key-in-URL, zero config</h3>
+      <p>The key is embedded in the MCP link (same style as Tavily), so clients without custom-header support work out of the box. Tool name: <code>ai_search_search</code>.</p>
+    </div>
+    <div class="feature">
+      <div class="f-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="m8 10-2 2 2 2m4 0 2-2-2-2"/></svg></div>
+      <h3>Self-serve for agents</h3>
+      <p>Send the link to your AI agent and it will complete the whole MCP setup by itself: <code>/agent-setup/SKILL.md</code>.</p>
+    </div>
+    <div class="feature">
+      <div class="f-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+      <h3>Production-grade guardrails</h3>
+      <p>Input/output content moderation, per-call billing with automatic refunds on failure, and rate limiting — safe even for high-frequency agent calls.</p>
     </div>
   </div>
   <p class="section-note">
