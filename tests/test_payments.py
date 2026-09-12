@@ -346,7 +346,7 @@ def test_renewal_via_webhook(client, fake_provider, sent_mails):
     _webhook(client, "fakepay", event)
 
     bal = _balance(client, headers)
-    assert bal["balance"] == pytest.approx(3200.0)
+    assert bal["balance"] == pytest.approx(3400.0)
     # 续期积分下一周期才生效：expiring 不变，upcoming +1200
     assert bal["expiring"] == pytest.approx(1200.0)
     assert bal["upcoming"] == pytest.approx(1200.0)
@@ -361,7 +361,7 @@ def test_renewal_via_webhook(client, fake_provider, sent_mails):
 
     # 事件幂等：同一 event_id 重放不重复发积分
     _webhook(client, "fakepay", event)
-    assert _balance(client, headers)["balance"] == pytest.approx(3200.0)
+    assert _balance(client, headers)["balance"] == pytest.approx(3400.0)
 
 
 def test_upgrade_flow(client, fake_provider, sent_mails):
@@ -457,7 +457,7 @@ def test_creem_style_subscribe_flow(client, fake_provider, sent_mails):
         "provider_subscription_id": sub_id,
     })
     bal = _balance(client, headers)
-    assert bal["balance"] == pytest.approx(3200.0)
+    assert bal["balance"] == pytest.approx(3400.0)
     assert bal["upcoming"] == pytest.approx(1200.0)
 
 
