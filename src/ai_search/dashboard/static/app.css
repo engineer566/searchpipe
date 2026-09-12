@@ -253,11 +253,23 @@ tbody tr:hover { background: var(--surface-2); }
 .section-head { text-align: center; margin-bottom: 40px; }
 .section-head h2 { font-size: 28px; font-weight: 800; letter-spacing: -.02em; }
 .section-head p { color: var(--muted); margin: 10px auto 0; max-width: 560px; }
-.feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; }
+.feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; align-items: stretch; }
 .feature {
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 22px; box-shadow: var(--shadow-sm);
+  display: flex; flex-direction: column;
 }
+.feature p { flex: 1; }
+
+/* 落地页「代码 + 要点」双栏：左栏代码块，右栏要点卡，顶底对齐 */
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: stretch; }
+.split-col { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+.code-label { font-size: 13px; font-weight: 600; color: var(--muted); margin: 0 0 8px; }
+.feature-stack { display: flex; flex-direction: column; gap: 14px; }
+.section-note { text-align: center; color: var(--muted); font-size: 13px; margin-top: 26px; }
+.plans-head { margin-top: 48px; }
+.faq-narrow { max-width: 760px; margin: 0 auto; }
+.cta-band .cta-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 .feature .f-icon {
   width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
   background: var(--accent-soft); color: var(--accent); margin-bottom: 14px;
@@ -280,6 +292,8 @@ tbody tr:hover { background: var(--surface-2); }
 }
 .price-card.featured { border-color: var(--accent); box-shadow: var(--shadow-md); }
 .price-card .price { font-size: 34px; font-weight: 800; letter-spacing: -.02em; margin: 10px 0 2px; }
+.price-card .price .per { font-size: 14px; color: var(--faint); font-weight: 600; }
+.section-note.tight { margin-top: 18px; }
 .price-card ul { list-style: none; padding: 0; margin: 18px 0; color: var(--muted); font-size: 14px; }
 .price-card ul li { padding: 5px 0; }
 
@@ -420,6 +434,7 @@ p.card-sub { color: var(--muted); font-size: 13px; }
   .topbar a.active { color: var(--accent); font-weight: 600; }
   .main-inner { padding: 22px 16px 56px; }
   .grid2 { grid-template-columns: 1fr; }
+  .split { grid-template-columns: 1fr; gap: 22px; }
   .site-nav .nav-links { display: none; }
   .doc-layout { grid-template-columns: 1fr; }
   .doc-toc { position: static; }
