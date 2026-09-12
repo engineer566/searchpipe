@@ -80,6 +80,7 @@ class Settings(BaseSettings):
     currency: str = "USD"                # 全站结算货币
     credit_price_rate: str = "0.005"     # $0.005 = 1 积分（自定义充值汇率）
     max_recharge_usd: int = 500          # 单笔充值上限（美元）
+    min_recharge_usd: int = 1            # 单笔充值下限（美元）；Creem custom_price 硬下限=100 分
 
     # --- 商业化后端：内容审核（合规）---
     moderation_provider: str = "aliyun"

@@ -1,8 +1,10 @@
 """支付订单服务 —— 下单（充值/订阅/升级）+ webhook 事件驱动到账。
 
 下单规则：
-- recharge：固定充值档（plan_id）或自定义金额（amount_cents，0 < 金额 ≤
-  MAX_RECHARGE_USD，积分 = 金额 ÷ credit_price_rate，精确到 0.01）。充值积分永久有效。
+- recharge：固定充值档（plan_id）或自定义金额（amount_cents，
+  MIN_RECHARGE_USD ≤ 金额 ≤ MAX_RECHARGE_USD，积分 = 金额 ÷ credit_price_rate，
+  精确到 0.01）。下限由支付方硬约束决定：Creem custom_price 最小 100 分（$1）。
+  充值积分永久有效。
 - subscribe：仅无有效订阅的用户可下单订阅档；创建托管收银台会话，
   周期扣款由平台托管（原生自动续订），续期由 webhook 事件驱动。
 - upgrade：目标订阅档 level 必须高于当前档（付新档当前售价全额，不支持降级）。
@@ -109,6 +111,10 @@ def max_recharge_cents() -> int:
     return get_settings().max_recharge_usd * 100
 
 
+def min_recharge_cents() -> int:
+    return get_settings().min_recharge_usd * 100
+
+
 async def create_order(
     db: AsyncSession,
     user_id: uuid.UUID,
@@ -149,6 +155,10 @@ async def create_order(
         else:
             if amount_cents is None or amount_cents <= 0:
                 raise ValueError("Please enter a recharge amount")
+            if amount_cents < min_recharge_cents():
+                raise ValueError(
+                    f"Minimum recharge is ${get_settings().min_recharge_usd}"
+                )
             if amount_cents > max_recharge_cents():
                 raise ValueError(
                     f"Single recharge cannot exceed ${get_settings().max_recharge_usd}"

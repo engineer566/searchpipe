@@ -13,7 +13,7 @@
 searchpipe/
 ├── src/ai_search/
 │   ├── main.py               # FastAPI 入口：中间件/路由汇聚 + /search 依赖链 + /healthz + /agent-setup/SKILL.md + 订阅积分过期清理后台任务（279 行；/static no-cache 防旧缓存；私有路径 X-Robots-Tag noindex 中间件 + 浏览器 404 HTML 页；Swagger 在 /api-docs；/search 增加邮箱验证检查）
-│   ├── config.py             # pydantic-settings 全部配置（含 SMTP、OAuth(GitHub/Google)、MoR 支付(creem/dodo)、currency=USD、充值规则、审核、限流、抓取超时/并发、结果缓存 TTL、API Key 加密主密钥）（116 行）
+│   ├── config.py             # pydantic-settings 全部配置（含 SMTP、OAuth(GitHub/Google)、MoR 支付(creem/dodo)、currency=USD、充值规则(min/max)、审核、限流、抓取超时/并发、结果缓存 TTL、API Key 加密主密钥）（117 行）
 │   ├── schemas.py            # /search 请求/响应模型
 │   ├── mcp_server.py         # FastMCP streamable-http 子应用（/mcp，共用商业管线；鉴权支持 URL ?api_key= / Authorization 头 / 工具参数；增加邮箱验证检查）（225 行）
 │   ├── agent_setup.py        # /agent-setup/SKILL.md 生成（Tavily 式 URL 内嵌 Key 的 MCP 接入指南）+ mcp_url()/build_agent_prompt()（一句话配置，agent_setup.py:180/185）（199 行）
@@ -39,7 +39,7 @@ searchpipe/
 │   │   ├── session.py        # get_db 依赖
 │   │   └── models/           # user(含 OAuthAccount)/api_key(含 key_cipher 密文与 is_default 默认 Key 标记)/billing(Plan 含 provider_products JSONB 套餐↔product 映射/Order 含订阅字段)/credit(含 CreditLot 批次)/subscription(含 provider/provider_subscription_id/provider_customer_id)/usage/feedback_ticket/site_message(站内信，batch_id 聚合已读统计)
 │   ├── billing/              # 积分计费：批次化扣费/退款/赠送/过期清理（service 396 行；pipeline 89 行；subscription 订阅事件驱动到账/续订/升级 199 行）
-│   ├── payments/             # MoR 支付（Creem/Dodo 托管收银台，USD）：catalog/下单（托管收银台 URL，下单需邮箱已验证，未验证 403）/webhook 验签归一化事件/portal 客户门户/状态查询（routes 306 行；service 476 行；provider.py 归一化 PaymentEvent 接口 91 行；creem.py 201 行；dodo.py 232 行）
+│   ├── payments/             # MoR 支付（Creem/Dodo 托管收银台，USD）：catalog/下单（托管收银台 URL，下单需邮箱已验证，未验证 403；自定义充值按分计价、下限 $1）/webhook 验签归一化事件/portal 客户门户/状态查询（routes 315 行；service 486 行；provider.py 归一化 PaymentEvent 接口 91 行；creem.py 202 行；dodo.py 238 行）
 │   ├── api_keys/             # sp- 前缀 API Key CRUD + 默认 Key + 明文可查看（crypto.py 47 行 Fernet 加解密；service 207 行；routes 180 行，含 /reveal）
 │   ├── usage/                # 用量日志中间件 + 统计/导出（middleware 75 行）
 │   ├── rate_limit/           # Redis ZSET 滑动窗口限流（service 42 行）
@@ -92,10 +92,10 @@ searchpipe/
 | `billing/service.py` | 396 | 积分账户：批次化 grant/deduct/refund/sweep_expired（行锁；限时批次优先消耗；退款按 lot_usage 还原原批次） |
 | `billing/subscription.py` | 199 | 订阅事件驱动到账：fulfill_subscribe/fulfill_subscription_payment（Creem 首期 subscription.paid、Dodo 首期 subscription.active，含归属校验）/fulfill_renew（event_id 幂等）/fulfill_upgrade |
 | `payments/provider.py` | 91 | 归一化支付接口：`PaymentEvent`（one_time_paid/subscription_checkout/subscription_activated/subscription_paid/subscription_canceled/ignored）+ Provider 抽象（create_checkout/parse_webhook/customer_portal_url） |
-| `payments/creem.py` | 201 | Creem provider：POST {api_base}/v1/checkouts（x-api-key）；webhook creem-signature=HMAC-SHA256 hex；Customer Portal POST /v1/customers/billing-portal |
-| `payments/dodo.py` | 232 | Dodo provider：POST {api_base}/checkouts（Bearer）；webhook 为 Standard Webhooks 三头（webhook-id/webhook-timestamp/webhook-signature）HMAC-SHA256+base64；portal POST /customers/{id}/customer-portal/session |
-| `payments/routes.py` | 306 | /payments/*：catalog（USD 字段 price/original_price/credit_price_rate/max_recharge_amount/currency）/orders（托管收银台 URL）/webhooks/{provider}（raw body + 验签 400/重试 500）/portal/orders/{id}/packages |
-| `payments/service.py` | 476 | 下单编排 + webhook 事件分发（按 provider 名匹配激活单例，便于测试注入 FakeProvider）+ 幂等发积分 |
+| `payments/creem.py` | 202 | Creem provider：POST {api_base}/v1/checkouts（x-api-key）；自定义充值按分传 custom_price（硬下限 $1）；webhook creem-signature=HMAC-SHA256 hex；Customer Portal POST /v1/customers/billing-portal |
+| `payments/dodo.py` | 238 | Dodo provider：POST {api_base}/checkouts（Bearer）；自定义充值走 product_cart[].amount 动态定价（需 product 开 PWYW，未开则忽略）；webhook 为 Standard Webhooks 三头（webhook-id/webhook-timestamp/webhook-signature）HMAC-SHA256+base64；portal POST /customers/{id}/customer-portal/session |
+| `payments/routes.py` | 315 | /payments/*：catalog（USD 字段 price/original_price/credit_price_rate/max_recharge_amount/min_recharge_amount/currency）/orders（托管收银台 URL）/webhooks/{provider}（raw body + 验签 400/重试 500）/portal/orders/{id}/packages |
+| `payments/service.py` | 486 | 下单编排（自定义充值校验 min/max）+ webhook 事件分发（按 provider 名匹配激活单例，便于测试注入 FakeProvider）+ 幂等发积分 |
 | `usage/middleware.py` | 75 | BaseHTTPMiddleware 用量日志（注意 task group 约束） |
 | `rate_limit/service.py` | 42 | Redis ZSET 滑动窗口 |
 | `utils/cache.py` | 97 | RedisCache 懒连接单例（测试 rebind 见 conftest） |

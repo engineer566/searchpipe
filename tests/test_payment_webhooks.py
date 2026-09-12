@@ -1,7 +1,8 @@
-"""支付 webhook 验签与事件归一化单元测试 —— Creem / Dodo 真实签名算法。
+"""支付 provider 单元测试 —— Creem / Dodo 真实签名算法 + 收银台 payload。
 
 不碰 DB：直接构造 provider 实例（monkeypatch 模块级 get_settings 注入测试密钥），
-验 verify_webhook 的验签与事件映射。链路级测试在 test_payments.py。
+验 verify_webhook 的验签与事件映射，以及 create_checkout 真正发出的 JSON
+（httpx.AsyncClient 被替换为捕获式假客户端）。链路级测试在 test_payments.py。
 """
 
 import base64
@@ -263,3 +264,113 @@ def test_dodo_missing_headers_rejected(monkeypatch):
     _, raw = _dodo_signed({"type": "payment.succeeded", "data": {}})
     with pytest.raises(WebhookVerificationError):
         p.verify_webhook(headers={}, raw_body=raw)
+
+
+# ---------- 收银台 payload（自定义充值按分计价）----------
+#
+# 历史 bug：自定义充值曾用「$1 product × units=美元数」，provider 里
+# `amount_cents % 100 != 0` 会把 $3.50 这类金额直接拒掉（路由回 400），
+# 而前端输入框允许 step=0.01。现改为按分传价（Creem custom_price /
+# Dodo product_cart[].amount）。这些测试直接断言发出的 JSON。
+
+
+class _FakeCheckoutResponse:
+    status_code = 200
+    text = ""
+
+    def json(self):
+        return {"checkout_url": "https://checkout.example/ch_test"}
+
+
+class _FakeAsyncClient:
+    """捕获 create_checkout 发出的请求，不触网。"""
+
+    def __init__(self, sink: dict):
+        self._sink = sink
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+    async def post(self, url, json=None, headers=None):
+        self._sink.update({"url": url, "json": json, "headers": headers})
+        return _FakeCheckoutResponse()
+
+
+def _capture_request(monkeypatch, module, sink: dict) -> None:
+    monkeypatch.setattr(
+        module.httpx, "AsyncClient", lambda **kwargs: _FakeAsyncClient(sink)
+    )
+
+
+async def test_creem_custom_amount_uses_custom_price(monkeypatch):
+    """$3.50 必须按分传 custom_price，且不再带 units。"""
+    from ai_search.payments import creem
+
+    p = _creem_provider(monkeypatch)
+    sink: dict = {}
+    _capture_request(monkeypatch, creem, sink)
+
+    url = await p.create_checkout(
+        order_no="ORDCENTS1",
+        kind="recharge",
+        amount_cents=350,
+        subject="Custom recharge",
+        customer_email="a@b.c",
+        success_url="https://searchpipe.tech/dashboard/billing",
+    )
+
+    assert url == "https://checkout.example/ch_test"
+    assert sink["json"]["custom_price"] == 350
+    assert "units" not in sink["json"]
+    assert sink["json"]["product_id"] == "prod_credit"
+    assert sink["json"]["request_id"] == "ORDCENTS1"
+    assert sink["headers"]["x-api-key"] == "ck_test"
+
+
+async def test_creem_custom_amount_below_one_dollar_rejected(monkeypatch):
+    """Creem custom_price 硬下限 100 分（$1）：本地拦下，不打 API。"""
+    p = _creem_provider(monkeypatch)
+    with pytest.raises(ValueError):
+        await p.create_checkout(
+            order_no="ORDCENTS2", kind="recharge", amount_cents=50, subject="Custom recharge"
+        )
+
+
+async def test_creem_plan_checkout_uses_mapped_product(monkeypatch):
+    """固定档/订阅档走 provider_products 映射，不带 custom_price / units。"""
+    from ai_search.payments import creem
+
+    p = _creem_provider(monkeypatch)
+    sink: dict = {}
+    _capture_request(monkeypatch, creem, sink)
+    plan = SimpleNamespace(name="Starter", provider_products={"creem": "prod_starter"})
+
+    await p.create_checkout(
+        order_no="ORDPLAN1", kind="subscribe", amount_cents=499, subject="s", plan=plan
+    )
+
+    assert sink["json"]["product_id"] == "prod_starter"
+    assert "custom_price" not in sink["json"]
+    assert "units" not in sink["json"]
+
+
+async def test_dodo_custom_amount_uses_cart_amount(monkeypatch):
+    """Dodo 动态定价：product_cart[].amount 按分（需 product 开启 PWYW）。"""
+    from ai_search.payments import dodo
+
+    p = _dodo_provider(monkeypatch)
+    sink: dict = {}
+    _capture_request(monkeypatch, dodo, sink)
+
+    await p.create_checkout(
+        order_no="ORDDODO1", kind="recharge", amount_cents=350, subject="Custom recharge"
+    )
+
+    item = sink["json"]["product_cart"][0]
+    assert item["product_id"] == "pdt_credit"
+    assert item["quantity"] == 1
+    assert item["amount"] == 350
+    assert sink["headers"]["Authorization"] == "Bearer dk_test"

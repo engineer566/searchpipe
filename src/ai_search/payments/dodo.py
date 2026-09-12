@@ -78,17 +78,23 @@ class DodoProvider(PaymentProvider):
                 raise RuntimeError(
                     f"Plan {plan.name} has no Dodo product mapping (provider_products)"
                 )
-            quantity = 1
+            cart_item = {"product_id": product_id, "quantity": 1}
         else:
+            # 自定义金额充值：Dodo 动态定价 product_cart[].amount（按分）。
+            # ⚠️ 前置条件：该 product 后台必须开启 Pay What You Want 且
+            # min/max 覆盖本区间；未开启时 Dodo 会忽略 amount 按固定价收款。
             if not self.credit_product_id:
                 raise RuntimeError("Dodo credit product (DODO_CREDIT_PRODUCT_ID) not configured")
-            if amount_cents % 100 != 0:
-                raise ValueError("Custom recharge amount must be a whole number of dollars")
-            product_id = self.credit_product_id
-            quantity = amount_cents // 100
+            if amount_cents < 100:
+                raise ValueError("Custom recharge amount must be at least $1")
+            cart_item = {
+                "product_id": self.credit_product_id,
+                "quantity": 1,
+                "amount": amount_cents,
+            }
 
         payload: dict = {
-            "product_cart": [{"product_id": product_id, "quantity": quantity}],
+            "product_cart": [cart_item],
             "metadata": {"order_no": order_no, "kind": kind},
         }
         if success_url:

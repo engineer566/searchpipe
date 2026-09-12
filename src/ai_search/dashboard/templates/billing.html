@@ -47,14 +47,14 @@
 
 <div class="card">
   <h2>Credit recharge</h2>
-  <p class="card-sub">Fixed tiers give you bonus credits; or enter a custom amount (up to $500 per transaction), converted strictly at $0.005 = 1 credit. Recharged credits never expire.</p>
+  <p class="card-sub">Fixed tiers give you bonus credits; or enter a custom amount ($1 – $500 per transaction), converted strictly at $0.005 = 1 credit. Recharged credits never expire.</p>
   <div class="pricing-grid" id="plans" style="max-width:none;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">
     <div class="empty" style="grid-column:1/-1">Loading…</div>
   </div>
   <div class="row mt" style="align-items:flex-end;flex-wrap:wrap">
     <div>
       <label class="stat-label" for="custom-amount">Custom amount (USD)</label><br>
-      <input id="custom-amount" type="number" min="0.01" max="500" step="0.01" placeholder="0.01 ~ 500.00"
+      <input id="custom-amount" type="number" min="1" max="500" step="0.01" placeholder="1.00 ~ 500.00"
              style="padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--txt);width:180px">
     </div>
     <div class="muted" id="custom-preview" style="padding-bottom:10px">Enter an amount to see the credits you'll get</div>
@@ -113,7 +113,7 @@
 {% block script %}
 <script>
 var CATALOG=null, PENDING=null;
-var RATE=0.005, MAX_AMOUNT=500, CURRENCY='$';
+var RATE=0.005, MAX_AMOUNT=500, MIN_AMOUNT=1, CURRENCY='$';
 var CHANNEL_NAMES={card:'Card',alipay:'Alipay',wechat:'WeChat Pay'};
 
 // Important notices shown in the pre-checkout confirmation modal
@@ -143,6 +143,7 @@ document.addEventListener('DOMContentLoaded',(async()=>{
     CATALOG=await AIS.api('/payments/catalog');
     RATE=parseFloat(CATALOG.credit_price_rate);
     MAX_AMOUNT=CATALOG.max_recharge_amount;
+    MIN_AMOUNT=CATALOG.min_recharge_amount;
     CURRENCY=(CATALOG.currency==='USD')?'$':(CATALOG.currency||'$');
     renderPayChannels();
     renderSubPlans();
@@ -231,6 +232,7 @@ var amountInput=document.getElementById('custom-amount');
 amountInput.addEventListener('input',function(){
   var v=parseFloat(amountInput.value), preview=document.getElementById('custom-preview'), btn=document.getElementById('custom-buy');
   if(!v||v<=0){ preview.textContent='Enter an amount to see the credits you\'ll get'; btn.disabled=true; return; }
+  if(v<MIN_AMOUNT){ preview.textContent='Minimum is '+CURRENCY+MIN_AMOUNT.toFixed(2); btn.disabled=true; return; }
   if(v>MAX_AMOUNT){ preview.textContent='Per-transaction limit is '+CURRENCY+MAX_AMOUNT; btn.disabled=true; return; }
   preview.innerHTML='You\'ll get <strong class="text-ok">'+(v/RATE).toFixed(2)+'</strong> credits ('+CURRENCY+v.toFixed(2)+' ÷ '+CURRENCY+RATE+'/credit)';
   btn.disabled=false;
@@ -238,7 +240,7 @@ amountInput.addEventListener('input',function(){
 
 function buyCustom(){
   var v=parseFloat(amountInput.value);
-  if(!v||v<=0||v>MAX_AMOUNT) return;
+  if(!v||v<MIN_AMOUNT||v>MAX_AMOUNT) return;
   var credits=(v/RATE).toFixed(2);
   openConfirm('recharge',null,'Custom recharge',v,credits,Math.round(v*100));
 }

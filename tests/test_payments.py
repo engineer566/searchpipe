@@ -161,6 +161,7 @@ def test_catalog_public(client, fake_provider):
         assert p["price"] < p["original_price"]
     assert data["credit_price_rate"] == "0.005"
     assert data["max_recharge_amount"] == 500
+    assert data["min_recharge_amount"] == 1
     assert data["currency"] == "USD"
     assert set(data["pay_channels"]) == {"card", "paypal"}
     assert data["subscription"] is None  # 未登录
@@ -200,6 +201,15 @@ def test_recharge_custom_amount(client, fake_provider, sent_mails):
     assert _balance(client, headers)["balance"] == pytest.approx(2000.0)
 
 
+def test_recharge_custom_amount_cents(client, fake_provider, sent_mails):
+    """自定义充值支持分位金额（$3.50 → 700 积分）。"""
+    headers = _register(client, sent_mails)
+    order = _create_order(client, headers, kind="recharge", amount_cents=350)
+    assert order["credits"] == "700.00"  # $3.50 ÷ $0.005
+    _pay(client, fake_provider, order)
+    assert _balance(client, headers)["balance"] == pytest.approx(1700.0)
+
+
 def test_recharge_custom_validation(client, fake_provider, sent_mails):
     headers = _register(client, sent_mails)
     # 未给金额
@@ -210,6 +220,12 @@ def test_recharge_custom_validation(client, fake_provider, sent_mails):
     assert client.post(
         "/payments/orders", json={"kind": "recharge", "amount_cents": 0}, headers=headers
     ).status_code == 400
+    # 低于下限 $1（Creem custom_price 硬下限）
+    resp = client.post(
+        "/payments/orders", json={"kind": "recharge", "amount_cents": 50}, headers=headers
+    )
+    assert resp.status_code == 400
+    assert "Minimum" in resp.json()["detail"]
     # 超过上限 $500
     resp = client.post(
         "/payments/orders", json={"kind": "recharge", "amount_cents": 50001}, headers=headers

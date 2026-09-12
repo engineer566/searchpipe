@@ -98,6 +98,7 @@ class CatalogResponse(BaseModel):
     subscription_plans: list[PlanInfo]
     credit_price_rate: str       # $0.005 = 1 积分
     max_recharge_amount: int     # 自定义充值上限（美元）
+    min_recharge_amount: int     # 自定义充值下限（美元）
     currency: str                # 全站结算货币，如 "USD"
     pay_channels: list[str]      # 已声明渠道，如 ["card", "paypal"]
     subscription: SubscriptionInfo | None  # 当前有效订阅（未登录/无订阅为 None）
@@ -178,6 +179,7 @@ async def catalog(
         subscription_plans=subs,
         credit_price_rate=s.credit_price_rate,
         max_recharge_amount=s.max_recharge_usd,
+        min_recharge_amount=s.min_recharge_usd,
         currency=s.currency,
         pay_channels=channels,
         subscription=subscription,

@@ -24,3 +24,110 @@
 - **测试**：`.venv/bin/python -m pytest tests/ -q` 文档改动后复跑确认仍全绿。
 
 【出海版生产部署】应用户要求（Creem 申请需提交网站审核），overseas 合入 main 并部署生产：rsync → DB 备份 → .env 切 PAYMENT_PROVIDER=creem → 构建 → 起栈（自动迁移 g1a2b3c4d5e6）。外网验证：公开页全英文 200、catalog USD、日志干净。详见 docs/memory/searchpipe-prod-server.md。
+
+---
+
+# Creem 商家审核通过：生产收款开通 + 自定义充值粒度假修复
+
+## 背景
+
+Creem 商家申请审核通过，进入生产收款开通。用户提供 live API Key，要求先用 API 把产品建完，再修「自定义充值粒度」bug。
+
+## 一、Creem 后台（本次全部经 live API 操作，未走后台 UI）
+
+- 确认既有产品 `Credits (Pay-as-you-go)` = `prod_29JsUAMP9ZE6tYSr0HLRIK`（100 分 = $1、USD、onetime/once、active、mode=prod），正是代码要的按量充值产品；该 Key 打 live 成功、打 test-api 返回 401 → **是生产 Key**，与 config 默认 `CREEM_API_BASE=https://api.creem.io` 一致。
+- 新建 6 个产品（价格严格对齐迁移 `g1a2b3c4d5e6` 种子；Starter 描述按 `h2b3c4d5e6f7` 的 **1200** 积分写，不是旧文档里的 1000）：
+
+| 用途 | Product ID | 名称 | 价格 | 类型 |
+|---|---|---|---|---|
+| 自定义充值 | `prod_29JsUAMP9ZE6tYSr0HLRIK` | Credits (Pay-as-you-go) | $1.00 | onetime |
+| 充值档 | `prod_1tdF1iRHpblpRzGYi52hLx` | Recharge $5 | $5.00 | onetime |
+| 充值档 | `prod_7XFQxetCdyymxePpiduAvf` | Recharge $10 | $10.00 | onetime |
+| 充值档 | `prod_4GZRlvxgs2pD4HVuh5axsv` | Recharge $20 | $20.00 | onetime |
+| 订阅 | `prod_f9w26mFHcphDUBEf65AYr` | Starter | $4.99 | recurring/monthly |
+| 订阅 | `prod_2Z2Rc1YT8TiNvDbDNu5uAz` | Pro | $9.99 | recurring/monthly |
+| 订阅 | `prod_3OInC8GbchcOipNy6WRUuD` | Max | $19.99 | recurring/monthly |
+
+- **端到端验证**：复刻 `payments/creem.py` 的 payload，分别对「固定充值档」与「订阅档」真实建单 → 各返回 200 + 可用收银台 URL，证明 `plan.provider_products` 映射链路可用（非纸面推断）。
+- **API 做不到、只能后台 UI 的两件事**：① webhook 端点（`/v1/webhooks` 返回 404，官方 API Reference 无 webhook 一节）；② Abandoned Cart Recovery（见坑 2）——用户已确认要开启。
+
+## 二、`plans.provider_products` 回填（部署时执行，**尚未执行**）
+
+```sql
+UPDATE plans SET provider_products = jsonb_set(provider_products, '{creem}', to_jsonb(v.pid))
+FROM (VALUES
+  ('33333333-0000-0000-0000-000000000001','prod_1tdF1iRHpblpRzGYi52hLx'),
+  ('33333333-0000-0000-0000-000000000002','prod_7XFQxetCdyymxePpiduAvf'),
+  ('33333333-0000-0000-0000-000000000003','prod_4GZRlvxgs2pD4HVuh5axsv'),
+  ('44444444-0000-0000-0000-000000000001','prod_f9w26mFHcphDUBEf65AYr'),
+  ('44444444-0000-0000-0000-000000000002','prod_2Z2Rc1YT8TiNvDbDNu5uAz'),
+  ('44444444-0000-0000-0000-000000000003','prod_3OInC8GbchcOipNy6WRUuD')
+) AS v(id, pid) WHERE plans.id = v.id::uuid;
+```
+
+## 三、修复：自定义充值分位金额直接 400（真 bug）
+
+- **现象/根因**：`billing.html` 自定义金额输入框是 `min=0.01 step=0.01`，但 `payments/creem.py` 与 `payments/dodo.py` 都要求 `amount_cents % 100 == 0`（整美元），非整数美元抛 ValueError → `payments/routes.py` 转 400。**用户输入 $3.50 必定失败**，而页面文案承诺「strictly at $0.005 = 1 credit」。
+- **为何测试测不出**：`tests/test_payments.py` 的自定义充值只用 500/100（整美元），且链路测试走 FakeProvider、不经过真实 provider 的 payload 构造。
+- **修复（改为按分计价）**：
+  - `creem.py`：自定义金额去掉 units，改传 `custom_price=amount_cents`（Creem 支持一次性产品按分覆盖单价）；本地拦 <100 分。
+  - `dodo.py`：改传 `product_cart[0].amount=amount_cents`（Dodo 动态定价）。⚠️ 前置条件：该 product 后台必须开启 Pay What You Want，否则 Dodo **忽略 amount 按固定价收款**。
+  - `config.py`：新增 `min_recharge_usd=1`（Creem custom_price 硬下限 $1）；`.env.example` 同步。
+  - `service.py`：新增 `min_recharge_cents()` + `create_order` 下限校验（provider 无关，两家一致）。
+  - `routes.py`：catalog 新增 `min_recharge_amount` 字段（与 max 对称，前端不再硬编码）。
+  - `billing.html`：输入框 `min=1`/placeholder `1.00 ~ 500.00`、文案改「$1 – $500」、JS 加 `MIN_AMOUNT` 下限分支。
+- **对 live Creem 的实测依据**：`custom_price=350, units=1` → 200 且回显 `custom_price:350`；`custom_price=50` → 400 `custom_price must not be less than 100`。
+- **测试**：`tests/test_payment_webhooks.py` 新增 4 个 provider payload 单测（捕获 httpx 实际发出的 JSON：Creem 传 custom_price 且无 units、<$1 本地拒绝、订阅档走映射不带 custom_price、Dodo cart amount）；`tests/test_payments.py` 新增分位金额链路测试 + 下限校验 + catalog min 断言。
+
+## 四、坑（重要）
+
+1. **Creem 建一次性产品不能传 `billing_period="once"`** —— 会被判为 recurring 并报 400「billing_period required for payment_type of recurring」。一次性产品必须**省略**该字段（读回来才是 `once`）。本次 3 个充值档首轮全因此失败。
+2. `abandoned_cart_recovery_enabled` 只在 `POST /v1/products`（创建）可用；`PATCH /v1/products/{id}` 传该字段报「property ... should not exist」→ 只能在 Creem 后台 UI 开。
+3. `custom_price` 硬下限 100 分（$1）；product price 下限同为 100 分（只允许 0=免费 或 ≥100）→ 做不出 $0.01 产品，**$1 是平台级下限**。
+4. webhook signing secret 与 API Key 都无法经 API 读取（根本没有 webhook 接口），只能后台复制。
+5. live Key 打 `test-api.creem.io` 返回 401 → 无法用测试环境验证生产 Key。
+
+## 五、分支流程异常（需项目负责人决策）
+
+- 当前工作副本在 `overseas-sync` = `origin/main` = `4b3f4d1`（生产跟随 main）；`origin/dev` 停在 `a4394c6`（出海前），且 **dev 是 main 的祖先**（`merge-base --is-ancestor` 通过）→ 出海工作只进了 main/origin/overseas，dev 从未合并。
+- **后果**：AGENTS.md 与 memory 里「dev 开发 → main 生产 / 测试服跟随 dev」的流程在出海后已失效——把提交放 dev 再 `git merge dev` 到 main 是 no-op（Already up to date），改动到不了生产。
+- 本次修复按「从 main 拉分支」处理：新分支 `fix/custom-recharge-granularity`（基于 `4b3f4d1`）。
+
+## 六、验证状态与待办
+
+- **本次未跑全量 pytest**：当前 Windows 工作副本无 `.venv`、无 docker（三个容器起不来）、无 WSL，Python 仅 3.10（项目要求 ≥3.11）→ 全量套件必须在 Linux 开发机执行：先 `docker start ai-search-postgres ai-search-redis ai-search-searxng`，再 `.venv/bin/python -m pytest tests/ -q`。
+- 待办：① 生产 `.env` 补 `PAYMENT_PROVIDER=creem` / `CREEM_API_KEY` / `CREEM_WEBHOOK_SECRET` / `CREEM_CREDIT_PRODUCT_ID`；② 执行上面 `provider_products` 回填 SQL；③ 重启并做真实小额下单验收（充值 / 订阅首期 / 续期 / portal）；④ Creem 后台开 webhook + Abandoned Cart Recovery；⑤ `tax_mode` 目前 7 个产品统一 `inclusive`，是否改 `exclusive` 未决策；⑥ 全量 pytest 基线（文档现记 203+5）与 `docs/REGRESSION_CHECKLIST.md` 支付节需随本次新增测试与 $1 下限同步更新。
+- 验证期间在 Creem 建了 4 笔 pending checkout 会话（$5 固定档 / Starter 订阅 / $3.50 分位 / $0.50 被拒），均 pending 不扣款、会自动过期；预填邮箱 `verify-check@searchpipe.tech` 仅用于会话占位。
+- **安全**：live API Key 与 webhook signing secret 在对话中明文传递过，建议配置完成后在 Creem 后台轮换；按纪律未把任何密钥值写入仓库文件。
+
+## 七、生产配置与验收（已执行）
+
+- **备份**：`/opt/searchpipe/backup-pre-creem-20260912-172841.sql`（README 纪律：改 DB 前先 pg_dump）。
+- **`.env` upsert 5 项**（值不回显）：`PAYMENT_PROVIDER=creem`（原本已有）、`CREEM_API_KEY`、`CREEM_WEBHOOK_SECRET`、`CREEM_API_BASE=https://api.creem.io`、`CREEM_CREDIT_PRODUCT_ID=prod_29JsUAMP9ZE6tYSr0HLRIK`。**注意：原来 `.env` 里根本没有 `CREEM_CREDIT_PRODUCT_ID` 这一项**，缺它自定义充值必然报「credit product not configured」。
+- **DB**：`UPDATE 6` 回填 `plans.provider_products`，6 个 USD 档全部写入 `{"creem": "prod_..."}`。
+- **容器**：`docker compose -f docker-compose.prod.yml up -d --force-recreate app`（`env_file: .env` 变更必须重建才生效）。
+- **迁移状态**：已在 `h2b3c4d5e6f7`，DB 内 Starter=1200，与 seo.py 常量一致。
+- **验收（真实 HTTP，全程走 127.0.0.1:8001）**：
+  - healthz 200；catalog 返回 USD + `card`/`paypal` + 6 档齐全
+  - 固定充值档 $5 → 真实 Creem 收银台 URL（`prod_1tdF1iRHpblpRzGYi52hLx`）✅
+  - 订阅 Starter → 真实 URL（`prod_f9w26mFHcphDUBEf65AYr`），credits 1200 ✅
+  - 自定义 $5 → 真实 URL（`prod_29JsUAMP9ZE6tYSr0HLRIK`）✅
+  - 自定义 $3.50 → **线上复现 400**（「修复未部署」，符合预期）
+  - webhook 坏签名 → 400 `Invalid creem-signature`（路由在 + 验签生效）✅
+  - 3 笔 pending 订单落库（provider=creem）✅
+  - 测试用户已定向清理（users 仅剩真实用户 `ferriswym@163.com`，`email_verified=t`）✅
+
+## 八、验收中发现的严重问题：生产 SMTP 认证失败（**上线阻塞**）
+
+- **现象**：注册发信报 `smtplib.SMTPAuthenticationError: (526, b'Authentication failure[0]')`；在 app 容器内直接 `smtplib.SMTP_SSL().login()` 复现。
+- **隔离结论**：**测试服同套凭证同样 526** → 是 `smtp.mxhichina.com` **账号级**问题，不是生产机 IP/网络问题。
+- **配置（非敏感项）**：`SMTP_HOST=smtp.mxhichina.com`、`SMTP_PORT=465`、`SMTP_USE_TLS=true`、`SMTP_FROM=support@searchpipe.tech`、密码长度 22。
+- **影响**：新用户收不到验证邮件 → 卡在「邮箱未验证」门禁 → **无法下单**（`POST /payments/orders` 403）；密码重置同样不可用。**Creem 已开通但新客买不了。**
+- **起始时间无法判断**：本次 `--force-recreate` 重建容器后旧日志已丢，当前容器内 4 次失败全部来自本次验收。
+- **待办**：阿里企业邮箱后台重新生成「客户端专用密码」→ 更新**两台**服务器 `.env` 的 `SMTP_PASSWORD` → 重启 → 用真实邮箱注册实测验证。
+
+## 九、沙箱无法推远程（分支收口需人工执行）
+
+- `origin = git@github.com:engineer566/searchpipe.git`（SSH）。本机受沙箱限制：`git ls-remote` 报 `ssh.exe: fatal error - couldn't create signal pipe, Win32 error 5`（命名管道边界）→ **fetch/push 均不可用**，分支收口必须在正常终端执行。
+- 分支现状：`origin/dev` 落后 `origin/main` **14 个提交**，`main` 落后 `dev` **0 个** → dev 是 main 的严格祖先，**快进即可无损同步**（`git branch -f dev main && git push origin dev`）。
+- 待决策：A) 把 dev 快进到 main 恢复「dev 开发 → main 生产」，但需同时把**测试服 .env 改成出海配置**（否则测试服变成「代码出海、配置境内」的混合体）；B) 弃用 dev，改为「功能分支 → main」，并同步改 AGENTS.md / memory 的流程描述。

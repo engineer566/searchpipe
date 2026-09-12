@@ -3,7 +3,7 @@
 文档：https://docs.creem.io
 - 下单：POST {api_base}/v1/checkouts（x-api-key 头）
   body: product_id + request_id(业务订单号) + metadata + customer.email + success_url
-  自定义金额充值：用配置的「$1/单位」按量 product，units=美元数（总价=单价×units）
+  自定义金额充值：用配置的一次性 product + custom_price 按分覆盖单价（官方下限 $1）
 - 响应：{"id": "ch_...", "checkout_url": "https://checkout.creem.io/ch_..."}
 - webhook：creem-signature 头 = HMAC-SHA256(raw_body, webhook_secret) hex
   事件：checkout.completed（含 request_id/order/subscription）
@@ -66,29 +66,30 @@ class CreemProvider(PaymentProvider):
     ) -> str:
         if not self.api_key:
             raise RuntimeError("Creem API key not configured")
+        custom_price: int | None = None
         if plan is not None:
             product_id = (plan.provider_products or {}).get(self.name, "")
             if not product_id:
                 raise RuntimeError(
                     f"Plan {plan.name} has no Creem product mapping (provider_products)"
                 )
-            units = None
         else:
-            # 自定义金额充值：$1/单位 product × units=美元数
+            # 自定义金额充值：一次性 product + custom_price 按分覆盖单价，
+            # 支持任意分位金额；Creem 硬下限 custom_price >= 100（$1）。
             if not self.credit_product_id:
                 raise RuntimeError("Creem credit product (CREEM_CREDIT_PRODUCT_ID) not configured")
-            if amount_cents % 100 != 0:
-                raise ValueError("Custom recharge amount must be a whole number of dollars")
+            if amount_cents < 100:
+                raise ValueError("Custom recharge amount must be at least $1")
             product_id = self.credit_product_id
-            units = amount_cents // 100
+            custom_price = amount_cents
 
         payload: dict = {
             "product_id": product_id,
             "request_id": order_no,
             "metadata": {"order_no": order_no, "kind": kind},
         }
-        if units:
-            payload["units"] = units
+        if custom_price is not None:
+            payload["custom_price"] = custom_price
         if success_url:
             payload["success_url"] = success_url
         if customer_email:
