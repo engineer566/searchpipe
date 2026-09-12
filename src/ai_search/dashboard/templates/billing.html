@@ -270,7 +270,13 @@ async function confirmOrder(){
     closeConfirm();
     document.getElementById('pending-card').style.display='block';
     document.getElementById('pending-order').innerHTML='<div class="msg msg-ok" style="margin-top:10px">Order created ('+CURRENCY+(d.amount_cents/100).toFixed(2)+' / '+d.credits+' credits, '+(CHANNEL_NAMES[d.pay_channel]||d.pay_channel)+') — <a href="'+d.pay_url+'" target="_blank" rel="noopener">proceed to payment →</a></div>';
+    // Order created. Go straight to the hosted checkout — the button says
+    // "Proceed to payment", so it must actually proceed. Same-tab navigation
+    // (window.open after await would be popup-blocked). The pending card and
+    // polling stay as a fallback if navigation is blocked or the user returns.
+    try{ document.getElementById('pending-card').scrollIntoView({block:'center'}); }catch(e2){}
     pollOrder(d.order_id);
+    window.location.assign(d.pay_url);
   }catch(e){ alert(e.message); }
   finally{ btn.disabled=false; }
 }
